@@ -45,7 +45,6 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
     long cpuTimeMsDelta; // delta of cpuTime since last update
     int age = 1;
   }
-  
   private String taskProcessId = null;
   private long cpuTimeMs = UNAVAILABLE;
   private Map<String, ProcessInfo> processTree =
@@ -83,7 +82,7 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
    * @param pid Identifier of the job object.
    */
   public WindowsBasedProcessTree(final String pid) {
-    this(pid, new SystemClock());
+    this(pid, SystemClock.getInstance());
   }
 
   /**
@@ -144,7 +143,7 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
     }
     return allProcs;
   }
-  
+
   @Override
   public void updateProcessTree() {
     if(taskProcessId != null) {
@@ -214,12 +213,6 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
     }
     return total;
   }
-  
-  @Override
-  @SuppressWarnings("deprecation")
-  public long getCumulativeVmem(int olderThanAge) {
-    return getVirtualMemorySize(olderThanAge);
-  }
 
   @Override
   public long getRssMemorySize(int olderThanAge) {
@@ -235,12 +228,6 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
       }
     }
     return total;
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public long getCumulativeRssmem(int olderThanAge) {
-    return getRssMemorySize(olderThanAge);
   }
 
   @Override
@@ -269,6 +256,14 @@ public class WindowsBasedProcessTree extends ResourceCalculatorProcessTree {
     return BigInteger.valueOf(totalMs);
   }
 
+  /**
+   * Get the CPU usage by all the processes in the process-tree in Windows.
+   * Note: UNAVAILABLE will be returned in case when CPU usage is not
+   * available. It is NOT advised to return any other error code.
+   *
+   * @return percentage CPU usage since the process-tree was created,
+   * {@link #UNAVAILABLE} if CPU usage cannot be calculated or not available.
+   */
   @Override
   public float getCpuUsagePercent() {
     BigInteger processTotalMs = getTotalProcessMs();

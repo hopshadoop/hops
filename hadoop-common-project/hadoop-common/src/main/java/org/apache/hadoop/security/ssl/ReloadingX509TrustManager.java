@@ -18,15 +18,12 @@
 
 package org.apache.hadoop.security.ssl;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.util.BackOff;
-import org.apache.hadoop.util.ExponentialBackOff;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
@@ -42,6 +39,9 @@ import java.security.cert.X509Certificate;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.util.BackOff;
+import org.apache.hadoop.util.ExponentialBackOff;
 
 /**
  * A {@link TrustManager} implementation that reloads its configuration when
@@ -53,7 +53,8 @@ public final class ReloadingX509TrustManager
   implements X509TrustManager, Runnable {
 
   @VisibleForTesting
-  static final Log LOG = LogFactory.getLog(ReloadingX509TrustManager.class);
+  static final Logger LOG =
+      LoggerFactory.getLogger(ReloadingX509TrustManager.class);
   @VisibleForTesting
   static final String RELOAD_ERROR_MESSAGE =
       "Could not load truststore (keep using existing one) : ";
@@ -69,7 +70,7 @@ public final class ReloadingX509TrustManager
   private WeakReference<ScheduledFuture> reloader = null;
   private final BackOff backOff;
   private long backOffTimeout = 0L;
-  
+
   private int numberOfFailures = 0;
   
   /**
@@ -86,7 +87,8 @@ public final class ReloadingX509TrustManager
    * @throws GeneralSecurityException thrown if the truststore could not be
    * initialized due to a security error.
    */
-  public ReloadingX509TrustManager(String type, String location, String password, long reloadInterval)
+  public ReloadingX509TrustManager(String type, String location,
+                                   String password, long reloadInterval)
     throws IOException, GeneralSecurityException {
     this(type, location, password, null, reloadInterval);
   }
@@ -211,7 +213,8 @@ public final class ReloadingX509TrustManager
     return reload;
   }
 
-  X509TrustManager loadTrustManager() throws IOException, GeneralSecurityException {
+  X509TrustManager loadTrustManager()
+  throws IOException, GeneralSecurityException {
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     String tstorePassword;
@@ -222,7 +225,7 @@ public final class ReloadingX509TrustManager
     }
     FileInputStream in = new FileInputStream(file);
     try {
-      ks.load(in, tstorePassword.toCharArray());
+      ks.load(in, (tstorePassword == null) ? null : tstorePassword.toCharArray());
       lastLoaded = file.lastModified();
       LOG.debug("Loaded truststore '" + file + "'");
     } finally {
@@ -256,8 +259,8 @@ public final class ReloadingX509TrustManager
           backOff.reset();
           numberOfFailures = 0;
           backOffTimeout = 0L;
-        }
-      } catch (Exception ex) {
+      }
+        } catch (Exception ex) {
         backOffTimeout = backOff.getBackOffInMillis();
         numberOfFailures++;
         if (backOffTimeout != -1) {

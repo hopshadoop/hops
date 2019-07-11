@@ -20,13 +20,13 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is an MR2 replacement for older MR1 MiniMRCluster, that was used
@@ -45,7 +45,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class MiniMRCluster {
-  private static final Log LOG = LogFactory.getLog(MiniMRCluster.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MiniMRCluster.class);
 
   private MiniMRClientCluster mrClientCluster;
 
@@ -98,7 +99,7 @@ public class MiniMRCluster {
     try {
       jobConf = new JobConf(mrClientCluster.getConfig());
     } catch (IOException e) {
-      LOG.error(e);
+      LOG.error(e.getMessage());
     }
     return jobConf;
   }
@@ -108,7 +109,7 @@ public class MiniMRCluster {
     try {
       jobConf = new JobConf(mrClientCluster.getConfig());
     } catch (IOException e) {
-      LOG.error(e);
+      LOG.error(e.getMessage());
     }
     return jobConf;
   }
@@ -132,7 +133,7 @@ public class MiniMRCluster {
       throws IOException {
     this(0, 0, numTaskTrackers, namenode, numDir);
   }
-  
+
   public MiniMRCluster(int numTaskTrackers, String namenode, int numDir, 
           boolean formatDB)
       throws IOException {
@@ -151,7 +152,7 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, null);
   }
-    
+
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts) throws IOException {
@@ -165,7 +166,7 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, hosts, ugi, null);
   }
-    
+
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts, UserGroupInformation ugi, JobConf conf)
@@ -173,7 +174,7 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, hosts, ugi, conf, 0);
   }
-    
+
   public MiniMRCluster(int jobTrackerPort, int taskTrackerPort,
       int numTaskTrackers, String namenode, int numDir, String[] racks,
       String[] hosts, UserGroupInformation ugi, JobConf conf,
@@ -181,7 +182,7 @@ public class MiniMRCluster {
     this(jobTrackerPort, taskTrackerPort, numTaskTrackers, namenode, numDir,
         racks, hosts, ugi, conf, numTrackerToExclude, new Clock(), true);
   }
-  
+
   public MiniMRCluster(int numTaskTrackers, String namenode, int numDir,
       String[] racks, String[] hosts, JobConf conf, boolean formatDB) throws IOException {
     this(0, 0, numTaskTrackers, namenode, numDir, racks, hosts, null, conf, formatDB);
@@ -278,7 +279,7 @@ public class MiniMRCluster {
     try {
       jobConf = new JobConf(mrClientCluster.getConfig());
     } catch (IOException e) {
-      LOG.error(e);
+      LOG.error(e.getMessage());
     }
     return jobConf;
   }
@@ -320,7 +321,7 @@ public class MiniMRCluster {
     try {
       mrClientCluster.stop();
     } catch (IOException e) {
-      LOG.error(e);
+      LOG.error(e.getMessage());
     }
   }
 

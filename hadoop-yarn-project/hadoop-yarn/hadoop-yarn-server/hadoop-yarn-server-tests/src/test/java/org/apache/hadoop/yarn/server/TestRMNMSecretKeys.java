@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.yarn.server;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
+import java.io.File;
 import java.io.IOException;
+import java.util.UUID;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
-
+import org.junit.BeforeClass;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -35,19 +35,39 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResp
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
-import org.junit.Before;
+import org.apache.kerby.util.IOUtil;
 import org.junit.Test;
 
 public class TestRMNMSecretKeys {
+  private static final String KRB5_CONF = "java.security.krb5.conf";
+  private static final File KRB5_CONF_ROOT_DIR = new File(
+      System.getProperty("test.build.dir", "target/test-dir"),
+          UUID.randomUUID().toString());
 
-  @Before
-  public void setup() throws IOException{
-    YarnConfiguration conf = new YarnConfiguration();
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
+  @BeforeClass
+  public static void setup() throws IOException {
+    KRB5_CONF_ROOT_DIR.mkdir();
+    File krb5ConfFile = new File(KRB5_CONF_ROOT_DIR, "krb5.conf");
+    krb5ConfFile.createNewFile();
+    String content = "[libdefaults]\n" +
+        "    default_realm = APACHE.ORG\n" +
+        "    udp_preference_limit = 1\n"+
+        "    extra_addresses = 127.0.0.1\n" +
+        "[realms]\n" +
+        "    APACHE.ORG = {\n" +
+        "        admin_server = localhost:88\n" +
+        "        kdc = localhost:88\n}\n" +
+        "[domain_realm]\n" +
+        "    localhost = APACHE.ORG";
+    IOUtil.writeFile(content, krb5ConfFile);
+    System.setProperty(KRB5_CONF, krb5ConfFile.getAbsolutePath());
   }
-  
+
+  @AfterClass
+  public static void tearDown() throws IOException {
+    KRB5_CONF_ROOT_DIR.delete();
+  }
+
   @Test(timeout = 1000000)
   public void testNMUpdation() throws Exception {
     YarnConfiguration conf = new YarnConfiguration();
@@ -64,6 +84,7 @@ public class TestRMNMSecretKeys {
   private void validateRMNMKeyExchange(YarnConfiguration conf) throws Exception {
     // Default rolling and activation intervals are large enough, no need to
     // intervene
+    final DrainDispatcher dispatcher = new DrainDispatcher();
     ResourceManager rm = new ResourceManager() {
 
       @Override
@@ -73,7 +94,7 @@ public class TestRMNMSecretKeys {
 
       @Override
       protected Dispatcher createDispatcher() {
-        return new DrainDispatcher();
+        return dispatcher;
       }
       @Override
       protected void startWepApp() {
@@ -98,7 +119,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNotNull(nmToken
         + "Registration should cause a key-update!", nmTokenMasterKey);
     
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     NodeHeartbeatResponse response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -107,7 +128,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "First heartbeat after registration shouldn't get any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -117,7 +138,7 @@ public class TestRMNMSecretKeys {
         "Even second heartbeat after registration shouldn't get any key updates!",
         response.getContainerTokenMasterKey());
     
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     // Let's force a roll-over
     rm.getRMContext().getContainerTokenSecretManager().rollMasterKey();
@@ -140,7 +161,7 @@ public class TestRMNMSecretKeys {
         "Roll-over should have incremented the key-id only by one!",
         nmTokenMasterKey.getKeyId() + 1,
         response.getNMTokenMasterKey().getKeyId());
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -149,7 +170,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "Second heartbeat after roll-over shouldn't get any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     // Let's force activation
     rm.getRMContext().getContainerTokenSecretManager().activateNextMasterKey();
@@ -162,7 +183,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken
         + "Activation shouldn't cause any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     response = nm.nodeHeartbeat(true);
     Assert.assertNull(containerToken +
@@ -171,7 +192,7 @@ public class TestRMNMSecretKeys {
     Assert.assertNull(nmToken +
         "Even second heartbeat after activation shouldn't get any key updates!",
         response.getNMTokenMasterKey());
-    ((DrainDispatcher)rm.getRMContext().getDispatcher()).await();
+    dispatcher.await();
 
     rm.stop();
   }

@@ -29,9 +29,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Initializes {@link AuthenticationWithProxyUserFilter}
- * which provides support for Kerberos HTTP SPNEGO authentication
- * and proxy user authentication.
+ * Initializes hadoop-auth AuthenticationFilter which provides support for
+ * Kerberos HTTP SPNEGO authentication.
  * <p/>
  * It enables anonymous access, simple/speudo and Kerberos HTTP SPNEGO
  * authentication  for Hadoop JobTracker, NameNode, DataNodes and
@@ -59,10 +58,8 @@ public class AuthenticationFilterInitializer extends FilterInitializer {
   public void initFilter(FilterContainer container, Configuration conf) {
     Map<String, String> filterConfig = getFilterConfigMap(conf, PREFIX);
 
-    // extend AuthenticationFilter's feature to
-    // support proxy user operation.
     container.addFilter("authentication",
-                        AuthenticationWithProxyUserFilter.class.getName(),
+                        AuthenticationFilter.class.getName(),
                         filterConfig);
   }
 
@@ -72,14 +69,10 @@ public class AuthenticationFilterInitializer extends FilterInitializer {
 
     //setting the cookie path to root '/' so it is used for all resources.
     filterConfig.put(AuthenticationFilter.COOKIE_PATH, "/");
+    Map<String, String> propsWithPrefix = conf.getPropsWithPrefix(prefix);
 
-    for (Map.Entry<String, String> entry : conf) {
-      String name = entry.getKey();
-      if (name.startsWith(prefix)) {
-        String value = conf.get(name);
-        name = name.substring(prefix.length());
-        filterConfig.put(name, value);
-      }
+    for (Map.Entry<String, String> entry : propsWithPrefix.entrySet()) {
+      filterConfig.put(entry.getKey(), entry.getValue());
     }
 
     //Resolve _HOST into bind address

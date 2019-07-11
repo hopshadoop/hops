@@ -69,10 +69,6 @@ public class TestRegisterNodeManagerRequest {
         .getRunningApplications().get(0));
     Assert.assertEquals(request1.getRunningApplications().get(1), request
         .getRunningApplications().get(1));
-    Assert.assertEquals(request1.getRunningApplications().get(appId1), request
-        .getRunningApplications().get(appId1));
-    Assert.assertEquals(request1.getRunningApplications().get(appId2), request
-        .getRunningApplications().get(appId2));
   }
   
   @Test

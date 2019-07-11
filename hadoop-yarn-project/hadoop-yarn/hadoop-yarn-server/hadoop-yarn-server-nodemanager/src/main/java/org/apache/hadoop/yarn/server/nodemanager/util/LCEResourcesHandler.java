@@ -21,11 +21,11 @@ package org.apache.hadoop.yarn.server.nodemanager.util;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
 
+@Deprecated
 public interface LCEResourcesHandler extends Configurable {
 
   void init(LinuxContainerExecutor lce) throws IOException;
@@ -39,8 +39,6 @@ public interface LCEResourcesHandler extends Configurable {
   void preExecute(ContainerId containerId, Resource containerResource)
        throws IOException;
 
-  public void setExecutablePath(String path);
-
   /**
    * Called by the LinuxContainerExecutor after the executable inside the
    * container has exited (successfully or not).
@@ -49,8 +47,4 @@ public interface LCEResourcesHandler extends Configurable {
   void postExecute(ContainerId containerId);
   
   String getResourcesOption(ContainerId containerId);
-  
-  void recoverDeviceControlSystem(ContainerId containerId);
-
-  void initializeHierarchy();
 }

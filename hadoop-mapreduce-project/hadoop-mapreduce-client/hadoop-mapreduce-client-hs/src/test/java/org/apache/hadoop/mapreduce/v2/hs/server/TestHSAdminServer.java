@@ -187,7 +187,6 @@ public class TestHSAdminServer {
     when(ugi.getRealUser()).thenReturn(superUser);
     when(superUser.getShortUserName()).thenReturn("superuser");
     when(superUser.getUserName()).thenReturn("superuser");
-    when(ugi.getGroupNames()).thenReturn(new String[] { "group3" });
     when(ugi.getGroups())
         .thenReturn(Arrays.asList(new String[] { "group3" }));
     when(ugi.getUserName()).thenReturn("regularUser");
@@ -206,7 +205,7 @@ public class TestHSAdminServer {
       th = e;
     }
     // Exception should be thrown
-    assertTrue(th.toString(), th instanceof AuthorizationException);
+    assertTrue(th instanceof AuthorizationException);
 
     // Now add regularUser group to superuser group but not execute
     // refreshSuperUserGroupMapping
@@ -222,7 +221,7 @@ public class TestHSAdminServer {
       th = e;
     }
     // Exception should be thrown again since we didn't refresh the configs
-    assertTrue(th.toString(),th instanceof AuthorizationException);
+    assertTrue(th instanceof AuthorizationException);
 
     // Lets refresh the config by running refreshSuperUserGroupsConfiguration
     hsAdminClient.run(args);

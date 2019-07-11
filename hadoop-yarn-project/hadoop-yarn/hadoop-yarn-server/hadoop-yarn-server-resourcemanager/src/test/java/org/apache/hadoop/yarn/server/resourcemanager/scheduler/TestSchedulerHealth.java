@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -47,20 +44,11 @@ import org.junit.Test;
 import java.io.IOException;
 
 import static org.junit.Assume.assumeTrue;
-import org.junit.Before;
 
 public class TestSchedulerHealth {
 
   private ResourceManager resourceManager;
 
-  @Before
-  public void before() throws IOException {
-    YarnConfiguration conf = new YarnConfiguration();
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
-  }
-  
   public void setup() {
     resourceManager = new ResourceManager() {
       @Override
@@ -219,12 +207,8 @@ public class TestSchedulerHealth {
           Resources.createResource(5 * 1024, 1));
 
     // ResourceRequest priorities
-    Priority priority_0 =
-        org.apache.hadoop.yarn.server.resourcemanager.resource.Priority
-          .create(0);
-    Priority priority_1 =
-        org.apache.hadoop.yarn.server.resourcemanager.resource.Priority
-          .create(1);
+    Priority priority_0 = Priority.newInstance(0);
+    Priority priority_1 = Priority.newInstance(1);
 
     // Submit an application
     Application application_0 =
@@ -254,8 +238,10 @@ public class TestSchedulerHealth {
     SchedulerHealth sh =
         ((CapacityScheduler) resourceManager.getResourceScheduler())
           .getSchedulerHealth();
-    Assert.assertEquals(2, sh.getAllocationCount().longValue());
-    Assert.assertEquals(Resource.newInstance(3 * 1024, 2),
+    // Now SchedulerHealth records last container allocated, aggregated
+    // allocation account will not be changed
+    Assert.assertEquals(1, sh.getAllocationCount().longValue());
+    Assert.assertEquals(Resource.newInstance(1 * 1024, 1),
       sh.getResourcesAllocated());
     Assert.assertEquals(2, sh.getAggregateAllocationCount().longValue());
     Assert.assertEquals("host_0:1234", sh.getLastAllocationDetails()
@@ -302,12 +288,8 @@ public class TestSchedulerHealth {
     nodeUpdate(nm_1);
 
     // ResourceRequest priorities
-    Priority priority_0 =
-        org.apache.hadoop.yarn.server.resourcemanager.resource.Priority
-          .create(0);
-    Priority priority_1 =
-        org.apache.hadoop.yarn.server.resourcemanager.resource.Priority
-          .create(1);
+    Priority priority_0 = Priority.newInstance(0);
+    Priority priority_1 = Priority.newInstance(1);
 
     // Submit an application
     Application application_0 =

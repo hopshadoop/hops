@@ -90,7 +90,7 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
    * balanced tree. However, we do not yet have a low memory footprint balanced
    * tree implementation.
    */
-  protected final PriorityQueue<Entry> queue;
+  private final PriorityQueue<Entry> queue;
   private final long creationExpirationPeriod;
   protected final long accessExpirationPeriod;
   private final int sizeLimit;
@@ -221,7 +221,7 @@ public class LightWeightCache<K, E extends K> extends LightWeightGSet<K, E> {
     evictEntries();
     return existing;
   }
-  
+
   @Override
   public E remove(K key) {
     evictExpiredEntries();

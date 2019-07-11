@@ -27,6 +27,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.NLineInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
 
 /**
@@ -50,17 +51,26 @@ import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
  */
 public class TestMapreduceConfigFields extends TestConfigurationFieldsBase {
 
+  @SuppressWarnings("deprecation")
   @Override
   public void initializeMemberVariables() {
-    xmlFilename = new String("mapred-default.xml");
-    configurationClasses = new Class[] { MRJobConfig.class, MRConfig.class,
-        JHAdminConfig.class, ShuffleHandler.class, FileOutputFormat.class,
-	FileInputFormat.class, Job.class, NLineInputFormat.class,
-	JobConf.class, FileOutputCommitter.class };
+    xmlFilename = "mapred-default.xml";
+    configurationClasses = new Class[] {
+        MRJobConfig.class,
+        MRConfig.class,
+        JHAdminConfig.class,
+        ShuffleHandler.class,
+        FileOutputFormat.class,
+        FileInputFormat.class,
+        Job.class,
+        NLineInputFormat.class,
+        JobConf.class,
+        FileOutputCommitter.class,
+        PathOutputCommitterFactory.class
+    };
 
     // Initialize used variables
-    configurationPropsToSkipCompare = new HashSet<String>();
-    xmlPropsToSkipCompare = new HashSet<String>();
+    configurationPropsToSkipCompare = new HashSet<>();
 
     // Set error modes
     errorIfMissingConfigProps = true;
@@ -72,12 +82,21 @@ public class TestMapreduceConfigFields extends TestConfigurationFieldsBase {
     configurationPropsToSkipCompare
             .add(JobConf.MAPRED_JOB_REDUCE_MEMORY_MB_PROPERTY);
 
-    // Obsolete entries listed in MAPREDUCE-6057 were removed from trunk
-    // but not removed from branch-2.
-    xmlPropsToSkipCompare.add("map.sort.class");
-    xmlPropsToSkipCompare.add("mapreduce.local.clientfactory.class.name");
-    xmlPropsToSkipCompare.add("mapreduce.jobtracker.system.dir");
-    xmlPropsToSkipCompare.add("mapreduce.jobtracker.staging.root.dir");
+    // Resource type related properties are only prefixes,
+    // they need to be postfixed with the resource name
+    // in order to take effect.
+    // There is nothing to be added to mapred-default.xml
+    configurationPropsToSkipCompare.add(
+        MRJobConfig.MR_AM_RESOURCE_PREFIX);
+    configurationPropsToSkipCompare.add(
+        MRJobConfig.MAP_RESOURCE_TYPE_PREFIX);
+    configurationPropsToSkipCompare.add(
+        MRJobConfig.REDUCE_RESOURCE_TYPE_PREFIX);
+
+    // PathOutputCommitterFactory values
+    xmlPrefixToSkipCompare = new HashSet<>();
+    xmlPrefixToSkipCompare.add(
+        PathOutputCommitterFactory.COMMITTER_FACTORY_SCHEME);
   }
 
 }

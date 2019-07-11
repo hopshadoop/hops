@@ -20,16 +20,14 @@ package org.apache.hadoop.yarn.server.applicationhistoryservice;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
-import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.HttpCrossOriginFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.service.CompositeService;
@@ -49,17 +47,18 @@ import org.apache.hadoop.yarn.server.timeline.LeveldbTimelineStore;
 import org.apache.hadoop.yarn.server.timeline.TimelineDataManager;
 import org.apache.hadoop.yarn.server.timeline.TimelineStore;
 import org.apache.hadoop.yarn.server.timeline.security.TimelineACLsManager;
-import org.apache.hadoop.yarn.server.timeline.security.TimelineAuthenticationFilter;
-import org.apache.hadoop.yarn.server.timeline.security.TimelineAuthenticationFilterInitializer;
-import org.apache.hadoop.yarn.server.timeline.security.TimelineDelegationTokenSecretManagerService;
+import org.apache.hadoop.yarn.server.timeline.security.TimelineV1DelegationTokenSecretManagerService;
 import org.apache.hadoop.yarn.server.timeline.webapp.CrossOriginFilterInitializer;
+import org.apache.hadoop.yarn.server.util.timeline.TimelineServerUtils;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
-import org.mortbay.jetty.servlet.FilterHolder;
-import org.mortbay.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * History server that keeps track of all types of history in the cluster.
@@ -68,14 +67,14 @@ import com.google.common.annotations.VisibleForTesting;
 public class ApplicationHistoryServer extends CompositeService {
 
   public static final int SHUTDOWN_HOOK_PRIORITY = 30;
-  private static final Log LOG = LogFactory
-    .getLog(ApplicationHistoryServer.class);
+  private static final Logger LOG = LoggerFactory
+      .getLogger(ApplicationHistoryServer.class);
 
   private ApplicationHistoryClientService ahsClientService;
   private ApplicationACLsManager aclsManager;
   private ApplicationHistoryManager historyManager;
   private TimelineStore timelineStore;
-  private TimelineDelegationTokenSecretManagerService secretManagerService;
+  private TimelineV1DelegationTokenSecretManagerService secretManagerService;
   private TimelineDataManager timelineDataManager;
   private WebApp webApp;
   private JvmPauseMonitor pauseMonitor;
@@ -110,7 +109,8 @@ public class ApplicationHistoryServer extends CompositeService {
 
     DefaultMetricsSystem.initialize("ApplicationHistoryServer");
     JvmMetrics jm = JvmMetrics.initSingleton("ApplicationHistoryServer", null);
-    pauseMonitor = new JvmPauseMonitor(conf);
+    pauseMonitor = new JvmPauseMonitor();
+    addService(pauseMonitor);
     jm.setPauseMonitor(pauseMonitor);
     super.serviceInit(conf);
   }
@@ -125,9 +125,6 @@ public class ApplicationHistoryServer extends CompositeService {
   protected void serviceStop() throws Exception {
     if (webApp != null) {
       webApp.stop();
-    }
-    if (pauseMonitor != null) {
-      pauseMonitor.stop();
     }
     DefaultMetricsSystem.shutdown();
     super.serviceStop();
@@ -180,7 +177,7 @@ public class ApplicationHistoryServer extends CompositeService {
       appHistoryServer.init(conf);
       appHistoryServer.start();
     } catch (Throwable t) {
-      LOG.fatal("Error starting ApplicationHistoryServer", t);
+      LOG.error("Error starting ApplicationHistoryServer", t);
       ExitUtil.terminate(-1, "Error starting ApplicationHistoryServer");
     }
     return appHistoryServer;
@@ -225,9 +222,9 @@ public class ApplicationHistoryServer extends CompositeService {
         TimelineStore.class), conf);
   }
 
-  private TimelineDelegationTokenSecretManagerService
+  private TimelineV1DelegationTokenSecretManagerService
       createTimelineDelegationTokenSecretManagerService(Configuration conf) {
-    return new TimelineDelegationTokenSecretManagerService();
+    return new TimelineV1DelegationTokenSecretManagerService();
   }
 
   private TimelineDataManager createTimelineDataManager(Configuration conf) {
@@ -239,105 +236,85 @@ public class ApplicationHistoryServer extends CompositeService {
   @SuppressWarnings("unchecked")
   private void startWebApp() {
     Configuration conf = getConfig();
-    TimelineAuthenticationFilter.setTimelineDelegationTokenSecretManager(
-        secretManagerService.getTimelineDelegationTokenSecretManager());
     // Always load pseudo authentication filter to parse "user.name" in an URL
     // to identify a HTTP request's user in insecure mode.
     // When Kerberos authentication type is set (i.e., secure mode is turned on),
     // the customized filter will be loaded by the timeline server to do Kerberos
     // + DT authentication.
-    String initializers = conf.get("hadoop.http.filter.initializers");
-    boolean modifiedInitializers = false;
-
-    initializers =
-        initializers == null || initializers.length() == 0 ? "" : initializers;
-
+    String initializers = conf.get("hadoop.http.filter.initializers", "");
+    Set<String> defaultInitializers = new LinkedHashSet<String>();
+    // Add CORS filter
     if (!initializers.contains(CrossOriginFilterInitializer.class.getName())) {
-      if(conf.getBoolean(YarnConfiguration
-          .TIMELINE_SERVICE_HTTP_CROSS_ORIGIN_ENABLED, YarnConfiguration
-              .TIMELINE_SERVICE_HTTP_CROSS_ORIGIN_ENABLED_DEFAULT)) {
-        if (initializers.contains(HttpCrossOriginFilterInitializer.class.getName())) {
-          initializers =
-            initializers.replaceAll(HttpCrossOriginFilterInitializer.class.getName(),
+      if(conf.getBoolean(YarnConfiguration.
+          TIMELINE_SERVICE_HTTP_CROSS_ORIGIN_ENABLED,
+          YarnConfiguration.
+          TIMELINE_SERVICE_HTTP_CROSS_ORIGIN_ENABLED_DEFAULT)) {
+        if (initializers.contains(
+            HttpCrossOriginFilterInitializer.class.getName())) {
+          initializers = initializers.replaceAll(
+              HttpCrossOriginFilterInitializer.class.getName(),
               CrossOriginFilterInitializer.class.getName());
+        } else {
+          defaultInitializers.add(CrossOriginFilterInitializer.class.getName());
         }
-        else {
-          if (initializers.length() != 0) {
-            initializers += ",";
-          }
-          initializers += CrossOriginFilterInitializer.class.getName();
-        }
-        modifiedInitializers = true;
       }
     }
-
-    if (!initializers.contains(TimelineAuthenticationFilterInitializer.class
-      .getName())) {
-      if (initializers.length() != 0) {
-        initializers += ",";
-      }
-      initializers += TimelineAuthenticationFilterInitializer.class.getName();
-      modifiedInitializers = true;
-    }
-
-    String[] parts = initializers.split(",");
-    ArrayList<String> target = new ArrayList<String>();
-    for (String filterInitializer : parts) {
-      filterInitializer = filterInitializer.trim();
-      if (filterInitializer.equals(AuthenticationFilterInitializer.class
-        .getName())) {
-        modifiedInitializers = true;
-        continue;
-      }
-      target.add(filterInitializer);
-    }
-    String actualInitializers =
-        org.apache.commons.lang.StringUtils.join(target, ",");
-    if (modifiedInitializers) {
-      conf.set("hadoop.http.filter.initializers", actualInitializers);
-    }
+    TimelineServerUtils.addTimelineAuthFilter(
+        initializers, defaultInitializers, secretManagerService);
+    TimelineServerUtils.setTimelineFilters(
+        conf, initializers, defaultInitializers);
     String bindAddress = WebAppUtils.getWebAppBindURL(conf,
                           YarnConfiguration.TIMELINE_SERVICE_BIND_HOST,
                           WebAppUtils.getAHSWebAppURLWithoutScheme(conf));
     try {
-      AHSWebApp ahsWebApp = new AHSWebApp(timelineDataManager, ahsClientService);
+      AHSWebApp ahsWebApp =
+          new AHSWebApp(timelineDataManager, ahsClientService);
       webApp =
           WebApps
             .$for("applicationhistory", ApplicationHistoryClientService.class,
                 ahsClientService, "ws")
-             .with(conf).withAttribute(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
-                 conf.get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS)).at(bindAddress).build(ahsWebApp);
+             .with(conf)
+              .withAttribute(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
+                 conf.get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS))
+              .withCSRFProtection(YarnConfiguration.TIMELINE_CSRF_PREFIX)
+              .withXFSProtection(YarnConfiguration.TIMELINE_XFS_PREFIX)
+              .at(bindAddress).build(ahsWebApp);
        HttpServer2 httpServer = webApp.httpServer();
 
-       String[] names = conf.getTrimmedStrings(YarnConfiguration.TIMELINE_SERVICE_UI_NAMES);
+       String[] names = conf.getTrimmedStrings(
+           YarnConfiguration.TIMELINE_SERVICE_UI_NAMES);
        WebAppContext webAppContext = httpServer.getWebAppContext();
 
-       for (String name : names) {
-         String webPath = conf.get(
-             YarnConfiguration.TIMELINE_SERVICE_UI_WEB_PATH_PREFIX + name);
-         String onDiskPath = conf.get(
-             YarnConfiguration.TIMELINE_SERVICE_UI_ON_DISK_PATH_PREFIX + name);
-         WebAppContext uiWebAppContext = new WebAppContext();
-         uiWebAppContext.setContextPath(webPath);
-         uiWebAppContext.setWar(onDiskPath);
-         final String[] ALL_URLS = { "/*" };
-         FilterHolder[] filterHolders =
-           webAppContext.getServletHandler().getFilters();
-         for (FilterHolder filterHolder: filterHolders) {
-           if (!"guice".equals(filterHolder.getName())) {
-             HttpServer2.defineFilter(uiWebAppContext, filterHolder.getName(),
-                 filterHolder.getClassName(), filterHolder.getInitParameters(),
-                 ALL_URLS);
-           }
-         }
-         LOG.info("Hosting " + name + " from " + onDiskPath + " at " + webPath);
-         httpServer.addContext(uiWebAppContext, true);
-       }
+      for (String name : names) {
+        String webPath = conf.get(
+            YarnConfiguration.TIMELINE_SERVICE_UI_WEB_PATH_PREFIX + name);
+        String onDiskPath = conf.get(
+            YarnConfiguration.TIMELINE_SERVICE_UI_ON_DISK_PATH_PREFIX + name);
+        WebAppContext uiWebAppContext = new WebAppContext();
+        uiWebAppContext.setContextPath(webPath);
+        if (onDiskPath.endsWith(".war")) {
+          uiWebAppContext.setWar(onDiskPath);
+        } else {
+          uiWebAppContext.setResourceBase(onDiskPath);
+        }
+        final String[] ALL_URLS = {"/*"};
+        FilterHolder[] filterHolders =
+            webAppContext.getServletHandler().getFilters();
+        for (FilterHolder filterHolder : filterHolders) {
+          if (!"guice".equals(filterHolder.getName())) {
+            HttpServer2.defineFilter(uiWebAppContext, filterHolder.getName(),
+                filterHolder.getClassName(), filterHolder.getInitParameters(),
+                ALL_URLS);
+          }
+        }
+        LOG.info("Hosting " + name + " from " + onDiskPath + " at " + webPath);
+        httpServer.addHandlerAtFront(uiWebAppContext);
+      }
        httpServer.start();
        conf.updateConnectAddr(YarnConfiguration.TIMELINE_SERVICE_BIND_HOST,
-         YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
-         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS,
-         this.getListenerAddress());
+        YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
+        YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS,
+        this.getListenerAddress());
        LOG.info("Instantiating AHSWebApp at " + getPort());
     } catch (Exception e) {
       String msg = "AHSWebApp failed to start.";

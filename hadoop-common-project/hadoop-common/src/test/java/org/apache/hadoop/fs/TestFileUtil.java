@@ -17,21 +17,31 @@
  */
 package org.apache.hadoop.fs;
 
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.*;
+import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.URI;
-import java.io.PrintWriter;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,23 +52,24 @@ import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.tools.tar.TarEntry;
 import org.apache.tools.tar.TarOutputStream;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestFileUtil {
-  private static final Log LOG = LogFactory.getLog(TestFileUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestFileUtil.class);
 
   private static final File TEST_DIR = GenericTestUtils.getTestDir("fu");
   private static final String FILE = "x";
@@ -91,7 +102,7 @@ public class TestFileUtil {
 
   /**
    * Creates multiple directories for testing.
-   *
+   * 
    * Contents of them are
    * dir:tmp: 
    *   file: x
@@ -183,9 +194,9 @@ public class TestFileUtil {
     try {
       files = FileUtil.listFiles(newDir);
       Assert.fail("IOException expected on listFiles() for non-existent dir "
-          + newDir.toString());
+      		+ newDir.toString());
     } catch(IOException ioe) {
-      //Expected an IOException
+    	//Expected an IOException
     }
   }
 
@@ -336,10 +347,10 @@ public class TestFileUtil {
   
   /**
    * Creates a directory which can not be deleted completely.
-   *
+   * 
    * Directory structure. The naming is important in that {@link MyFile}
    * is used to return them in alphabetical order when listed.
-   *
+   * 
    *                     del(+w)
    *                       |
    *    .---------------------------------------,
@@ -351,7 +362,7 @@ public class TestFileUtil {
    *            xSubSubDir(-rwx) 
    *              |
    *             file22(-rwx)
-   *
+   *             
    * @throws IOException
    */
   private void setupDirsAndNonWritablePermissions() throws IOException {
@@ -392,9 +403,9 @@ public class TestFileUtil {
   }
   
   private static void revokePermissions(final File f) {
-    FileUtil.setWritable(f, false);
-    FileUtil.setExecutable(f, false);
-    FileUtil.setReadable(f, false);
+     FileUtil.setWritable(f, false);
+     FileUtil.setExecutable(f, false);
+     FileUtil.setReadable(f, false);
   }
   
   // Validates the return value.
@@ -427,10 +438,8 @@ public class TestFileUtil {
 
   @Test (timeout = 30000)
   public void testFailFullyDelete() throws IOException {
-    if(Shell.WINDOWS) {
-      // windows Dir.setWritable(false) does not work for directories
-      return;
-    }
+    // Windows Dir.setWritable(false) does not work for directories
+    assumeNotWindows();
     LOG.info("Running test to verify failure of fullyDelete()");
     setupDirsAndNonWritablePermissions();
     boolean ret = FileUtil.fullyDelete(new MyFile(del));
@@ -451,7 +460,7 @@ public class TestFileUtil {
    * irrespective of it's parent-dir's permissions, a peculiar file instance for
    * testing. (2) It returns the files in alphabetically sorted order when
    * listed.
-   *
+   * 
    */
   public static class MyFile extends File {
 
@@ -493,7 +502,7 @@ public class TestFileUtil {
     public File[] listFiles() {
       final File[] files = super.listFiles();
       if (files == null) {
-        return null;
+         return null;
       }
       List<File> filesList = Arrays.asList(files);
       Collections.sort(filesList);
@@ -508,10 +517,8 @@ public class TestFileUtil {
 
   @Test (timeout = 30000)
   public void testFailFullyDeleteContents() throws IOException {
-    if(Shell.WINDOWS) {
-      // windows Dir.setWritable(false) does not work for directories
-      return;
-    }
+    // Windows Dir.setWritable(false) does not work for directories
+    assumeNotWindows();
     LOG.info("Running test to verify failure of fullyDeleteContents()");
     setupDirsAndNonWritablePermissions();
     boolean ret = FileUtil.fullyDeleteContents(new MyFile(del));
@@ -526,61 +533,6 @@ public class TestFileUtil {
     validateAndSetWritablePermissions(false, ret);
   }
   
-  @Test (timeout = 30000)
-  public void testCopyMergeSingleDirectory() throws IOException {
-    setupDirs();
-    boolean copyMergeResult = copyMerge("partitioned", "tmp/merged");
-    Assert.assertTrue("Expected successful copyMerge result.", copyMergeResult);
-    File merged = new File(TEST_DIR, "tmp/merged");
-    Assert.assertTrue("File tmp/merged must exist after copyMerge.",
-        merged.exists());
-    BufferedReader rdr = new BufferedReader(new FileReader(merged));
-
-    try {
-      Assert.assertEquals("Line 1 of merged file must contain \"foo\".",
-          "foo", rdr.readLine());
-      Assert.assertEquals("Line 2 of merged file must contain \"bar\".",
-          "bar", rdr.readLine());
-      Assert.assertNull("Expected end of file reading merged file.",
-          rdr.readLine());
-    }
-    finally {
-      rdr.close();
-    }
-  }
-
-  /**
-   * Calls FileUtil.copyMerge using the specified source and destination paths.
-   * Both source and destination are assumed to be on the local file system.
-   * The call will not delete source on completion and will not add an
-   * additional string between files.
-   * @param src String non-null source path.
-   * @param dst String non-null destination path.
-   * @return boolean true if the call to FileUtil.copyMerge was successful.
-   * @throws IOException if an I/O error occurs.
-   */
-  @SuppressWarnings("deprecation")
-  private boolean copyMerge(String src, String dst)
-      throws IOException {
-    Configuration conf = new Configuration();
-    FileSystem fs = FileSystem.getLocal(conf);
-    final boolean result;
-
-    try {
-      Path srcPath = new Path(TEST_DIR.getAbsolutePath(), src);
-      Path dstPath = new Path(TEST_DIR.getAbsolutePath(), dst);
-      boolean deleteSource = false;
-      String addString = null;
-      result = FileUtil.copyMerge(fs, srcPath, fs, dstPath, deleteSource, conf,
-          addString);
-    }
-    finally {
-      fs.close();
-    }
-
-    return result;
-  }
-
   /**
    * Test that getDU is able to handle cycles caused due to symbolic links
    * and that directory sizes are not added to the final calculated size
@@ -614,7 +566,7 @@ public class TestFileUtil {
         FileUtil.chmod(notADirectory.getAbsolutePath(), "0000");
       } catch (InterruptedException ie) {
         // should never happen since that method never throws InterruptedException.      
-        assertNull(ie);
+        assertNull(ie);  
       }
       assertFalse(FileUtil.canRead(notADirectory));
       final long du3 = FileUtil.getDU(partitioned);
@@ -624,26 +576,26 @@ public class TestFileUtil {
       try {
         FileUtil.chmod(partitioned.getAbsolutePath(), "0000");
       } catch (InterruptedException ie) {
-        // should never happen since that method never throws InterruptedException.
-        assertNull(ie);
+        // should never happen since that method never throws InterruptedException.      
+        assertNull(ie);  
       }
       assertFalse(FileUtil.canRead(partitioned));
       final long du4 = FileUtil.getDU(partitioned);
       assertEquals(0, du4);
     } finally {
-      // Restore the permissions so that we can delete the folder
+      // Restore the permissions so that we can delete the folder 
       // in @After method:
       FileUtil.chmod(partitioned.getAbsolutePath(), "0777", true/*recursive*/);
     }
   }
-
+  
   @Test (timeout = 30000)
   public void testUnTar() throws IOException {
     setupDirs();
-
+    
     // make a simple tar:
     final File simpleTar = new File(del, FILE);
-    OutputStream os = new FileOutputStream(simpleTar);
+    OutputStream os = new FileOutputStream(simpleTar); 
     TarOutputStream tos = new TarOutputStream(os);
     try {
       TarEntry te = new TarEntry("/bar/foo");
@@ -663,7 +615,7 @@ public class TestFileUtil {
     // check result:
     assertTrue(new File(tmp, "/bar/foo").exists());
     assertEquals(12, new File(tmp, "/bar/foo").length());
-
+    
     final File regularFile = new File(tmp, "QuickBrownFoxJumpsOverTheLazyDog");
     regularFile.createNewFile();
     assertTrue(regularFile.exists());
@@ -674,12 +626,12 @@ public class TestFileUtil {
       // okay
     }
   }
-
+  
   @Test (timeout = 30000)
   public void testReplaceFile() throws IOException {
     setupDirs();
     final File srcFile = new File(tmp, "src");
-
+    
     // src exists, and target does not exist:
     srcFile.createNewFile();
     assertTrue(srcFile.exists());
@@ -689,14 +641,14 @@ public class TestFileUtil {
     assertTrue(!srcFile.exists());
     assertTrue(targetFile.exists());
 
-    // src exists and target is a regular file:
+    // src exists and target is a regular file: 
     srcFile.createNewFile();
     assertTrue(srcFile.exists());
     FileUtil.replaceFile(srcFile, targetFile);
     assertTrue(!srcFile.exists());
     assertTrue(targetFile.exists());
-
-    // src exists, and target is a non-empty directory:
+    
+    // src exists, and target is a non-empty directory: 
     srcFile.createNewFile();
     assertTrue(srcFile.exists());
     targetFile.delete();
@@ -716,7 +668,7 @@ public class TestFileUtil {
     assertTrue(targetFile.exists() && targetFile.isDirectory());
     assertTrue(obstacle.exists());
   }
-
+  
   @Test (timeout = 30000)
   public void testCreateLocalTempFile() throws IOException {
     setupDirs();
@@ -732,15 +684,13 @@ public class TestFileUtil {
     tmp2.delete();
     assertTrue(!tmp1.exists() && !tmp2.exists());
   }
-
+  
   @Test (timeout = 30000)
   public void testUnZip() throws IOException {
-    // make sa simple zip
     setupDirs();
-
-    // make a simple tar:
+    // make a simple zip
     final File simpleZip = new File(del, FILE);
-    OutputStream os = new FileOutputStream(simpleZip);
+    OutputStream os = new FileOutputStream(simpleZip); 
     ZipOutputStream tos = new ZipOutputStream(os);
     try {
       ZipEntry ze = new ZipEntry("foo");
@@ -754,13 +704,13 @@ public class TestFileUtil {
     } finally {
       tos.close();
     }
-
-    // successfully untar it into an existing dir:
+    
+    // successfully unzip it into an existing dir:
     FileUtil.unZip(simpleZip, tmp);
     // check result:
     assertTrue(new File(tmp, "foo").exists());
     assertEquals(12, new File(tmp, "foo").length());
-
+    
     final File regularFile = new File(tmp, "QuickBrownFoxJumpsOverTheLazyDog");
     regularFile.createNewFile();
     assertTrue(regularFile.exists());
@@ -773,38 +723,66 @@ public class TestFileUtil {
   }
 
   @Test (timeout = 30000)
+  public void testUnZip2() throws IOException {
+    setupDirs();
+    // make a simple zip
+    final File simpleZip = new File(del, FILE);
+    OutputStream os = new FileOutputStream(simpleZip);
+    try (ZipOutputStream tos = new ZipOutputStream(os)) {
+      // Add an entry that contains invalid filename
+      ZipEntry ze = new ZipEntry("../foo");
+      byte[] data = "some-content".getBytes(StandardCharsets.UTF_8);
+      ze.setSize(data.length);
+      tos.putNextEntry(ze);
+      tos.write(data);
+      tos.closeEntry();
+      tos.flush();
+      tos.finish();
+    }
+
+    // Unzip it into an existing dir
+    try {
+      FileUtil.unZip(simpleZip, tmp);
+      fail("unZip should throw IOException.");
+    } catch (IOException e) {
+      GenericTestUtils.assertExceptionContains(
+          "would create file outside of", e);
+    }
+  }
+
+  @Test (timeout = 30000)
   /*
    * Test method copy(FileSystem srcFS, Path src, File dst, boolean deleteSource, Configuration conf)
    */
   public void testCopy5() throws IOException {
     setupDirs();
-
+    
     URI uri = tmp.toURI();
     Configuration conf = new Configuration();
     FileSystem fs = FileSystem.newInstance(uri, conf);
     final String content = "some-content";
     File srcFile = createFile(tmp, "src", content);
     Path srcPath = new Path(srcFile.toURI());
-
+    
     // copy regular file:
     final File dest = new File(del, "dest");
     boolean result = FileUtil.copy(fs, srcPath, dest, false, conf);
     assertTrue(result);
     assertTrue(dest.exists());
-    assertEquals(content.getBytes().length
+    assertEquals(content.getBytes().length 
         + System.getProperty("line.separator").getBytes().length, dest.length());
     assertTrue(srcFile.exists()); // should not be deleted
-
+    
     // copy regular file, delete src:
     dest.delete();
     assertTrue(!dest.exists());
     result = FileUtil.copy(fs, srcPath, dest, true, conf);
     assertTrue(result);
     assertTrue(dest.exists());
-    assertEquals(content.getBytes().length
+    assertEquals(content.getBytes().length 
         + System.getProperty("line.separator").getBytes().length, dest.length());
     assertTrue(!srcFile.exists()); // should be deleted
-
+    
     // copy a dir:
     dest.delete();
     assertTrue(!dest.exists());
@@ -816,32 +794,32 @@ public class TestFileUtil {
     assertTrue(files != null);
     assertEquals(2, files.length);
     for (File f: files) {
-      assertEquals(3
+      assertEquals(3 
           + System.getProperty("line.separator").getBytes().length, f.length());
     }
     assertTrue(!partitioned.exists()); // should be deleted
-  }
+  }  
 
   @Test (timeout = 30000)
   public void testStat2Paths1() {
     assertNull(FileUtil.stat2Paths(null));
-
-    FileStatus[] fileStatuses = new FileStatus[0];
+    
+    FileStatus[] fileStatuses = new FileStatus[0]; 
     Path[] paths = FileUtil.stat2Paths(fileStatuses);
     assertEquals(0, paths.length);
-
+    
     Path path1 = new Path("file://foo");
     Path path2 = new Path("file://moo");
-    fileStatuses = new FileStatus[] {
-        new FileStatus(3, false, 0, 0, 0, path1),
-        new FileStatus(3, false, 0, 0, 0, path2)
-    };
+    fileStatuses = new FileStatus[] { 
+        new FileStatus(3, false, 0, 0, 0, path1), 
+        new FileStatus(3, false, 0, 0, 0, path2) 
+        };
     paths = FileUtil.stat2Paths(fileStatuses);
     assertEquals(2, paths.length);
     assertEquals(paths[0], path1);
     assertEquals(paths[1], path2);
   }
-
+  
   @Test (timeout = 30000)
   public void testStat2Paths2()  {
     Path defaultPath = new Path("file://default");
@@ -853,13 +831,13 @@ public class TestFileUtil {
     assertTrue(paths != null);
     assertEquals(1, paths.length);
     assertEquals(null, paths[0]);
-
+    
     Path path1 = new Path("file://foo");
     Path path2 = new Path("file://moo");
-    FileStatus[] fileStatuses = new FileStatus[] {
-        new FileStatus(3, false, 0, 0, 0, path1),
-        new FileStatus(3, false, 0, 0, 0, path2)
-    };
+    FileStatus[] fileStatuses = new FileStatus[] { 
+        new FileStatus(3, false, 0, 0, 0, path1), 
+        new FileStatus(3, false, 0, 0, 0, path2) 
+        };
     paths = FileUtil.stat2Paths(fileStatuses, defaultPath);
     assertEquals(2, paths.length);
     assertEquals(paths[0], path1);
@@ -897,7 +875,7 @@ public class TestFileUtil {
     in.close();
     Assert.assertEquals(data.length, len);
   }
-
+  
   /**
    * Test that rename on a symlink works as expected.
    */
@@ -990,8 +968,162 @@ public class TestFileUtil {
     Assert.assertFalse(link.exists());
   }
 
-  private void doUntarAndVerify(File tarFile, File untarDir)
-      throws IOException {
+  /**
+   * This test validates the correctness of
+   * {@link FileUtil#symLink(String, String)} in case of null pointer inputs.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testSymlinkWithNullInput() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+
+    File file = new File(del, FILE);
+    File link = new File(del, "_link");
+
+    // Create the same symbolic link
+    // The operation should fail and returns 1
+    int result = FileUtil.symLink(null, null);
+    Assert.assertEquals(1, result);
+
+    // Create the same symbolic link
+    // The operation should fail and returns 1
+    result = FileUtil.symLink(file.getAbsolutePath(), null);
+    Assert.assertEquals(1, result);
+
+    // Create the same symbolic link
+    // The operation should fail and returns 1
+    result = FileUtil.symLink(null, link.getAbsolutePath());
+    Assert.assertEquals(1, result);
+
+    file.delete();
+    link.delete();
+  }
+
+  /**
+   * This test validates the correctness of
+   * {@link FileUtil#symLink(String, String)} in case the file already exists.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testSymlinkFileAlreadyExists() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+
+    File file = new File(del, FILE);
+    File link = new File(del, "_link");
+
+    // Create a symbolic link
+    // The operation should succeed
+    int result1 =
+        FileUtil.symLink(file.getAbsolutePath(), link.getAbsolutePath());
+
+    Assert.assertEquals(0, result1);
+
+    // Create the same symbolic link
+    // The operation should fail and returns 1
+    result1 = FileUtil.symLink(file.getAbsolutePath(), link.getAbsolutePath());
+
+    Assert.assertEquals(1, result1);
+
+    file.delete();
+    link.delete();
+  }
+
+  /**
+   * This test validates the correctness of
+   * {@link FileUtil#symLink(String, String)} in case the file and the link are
+   * the same file.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testSymlinkSameFile() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+
+    File file = new File(del, FILE);
+
+    // Create a symbolic link
+    // The operation should succeed
+    int result =
+        FileUtil.symLink(file.getAbsolutePath(), file.getAbsolutePath());
+
+    Assert.assertEquals(0, result);
+
+    file.delete();
+  }
+
+  /**
+   * This test validates the correctness of
+   * {@link FileUtil#symLink(String, String)} in case we want to use a link for
+   * 2 different files.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testSymlink2DifferentFile() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+    File file = new File(del, FILE);
+    File fileSecond = new File(del, FILE + "_1");
+    File link = new File(del, "_link");
+
+    // Create a symbolic link
+    // The operation should succeed
+    int result =
+        FileUtil.symLink(file.getAbsolutePath(), link.getAbsolutePath());
+
+    Assert.assertEquals(0, result);
+
+    // The operation should fail and returns 1
+    result =
+        FileUtil.symLink(fileSecond.getAbsolutePath(), link.getAbsolutePath());
+
+    Assert.assertEquals(1, result);
+
+    file.delete();
+    fileSecond.delete();
+    link.delete();
+  }
+
+  /**
+   * This test validates the correctness of
+   * {@link FileUtil#symLink(String, String)} in case we want to use a 2
+   * different links for the same file.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testSymlink2DifferentLinks() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+    File file = new File(del, FILE);
+    File link = new File(del, "_link");
+    File linkSecond = new File(del, "_link_1");
+
+    // Create a symbolic link
+    // The operation should succeed
+    int result =
+        FileUtil.symLink(file.getAbsolutePath(), link.getAbsolutePath());
+
+    Assert.assertEquals(0, result);
+
+    // The operation should succeed
+    result =
+        FileUtil.symLink(file.getAbsolutePath(), linkSecond.getAbsolutePath());
+
+    Assert.assertEquals(0, result);
+
+    file.delete();
+    link.delete();
+    linkSecond.delete();
+  }
+
+  private void doUntarAndVerify(File tarFile, File untarDir) 
+                                 throws IOException {
     if (untarDir.exists() && !FileUtil.fullyDelete(untarDir)) {
       throw new IOException("Could not delete directory '" + untarDir + "'");
     }
@@ -1018,8 +1150,6 @@ public class TestFileUtil {
   }
 
   @Test (timeout = 30000)
-  // Also fails in Hadoop 2.6.3, so let's ignore it...
-  @Ignore
   public void testUntar() throws IOException {
     String tarGzFileName = System.getProperty("test.cache.data",
         "target/test/cache") + "/test-untar.tgz";
@@ -1040,11 +1170,11 @@ public class TestFileUtil {
 
     // create files expected to match a wildcard
     List<File> wildcardMatches = Arrays.asList(new File(tmp, "wildcard1.jar"),
-        new File(tmp, "wildcard2.jar"), new File(tmp, "wildcard3.JAR"),
-        new File(tmp, "wildcard4.JAR"));
+      new File(tmp, "wildcard2.jar"), new File(tmp, "wildcard3.JAR"),
+      new File(tmp, "wildcard4.JAR"));
     for (File wildcardMatch: wildcardMatches) {
       Assert.assertTrue("failure creating file: " + wildcardMatch,
-          wildcardMatch.createNewFile());
+        wildcardMatch.createNewFile());
     }
 
     // create non-jar files, which we expect to not be included in the classpath
@@ -1055,14 +1185,14 @@ public class TestFileUtil {
     // create classpath jar
     String wildcardPath = tmp.getCanonicalPath() + File.separator + "*";
     String nonExistentSubdir = tmp.getCanonicalPath() + Path.SEPARATOR + "subdir"
-        + Path.SEPARATOR;
+      + Path.SEPARATOR;
     List<String> classPaths = Arrays.asList("", "cp1.jar", "cp2.jar", wildcardPath,
-        "cp3.jar", nonExistentSubdir);
+      "cp3.jar", nonExistentSubdir);
     String inputClassPath = StringUtils.join(File.pathSeparator, classPaths);
     String[] jarCp = FileUtil.createJarWithClassPath(inputClassPath + File.pathSeparator + "unexpandedwildcard/*",
-        new Path(tmp.getCanonicalPath()), System.getenv());
+      new Path(tmp.getCanonicalPath()), System.getenv());
     String classPathJar = jarCp[0];
-    assertNotSame("Unexpanded wildcard was not placed in extra classpath", jarCp[1].indexOf("unexpanded"), -1);
+    assertNotEquals("Unexpanded wildcard was not placed in extra classpath", jarCp[1].indexOf("unexpanded"), -1);
 
     // verify classpath by reading manifest from jar file
     JarFile jarFile = null;
@@ -1084,7 +1214,7 @@ public class TestFileUtil {
           // add wildcard matches
           for (File wildcardMatch: wildcardMatches) {
             expectedClassPaths.add(wildcardMatch.toURI().toURL()
-                .toExternalForm());
+              .toExternalForm());
           }
         } else {
           File fileCp = null;
@@ -1098,10 +1228,10 @@ public class TestFileUtil {
             // expect to maintain trailing path separator if present in input, even
             // if directory doesn't exist yet
             expectedClassPaths.add(fileCp.toURI().toURL()
-                .toExternalForm() + Path.SEPARATOR);
+              .toExternalForm() + Path.SEPARATOR);
           } else {
             expectedClassPaths.add(fileCp.toURI().toURL()
-                .toExternalForm());
+              .toExternalForm());
           }
         }
       }
@@ -1117,6 +1247,40 @@ public class TestFileUtil {
           LOG.warn("exception closing jarFile: " + classPathJar, e);
         }
       }
+    }
+  }
+
+  @Test
+  public void testGetJarsInDirectory() throws Exception {
+    List<Path> jars = FileUtil.getJarsInDirectory("/foo/bar/bogus/");
+    assertTrue("no jars should be returned for a bogus path",
+        jars.isEmpty());
+
+    // setup test directory for files
+    assertFalse(tmp.exists());
+    assertTrue(tmp.mkdirs());
+
+    // create jar files to be returned
+    File jar1 = new File(tmp, "wildcard1.jar");
+    File jar2 = new File(tmp, "wildcard2.JAR");
+    List<File> matches = Arrays.asList(jar1, jar2);
+    for (File match: matches) {
+      assertTrue("failure creating file: " + match, match.createNewFile());
+    }
+
+    // create non-jar files, which we expect to not be included in the result
+    assertTrue(new File(tmp, "text.txt").createNewFile());
+    assertTrue(new File(tmp, "executable.exe").createNewFile());
+    assertTrue(new File(tmp, "README").createNewFile());
+
+    // pass in the directory
+    String directory = tmp.getCanonicalPath();
+    jars = FileUtil.getJarsInDirectory(directory);
+    assertEquals("there should be 2 jars", 2, jars.size());
+    for (Path jar: jars) {
+      URL url = jar.toUri().toURL();
+      assertTrue("the jar should match either of the jars",
+          url.equals(jar1.toURI().toURL()) || url.equals(jar2.toURI().toURL()));
     }
   }
 
@@ -1197,4 +1361,136 @@ public class TestFileUtil {
     assertEquals(FileUtil.compareFs(fs3,fs4),true);
     assertEquals(FileUtil.compareFs(fs1,fs6),false);
   }
+
+  @Test(timeout = 8000)
+  public void testCreateSymbolicLinkUsingJava() throws IOException {
+    setupDirs();
+    final File simpleTar = new File(del, FILE);
+    OutputStream os = new FileOutputStream(simpleTar);
+    TarArchiveOutputStream tos = new TarArchiveOutputStream(os);
+    File untarFile = null;
+    try {
+      // Files to tar
+      final String tmpDir = "tmp/test";
+      File tmpDir1 = new File(tmpDir, "dir1/");
+      File tmpDir2 = new File(tmpDir, "dir2/");
+      // Delete the directories if they already exist
+      tmpDir1.mkdirs();
+      tmpDir2.mkdirs();
+
+      java.nio.file.Path symLink = FileSystems
+          .getDefault().getPath(tmpDir1.getPath() + "/sl");
+
+      // Create Symbolic Link
+      Files.createSymbolicLink(symLink,
+          FileSystems.getDefault().getPath(tmpDir2.getPath())).toString();
+      assertTrue(Files.isSymbolicLink(symLink.toAbsolutePath()));
+      // put entries in tar file
+      putEntriesInTar(tos, tmpDir1.getParentFile());
+      tos.close();
+
+      untarFile = new File(tmpDir, "2");
+      // Untar using java
+      FileUtil.unTarUsingJava(simpleTar, untarFile, false);
+
+      // Check symbolic link and other directories are there in untar file
+      assertTrue(Files.exists(untarFile.toPath()));
+      assertTrue(Files.exists(FileSystems.getDefault().getPath(untarFile
+          .getPath(), tmpDir)));
+      assertTrue(Files.isSymbolicLink(FileSystems.getDefault().getPath(untarFile
+          .getPath().toString(), symLink.toString())));
+
+    } finally {
+      FileUtils.deleteDirectory(new File("tmp"));
+      tos.close();
+    }
+
+  }
+
+  private void putEntriesInTar(TarArchiveOutputStream tos, File f)
+      throws IOException {
+    if (Files.isSymbolicLink(f.toPath())) {
+      TarArchiveEntry tarEntry = new TarArchiveEntry(f.getPath(),
+          TarArchiveEntry.LF_SYMLINK);
+      tarEntry.setLinkName(Files.readSymbolicLink(f.toPath()).toString());
+      tos.putArchiveEntry(tarEntry);
+      tos.closeArchiveEntry();
+      return;
+    }
+
+    if (f.isDirectory()) {
+      tos.putArchiveEntry(new TarArchiveEntry(f));
+      tos.closeArchiveEntry();
+      for (File child : f.listFiles()) {
+        putEntriesInTar(tos, child);
+      }
+    }
+
+    if (f.isFile()) {
+      tos.putArchiveEntry(new TarArchiveEntry(f));
+      BufferedInputStream origin = new BufferedInputStream(
+          new FileInputStream(f));
+      int count;
+      byte[] data = new byte[2048];
+      while ((count = origin.read(data)) != -1) {
+        tos.write(data, 0, count);
+      }
+      tos.flush();
+      tos.closeArchiveEntry();
+      origin.close();
+    }
+  }
+
+  /**
+   * This test validates the correctness of {@link FileUtil#readLink(File)} in
+   * case of null pointer inputs.
+   */
+  @Test
+  public void testReadSymlinkWithNullInput() {
+    String result = FileUtil.readLink(null);
+    Assert.assertEquals("", result);
+  }
+
+  /**
+   * This test validates the correctness of {@link FileUtil#readLink(File)}.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testReadSymlink() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+
+    File file = new File(del, FILE);
+    File link = new File(del, "_link");
+
+    // Create a symbolic link
+    FileUtil.symLink(file.getAbsolutePath(), link.getAbsolutePath());
+
+    String result = FileUtil.readLink(link);
+    Assert.assertEquals(file.getAbsolutePath(), result);
+
+    file.delete();
+    link.delete();
+  }
+
+  /**
+   * This test validates the correctness of {@link FileUtil#readLink(File)} when
+   * it gets a file in input.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testReadSymlinkWithAFileAsInput() throws IOException {
+    Assert.assertFalse(del.exists());
+    del.mkdirs();
+
+    File file = new File(del, FILE);
+
+    String result = FileUtil.readLink(file);
+    Assert.assertEquals("", result);
+
+    file.delete();
+  }
+
 }

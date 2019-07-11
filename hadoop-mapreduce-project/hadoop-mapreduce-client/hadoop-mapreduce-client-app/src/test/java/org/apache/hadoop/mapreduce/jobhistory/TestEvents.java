@@ -18,13 +18,15 @@
 
 package org.apache.hadoop.mapreduce.jobhistory;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import static org.junit.Assert.*;
+import java.util.Set;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,6 +37,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.v2.app.job.impl.JobImpl;
+import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
+import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 import org.junit.Test;
 
 public class TestEvents {
@@ -53,19 +57,19 @@ public class TestEvents {
     TaskAttemptID taskAttemptId = new TaskAttemptID(tid, 3);
     Counters counters = new Counters();
     TaskAttemptFinishedEvent test = new TaskAttemptFinishedEvent(taskAttemptId,
-        TaskType.REDUCE, "TEST", 123L, "RAKNAME", "RPC_ADDRESSES", "STATUS",
-        counters);
+        TaskType.REDUCE, "TEST", 123L, "RAKNAME", "HOSTNAME", "STATUS",
+        counters, 234);
     assertEquals(test.getAttemptId().toString(), taskAttemptId.toString());
 
     assertEquals(test.getCounters(), counters);
     assertEquals(test.getFinishTime(), 123L);
-    assertEquals(test.getHostname(), "RPC_ADDRESSES");
+    assertEquals(test.getHostname(), "HOSTNAME");
     assertEquals(test.getRackName(), "RAKNAME");
     assertEquals(test.getState(), "STATUS");
     assertEquals(test.getTaskId(), tid);
     assertEquals(test.getTaskStatus(), "TEST");
     assertEquals(test.getTaskType(), TaskType.REDUCE);
-
+    assertEquals(234, test.getStartTime());
   }
 
   /**
@@ -403,6 +407,16 @@ public class TestEvents {
     @Override
     public void setDatum(Object datum) {
       this.datum = datum;
+    }
+
+    @Override
+    public TimelineEvent toTimelineEvent() {
+      return null;
+    }
+
+    @Override
+    public Set<TimelineMetric> getTimelineMetrics() {
+      return null;
     }
 
   }

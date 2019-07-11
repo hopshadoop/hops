@@ -13,15 +13,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# export JAVA_HOME=/home/y/libexec/jdk1.6.0/
+##
+## THIS FILE ACTS AS AN OVERRIDE FOR hadoop-env.sh FOR ALL
+## WORK DONE BY THE mapred AND RELATED COMMANDS.
+##
+## Precedence rules:
+##
+## mapred-env.sh > hadoop-env.sh > hard-coded defaults
+##
+## MAPRED_xyz > HADOOP_xyz > hard-coded defaults
+##
 
-export HADOOP_JOB_HISTORYSERVER_HEAPSIZE=1000
+###
+# Job History Server specific parameters
+###
 
-export HADOOP_MAPRED_ROOT_LOGGER=INFO,RFA
+# Specify the max heapsize for the JobHistoryServer.  If no units are
+# given, it will be assumed to be in MB.
+# This value will be overridden by an Xmx setting specified in HADOOP_OPTS,
+# and/or MAPRED_HISTORYSERVER_OPTS.
+# Default is the same as HADOOP_HEAPSIZE_MAX.
+#export HADOOP_JOB_HISTORYSERVER_HEAPSIZE=
 
-#export HADOOP_JOB_HISTORYSERVER_OPTS=
-#export HADOOP_MAPRED_LOG_DIR="" # Where log files are stored.  $HADOOP_MAPRED_HOME/logs by default.
-#export HADOOP_JHS_LOGGER=INFO,RFA # Hadoop JobSummary logger.
-#export HADOOP_MAPRED_PID_DIR= # The pid files are stored. /tmp by default.
-#export HADOOP_MAPRED_IDENT_STRING= #A string representing this instance of hadoop. $USER by default
-#export HADOOP_MAPRED_NICENESS= #The scheduling priority for daemons. Defaults to 0.
+# Specify the JVM options to be used when starting the HistoryServer.
+# These options will be appended to the options specified as HADOOP_OPTS
+# and therefore may override any similar flags set in HADOOP_OPTS
+#export MAPRED_HISTORYSERVER_OPTS=
+
+# Specify the log4j settings for the JobHistoryServer
+# Java property: hadoop.root.logger
+#export HADOOP_JHS_LOGGER=INFO,RFA

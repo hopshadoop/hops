@@ -25,12 +25,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.configuration.SubsetConfiguration;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.configuration2.SubsetConfiguration;
 import org.apache.hadoop.metrics2.MetricsSink;
 import org.apache.hadoop.metrics2.util.Servers;
 import org.apache.hadoop.net.DNS;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This the base class for Ganglia sink classes using metrics2. Lot of the code
@@ -41,7 +41,7 @@ import org.apache.hadoop.net.DNS;
  */
 public abstract class AbstractGangliaSink implements MetricsSink {
 
-  public final Log LOG = LogFactory.getLog(this.getClass());
+  public final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
   /*
    * Output of "gmetric --help" showing allowable values
@@ -112,6 +112,7 @@ public abstract class AbstractGangliaSink implements MetricsSink {
    * org.apache.hadoop.metrics2.MetricsPlugin#init(org.apache.commons.configuration
    * .SubsetConfiguration)
    */
+  @Override
   public void init(SubsetConfiguration conf) {
     LOG.debug("Initializing the GangliaSink for Ganglia metrics.");
 
@@ -126,7 +127,7 @@ public abstract class AbstractGangliaSink implements MetricsSink {
             conf.getString("dfs.datanode.dns.interface", "default"),
             conf.getString("dfs.datanode.dns.nameserver", "default"));
       } catch (UnknownHostException uhe) {
-        LOG.error(uhe);
+        LOG.error(uhe.toString());
         hostName = "UNKNOWN.example.com";
       }
     }
@@ -154,7 +155,7 @@ public abstract class AbstractGangliaSink implements MetricsSink {
         datagramSocket = new DatagramSocket();
       }
     } catch (IOException e) {
-      LOG.error(e);
+      LOG.error(e.toString());
     }
 
     // see if sparseMetrics is supported. Default is false
@@ -167,6 +168,7 @@ public abstract class AbstractGangliaSink implements MetricsSink {
    *
    * @see org.apache.hadoop.metrics2.MetricsSink#flush()
    */
+  @Override
   public void flush() {
     // nothing to do as we are not buffering data
   }

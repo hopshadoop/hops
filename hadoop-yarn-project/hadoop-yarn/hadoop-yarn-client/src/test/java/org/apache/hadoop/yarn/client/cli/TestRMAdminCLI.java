@@ -34,22 +34,28 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceStatus;
 import org.apache.hadoop.ha.HAServiceTarget;
+import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.service.Service.STATE;
 import org.apache.hadoop.yarn.api.records.DecommissionType;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceInformation;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
@@ -67,13 +73,15 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshServiceAclsReque
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshSuperUserGroupsConfigurationRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshUserToGroupsMappingsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceRequest;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
+import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -88,6 +96,29 @@ public class TestRMAdminCLI {
   private RMAdminCLI rmAdminCLIWithHAEnabled;
   private CommonNodeLabelsManager dummyNodeLabelsManager;
   private boolean remoteAdminServiceAccessed = false;
+  private static final String HOST_A = "1.2.3.1";
+  private static final String HOST_B = "1.2.3.2";
+  private static File dest;
+
+  @Before
+  public void setup() throws Exception {
+    ResourceUtils.resetResourceTypes();
+    Configuration yarnConf = new YarnConfiguration();
+    String resourceTypesFile = "resource-types-4.xml";
+    InputStream source =
+        yarnConf.getClassLoader().getResourceAsStream(resourceTypesFile);
+    dest = new File(yarnConf.getClassLoader().
+        getResource(".").getPath(), "resource-types.xml");
+    FileUtils.copyInputStreamToFile(source, dest);
+    ResourceUtils.getResourceTypes();
+  }
+
+  @After
+  public void teardown() {
+    if (dest.exists()) {
+      dest.delete();
+    }
+  }
 
   @SuppressWarnings("static-access")
   @Before
@@ -130,6 +161,14 @@ public class TestRMAdminCLI {
     YarnConfiguration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
     conf.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
+    conf.set(HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, "rm1"), HOST_A
+        + ":12345");
+    conf.set(HAUtil.addSuffix(YarnConfiguration.RM_ADMIN_ADDRESS, "rm1"),
+        HOST_A + ":12346");
+    conf.set(HAUtil.addSuffix(YarnConfiguration.RM_ADDRESS, "rm2"), HOST_B
+        + ":12345");
+    conf.set(HAUtil.addSuffix(YarnConfiguration.RM_ADMIN_ADDRESS, "rm2"),
+        HOST_B + ":12346");
     rmAdminCLIWithHAEnabled = new RMAdminCLI(conf) {
 
       @Override
@@ -140,7 +179,17 @@ public class TestRMAdminCLI {
 
       @Override
       protected HAServiceTarget resolveTarget(String rmId) {
-        return haServiceTarget;
+        HAServiceTarget target = super.resolveTarget(rmId);
+        HAServiceTarget spy = Mockito.spy(target);
+        // Override the target to return our mock protocol
+        try {
+          Mockito.doReturn(haadmin).when(spy)
+              .getProxy(Mockito.<Configuration> any(), Mockito.anyInt());
+          Mockito.doReturn(false).when(spy).isAutoFailoverEnabled();
+        } catch (IOException e) {
+          throw new AssertionError(e); // mock setup doesn't really throw
+        }
+        return spy;
       }
     };
   }
@@ -235,16 +284,185 @@ public class TestRMAdminCLI {
   }
 
   @Test
+  public void testUpdateNodeResourceWithOverCommitTimeout() throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    int memSize = 2048;
+    int cores = 2;
+    int timeout = 1000;
+    String[] args = {"-updateNodeResource", nodeIdStr,
+        Integer.toString(memSize), Integer.toString(cores),
+        Integer.toString(timeout)};
+    assertEquals(0, rmAdminCLI.run(args));
+    ArgumentCaptor<UpdateNodeResourceRequest> argument =
+        ArgumentCaptor.forClass(UpdateNodeResourceRequest.class);
+    verify(admin).updateNodeResource(argument.capture());
+    UpdateNodeResourceRequest request = argument.getValue();
+    Map<NodeId, ResourceOption> resourceMap = request.getNodeResourceMap();
+    NodeId nodeId = NodeId.fromString(nodeIdStr);
+    Resource expectedResource = Resources.createResource(memSize, cores);
+    ResourceOption resource = resourceMap.get(nodeId);
+    assertNotNull("resource for " + nodeIdStr + " shouldn't be null.",
+        resource);
+    assertEquals("resource value for " + nodeIdStr + " is not as expected.",
+        ResourceOption.newInstance(expectedResource, timeout), resource);
+  }
+
+  @Test
   public void testUpdateNodeResourceWithInvalidValue() throws Exception {
     String nodeIdStr = "0.0.0.0:0";
     int memSize = -2048;
     int cores = 2;
-    String[] args = { "-updateNodeResource", nodeIdStr,
-        Integer.toString(memSize), Integer.toString(cores) };
+    String[] args = {"-updateNodeResource", nodeIdStr,
+        Integer.toString(memSize), Integer.toString(cores)};
     // execution of command line is expected to be failed
     assertEquals(-1, rmAdminCLI.run(args));
     // verify admin protocol never calls. 
-    verify(admin,times(0)).updateNodeResource(
+    verify(admin, times(0)).updateNodeResource(
+        any(UpdateNodeResourceRequest.class));
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypes() throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes =
+        "memory-mb=1Gi,vcores=1,resource1=3Gi,resource2=2m";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    assertEquals(0, rmAdminCLI.run(args));
+    ArgumentCaptor<UpdateNodeResourceRequest> argument =
+        ArgumentCaptor.forClass(UpdateNodeResourceRequest.class);
+    verify(admin).updateNodeResource(argument.capture());
+    UpdateNodeResourceRequest request = argument.getValue();
+    Map<NodeId, ResourceOption> resourceMap = request.getNodeResourceMap();
+    NodeId nodeId = NodeId.fromString(nodeIdStr);
+
+    Resource expectedResource = Resource.newInstance(1024, 1);
+    expectedResource.setResourceInformation("resource1",
+        ResourceInformation.newInstance("resource1", "Gi", 3));
+    expectedResource.setResourceInformation("resource2",
+        ResourceInformation.newInstance("resource2", "m", 2));
+
+    ResourceOption resource = resourceMap.get(nodeId);
+    // Ensure memory-mb has been converted to "Mi"
+    assertEquals(1024,
+        resource.getResource().getResourceInformation("memory-mb").getValue());
+    assertEquals("Mi",
+        resource.getResource().getResourceInformation("memory-mb").getUnits());
+    assertNotNull("resource for " + nodeIdStr + " shouldn't be null.",
+        resource);
+    assertEquals("resource value for " + nodeIdStr + " is not as expected.",
+        ResourceOption.newInstance(expectedResource,
+            ResourceOption.OVER_COMMIT_TIMEOUT_MILLIS_DEFAULT), resource);
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithOverCommitTimeout()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes =
+        "memory-mb=1024Mi,vcores=1,resource1=3Gi,resource2=2m";
+    int timeout = 1000;
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes,
+        Integer.toString(timeout)};
+    assertEquals(0, rmAdminCLI.run(args));
+    ArgumentCaptor<UpdateNodeResourceRequest> argument =
+        ArgumentCaptor.forClass(UpdateNodeResourceRequest.class);
+    verify(admin).updateNodeResource(argument.capture());
+    UpdateNodeResourceRequest request = argument.getValue();
+    Map<NodeId, ResourceOption> resourceMap = request.getNodeResourceMap();
+    NodeId nodeId = NodeId.fromString(nodeIdStr);
+
+    Resource expectedResource = Resource.newInstance(1024, 1);
+    expectedResource.setResourceInformation("resource1",
+        ResourceInformation.newInstance("resource1", "Gi", 3));
+    expectedResource.setResourceInformation("resource2",
+        ResourceInformation.newInstance("resource2", "m", 2));
+
+    ResourceOption resource = resourceMap.get(nodeId);
+    assertNotNull("resource for " + nodeIdStr + " shouldn't be null.",
+        resource);
+    assertEquals("resource value for " + nodeIdStr + " is not as expected.",
+        ResourceOption.newInstance(expectedResource, timeout), resource);
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithoutMandatoryResources()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes = "resource1=3Gi,resource2=2m";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    assertEquals(-1, rmAdminCLI.run(args));
+
+    // verify admin protocol never calls.
+    verify(admin, times(0)).updateNodeResource(
+        any(UpdateNodeResourceRequest.class));
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithInvalidResource()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes =
+        "memory-mb=1024Mi,vcores=1,resource1=3Gi,resource3=2m";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    // execution of command line is expected to be failed
+    assertEquals(-1, rmAdminCLI.run(args));
+    // verify admin protocol never calls.
+    verify(admin, times(0)).updateNodeResource(
+        any(UpdateNodeResourceRequest.class));
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithInvalidResourceValue()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes =
+        "memory-mb=1024Mi,vcores=1,resource1=ABDC,resource2=2m";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    // execution of command line is expected to be failed
+    assertEquals(-1, rmAdminCLI.run(args));
+    // verify admin protocol never calls.
+    verify(admin, times(0)).updateNodeResource(
+        any(UpdateNodeResourceRequest.class));
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithInvalidResourceUnit()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes =
+        "memory-mb=1024Mi,vcores=1,resource1=2XYZ,resource2=2m";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    // execution of command line is expected to be failed
+    assertEquals(-1, rmAdminCLI.run(args));
+    // verify admin protocol never calls.
+    verify(admin, times(0)).updateNodeResource(
+        any(UpdateNodeResourceRequest.class));
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithNonAlphaResourceUnit()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes =
+        "memory-mb=1024M i,vcores=1,resource1=2G,resource2=2m";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    // execution of command line is expected to be failed
+    assertEquals(-1, rmAdminCLI.run(args));
+    // verify admin protocol never calls.
+    verify(admin, times(0)).updateNodeResource(
+        any(UpdateNodeResourceRequest.class));
+  }
+
+  @Test
+  public void testUpdateNodeResourceTypesWithInvalidResourceFormat()
+      throws Exception {
+    String nodeIdStr = "0.0.0.0:0";
+    String resourceTypes = "memory-mb=1024Mi,vcores=1,resource2";
+    String[] args = {"-updateNodeResource", nodeIdStr, resourceTypes};
+    // execution of command line is expected to be failed
+    assertEquals(-1, rmAdminCLI.run(args));
+    // verify admin protocol never calls.
+    verify(admin, times(0)).updateNodeResource(
         any(UpdateNodeResourceRequest.class));
   }
 
@@ -267,7 +485,7 @@ public class TestRMAdminCLI {
         CheckForDecommissioningNodesRequest.class))).thenReturn(response);
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshNodes(
-        RefreshNodesRequest.newInstance(DecommissionType.GRACEFUL));
+        RefreshNodesRequest.newInstance(DecommissionType.GRACEFUL, 1));
     verify(admin, never()).refreshNodes(
         RefreshNodesRequest.newInstance(DecommissionType.FORCEFUL));
   }
@@ -327,7 +545,7 @@ public class TestRMAdminCLI {
           });
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin, atLeastOnce()).refreshNodes(
-        RefreshNodesRequest.newInstance(DecommissionType.GRACEFUL));
+        RefreshNodesRequest.newInstance(DecommissionType.GRACEFUL, -1));
     verify(admin, never()).refreshNodes(
         RefreshNodesRequest.newInstance(DecommissionType.FORCEFUL));
   }
@@ -345,10 +563,6 @@ public class TestRMAdminCLI {
     // negative timeout
     String[] negativeTimeoutArgs = {"-refreshNodes", "-g", "-1000", "-client"};
     assertEquals(-1, rmAdminCLI.run(negativeTimeoutArgs));
-
-    // server tracking mode
-    String[] serveTrackingrArgs = {"-refreshNodes", "-g", "1", "-server"};
-    assertEquals(-1, rmAdminCLI.run(serveTrackingrArgs));
 
     // invalid tracking mode
     String[] invalidTrackingArgs = {"-refreshNodes", "-g", "1", "-foo"};
@@ -429,6 +643,24 @@ public class TestRMAdminCLI {
   }
 
   @Test
+  public void testGetAllServiceState() throws Exception {
+    HAServiceStatus standbyStatus = new HAServiceStatus(
+        HAServiceState.STANDBY).setReadyToBecomeActive();
+    Mockito.doReturn(standbyStatus).when(haadmin).getServiceStatus();
+    ByteArrayOutputStream dataOut = new ByteArrayOutputStream();
+    rmAdminCLIWithHAEnabled.setOut(new PrintStream(dataOut));
+    String[] args = {"-getAllServiceState"};
+    assertEquals(0, rmAdminCLIWithHAEnabled.run(args));
+    assertTrue(dataOut.toString().contains(
+        String.format("%-50s %-10s", (HOST_A + ":" + 12346),
+            standbyStatus.getState())));
+    assertTrue(dataOut.toString().contains(
+        String.format("%-50s %-10s", (HOST_B + ":" + 12346),
+            standbyStatus.getState())));
+    rmAdminCLIWithHAEnabled.setOut(System.out);
+  }
+
+  @Test
   public void testCheckHealth() throws Exception {
     String[] args = {"-checkHealth", "rm1"};
 
@@ -465,8 +697,9 @@ public class TestRMAdminCLI {
       assertTrue(dataOut
           .toString()
           .contains(
-              "yarn rmadmin [-refreshQueues] [-refreshNodes [-g [timeout in " +
-              "seconds] -client|server]] [-refreshNodesResources] [-refresh" +
+              "yarn rmadmin [-refreshQueues] [-refreshNodes "+
+              "[-g|graceful [timeout in seconds] -client|server]] " +
+              "[-refreshNodesResources] [-refresh" +
               "SuperUserGroupsConfiguration] [-refreshUserToGroupsMappings] " +
               "[-refreshAdminAcls] [-refreshServiceAcl] [-getGroup " +
               "[username]] [-addToClusterNodeLabels " +
@@ -476,8 +709,10 @@ public class TestRMAdminCLI {
               "<\"node1[:port]=label1,label2 node2[:port]=label1\"> " +
               "[-failOnUnknownNodes]] " +
               "[-directlyAccessNodeLabelStore] [-refreshClusterMaxPriority] " +
-              "[-updateNodeResource [NodeID] [MemSize] [vCores] " +
-              "([OvercommitTimeout]) [-help [cmd]]"));
+              "[-updateNodeResource [NodeID] [MemSize] [vCores] "
+              + "([OvercommitTimeout]) or -updateNodeResource "
+              + "[NodeID] [ResourceTypes] ([OvercommitTimeout])] "
+              + "[-help [cmd]]"));
       assertTrue(dataOut
           .toString()
           .contains(
@@ -486,7 +721,8 @@ public class TestRMAdminCLI {
       assertTrue(dataOut
           .toString()
           .contains(
-              "-refreshNodes [-g [timeout in seconds] -client|server]: " +
+              "-refreshNodes [-g|graceful [timeout in seconds]" +
+              " -client|server]: " +
               "Refresh the hosts information at the ResourceManager."));
       assertTrue(dataOut
           .toString()
@@ -519,8 +755,8 @@ public class TestRMAdminCLI {
       testError(new String[] { "-help", "-refreshQueues" },
           "Usage: yarn rmadmin [-refreshQueues]", dataErr, 0);
       testError(new String[] { "-help", "-refreshNodes" },
-          "Usage: yarn rmadmin [-refreshNodes [-g [timeout in seconds] " +
-          "-client|server]]", dataErr, 0);
+          "Usage: yarn rmadmin [-refreshNodes [-g|graceful " +
+          "[timeout in seconds] -client|server]]", dataErr, 0);
       testError(new String[] { "-help", "-refreshNodesResources" },
           "Usage: yarn rmadmin [-refreshNodesResources]", dataErr, 0);
       testError(new String[] { "-help", "-refreshUserToGroupsMappings" },
@@ -559,8 +795,8 @@ public class TestRMAdminCLI {
       assertEquals(0, rmAdminCLIWithHAEnabled.run(args));
       oldOutPrintStream.println(dataOut);
       String expectedHelpMsg = 
-          "yarn rmadmin [-refreshQueues] [-refreshNodes [-g [timeout in "
-              + "seconds] -client|server]] "
+          "yarn rmadmin [-refreshQueues] [-refreshNodes [-g|graceful "
+              + "[timeout in seconds] -client|server]] "
               + "[-refreshNodesResources] [-refreshSuperUserGroupsConfiguration] "
               + "[-refreshUserToGroupsMappings] "
               + "[-refreshAdminAcls] [-refreshServiceAcl] [-getGroup"
@@ -569,10 +805,15 @@ public class TestRMAdminCLI {
               + " [-removeFromClusterNodeLabels <label1,label2,label3>] [-replaceLabelsOnNode "
               + "<\"node1[:port]=label1,label2 node2[:port]=label1\"> "
               + "[-failOnUnknownNodes]] [-directlyAccessNodeLabelStore] "
-              + "[-refreshClusterMaxPriority] [-updateNodeResource [NodeID] [MemSize] [vCores] "
-              + "([OvercommitTimeout]) [-transitionToActive [--forceactive] <serviceId>] "
+              + "[-refreshClusterMaxPriority] "
+              + "[-updateNodeResource [NodeID] [MemSize] [vCores] "
+              + "([OvercommitTimeout]) "
+              + "or -updateNodeResource [NodeID] [ResourceTypes] "
+              + "([OvercommitTimeout])] "
+              + "[-transitionToActive [--forceactive] <serviceId>] "
               + "[-transitionToStandby <serviceId>] "
-              + "[-getServiceState <serviceId>] [-checkHealth <serviceId>] [-help [cmd]]";
+              + "[-getServiceState <serviceId>] [-getAllServiceState] "
+              + "[-checkHealth <serviceId>] [-help [cmd]]";
       String actualHelpMsg = dataOut.toString();
       assertTrue(String.format("Help messages: %n " + actualHelpMsg + " %n doesn't include expected " +
           "messages: %n" + expectedHelpMsg), actualHelpMsg.contains(expectedHelpMsg

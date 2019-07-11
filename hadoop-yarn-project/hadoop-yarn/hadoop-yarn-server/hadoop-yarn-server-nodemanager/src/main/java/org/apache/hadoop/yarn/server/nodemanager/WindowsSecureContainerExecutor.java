@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -509,7 +509,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
               output.append(buf, 0, nRead);
             }
           } catch (Throwable t) {
-            LOG.error("Error occured reading the process stdout", t);
+            LOG.error("Error occurred reading the process stdout", t);
           }
         }
       };
@@ -628,16 +628,16 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   }
 
   @Override
-  public Path localizeClasspathJar(Path classPathJar, Path pwd, String owner) 
+  public Path localizeClasspathJar(Path jarPath, Path target, String owner) 
       throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug(String.format("localizeClasspathJar: %s %s o:%s", 
-          classPathJar, pwd, owner));
+          jarPath, target, owner));
     }
-    createDir(pwd,  new FsPermission(DIR_PERM), true, owner);
-    String fileName = classPathJar.getName();
-    Path dst = new Path(pwd, fileName);
-    Native.Elevated.move(classPathJar, dst, true);
+    createDir(target,  new FsPermission(DIR_PERM), true, owner);
+    String fileName = jarPath.getName();
+    Path dst = new Path(target, fileName);
+    Native.Elevated.move(jarPath, dst, true);
     Native.Elevated.chown(dst, owner, nodeManagerGroup);
     return dst;
   }
@@ -648,7 +648,6 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     Path nmPrivateContainerTokensPath = ctx.getNmPrivateContainerTokens();
     InetSocketAddress nmAddr = ctx.getNmAddr();
     String user = ctx.getUser();
-    String userFolder = ctx.getUserFolder();
     String appId = ctx.getAppId();
     String locId = ctx.getLocId();
     LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
@@ -657,12 +656,12 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
 
     Path classpathJarPrivateDir = dirsHandler.getLocalPathForWrite(
         ResourceLocalizationService.NM_PRIVATE_DIR);
-    createUserLocalDirs(localDirs, user, userFolder);
-    createUserCacheDirs(localDirs, user, userFolder);
-    createAppDirs(localDirs, user, appId, userFolder);
-    createAppLogDirs(appId, logDirs, user, userFolder);
+    createUserLocalDirs(localDirs, user);
+    createUserCacheDirs(localDirs, user);
+    createAppDirs(localDirs, user, appId);
+    createAppLogDirs(appId, logDirs, user);
 
-    Path appStorageDir = getWorkingDir(localDirs, user, appId, userFolder);
+    Path appStorageDir = getWorkingDir(localDirs, user, appId);
 
     String tokenFn = String.format(
         ContainerLocalizer.TOKEN_FILE_NAME_FMT, locId);
@@ -703,7 +702,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     command.addAll(ContainerLocalizer.getJavaOpts(getConf()));
 
     ContainerLocalizer.buildMainArgs(command, user, appId, locId, nmAddr,
-        localDirs, userFolder);
+        localDirs, super.getConf());
 
     String cmdLine = StringUtils.join(command, " ");
 
@@ -723,7 +722,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
       }
       catch(Throwable e) {
         LOG.warn(String.format(
-            "An exception occured during the cleanup of localizer job %s:%n%s",
+            "An exception occurred during the cleanup of localizer job %s:%n%s",
             localizerPid,
             org.apache.hadoop.util.StringUtils.stringifyException(e)));
       }
@@ -733,7 +732,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   @Override
   protected CommandExecutor buildCommandExecutor(String wrapperScriptPath,
       String containerIdStr, String userName, Path pidFile, Resource resource,
-      File wordDir, Map<String, String> environment) throws IOException {
+      File wordDir, Map<String, String> environment) {
      return new WintuilsProcessStubExecutor(
          wordDir.toString(),
          containerIdStr, userName, pidFile.toString(), 

@@ -75,7 +75,7 @@ public class TestResourceTrackerOnHA extends ProtocolHATestBase{
   }
 
   private ResourceTracker getRMClient() throws IOException {
-    return ServerRMProxy.createRMProxy(this.conf, ResourceTracker.class,true);
+    return ServerRMProxy.createRMProxy(this.conf, ResourceTracker.class);
   }
 
   private boolean waitForNodeManagerToConnect(int timeout, NodeId nodeId)

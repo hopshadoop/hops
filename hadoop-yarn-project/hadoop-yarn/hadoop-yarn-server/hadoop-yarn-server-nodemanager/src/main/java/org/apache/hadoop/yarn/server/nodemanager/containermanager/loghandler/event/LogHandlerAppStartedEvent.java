@@ -29,26 +29,39 @@ public class LogHandlerAppStartedEvent extends LogHandlerEvent {
 
   private final ApplicationId applicationId;
   private final String user;
-  private final String userFolder;
   private final Credentials credentials;
   private final Map<ApplicationAccessType, String> appAcls;
   private final LogAggregationContext logAggregationContext;
+  /**
+   * The value will be set when the application is recovered from state store.
+   * We use this value in AppLogAggregatorImpl to determine, if log retention
+   * policy is enabled, if we need to upload old application log files. Files
+   * older than retention policy will not be uploaded but scheduled for
+   * deletion.
+   */
+  private final long recoveredAppLogInitedTime;
 
   public LogHandlerAppStartedEvent(ApplicationId appId, String user,
-      Credentials credentials, Map<ApplicationAccessType, String> appAcls, String userFolder) {
-    this(appId, user, credentials, appAcls, null, userFolder);
+      Credentials credentials, Map<ApplicationAccessType, String> appAcls) {
+    this(appId, user, credentials, appAcls, null, -1);
   }
 
   public LogHandlerAppStartedEvent(ApplicationId appId, String user,
       Credentials credentials, Map<ApplicationAccessType, String> appAcls,
-      LogAggregationContext logAggregationContext, String userFolder) {
+      LogAggregationContext logAggregationContext) {
+    this(appId, user, credentials, appAcls, logAggregationContext, -1);
+  }
+
+  public LogHandlerAppStartedEvent(ApplicationId appId, String user,
+      Credentials credentials, Map<ApplicationAccessType, String> appAcls,
+      LogAggregationContext logAggregationContext, long appLogInitedTime) {
     super(LogHandlerEventType.APPLICATION_STARTED);
     this.applicationId = appId;
     this.user = user;
-    this.userFolder = userFolder;
     this.credentials = credentials;
     this.appAcls = appAcls;
     this.logAggregationContext = logAggregationContext;
+    this.recoveredAppLogInitedTime = appLogInitedTime;
   }
 
   public ApplicationId getApplicationId() {
@@ -62,10 +75,6 @@ public class LogHandlerAppStartedEvent extends LogHandlerEvent {
   public String getUser() {
     return this.user;
   }
-
-  public String getUserFolder() {
-    return this.userFolder;
-  }
   
   public Map<ApplicationAccessType, String> getApplicationAcls() {
     return this.appAcls;
@@ -73,5 +82,9 @@ public class LogHandlerAppStartedEvent extends LogHandlerEvent {
 
   public LogAggregationContext getLogAggregationContext() {
     return this.logAggregationContext;
+  }
+
+  public long getRecoveredAppLogInitedTime() {
+    return this.recoveredAppLogInitedTime;
   }
 }

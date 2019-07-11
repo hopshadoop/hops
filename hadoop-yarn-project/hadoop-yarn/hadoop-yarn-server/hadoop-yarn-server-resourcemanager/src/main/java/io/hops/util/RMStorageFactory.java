@@ -56,7 +56,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import io.hops.DalEventStreaming;
 
 public class RMStorageFactory {
 
@@ -67,33 +66,11 @@ public class RMStorageFactory {
   private static Map<Class, EntityDataAccess> dataAccessAdaptors =
       new HashMap<Class, EntityDataAccess>();
 
-  private static DalEventStreaming dEventStreaming;
   private static boolean streaingRunning = false;
   public static StorageConnector getConnector() {
     return dStorageFactory.getConnector();
   }
-
-  public static synchronized void kickEventStreamingAPI(boolean isLeader,
-          Configuration conf) throws
-          StorageInitializtionException {
-    dEventStreaming = DalDriver.loadHopsEventStreamingLib(YarnAPIStorageFactory.EVENT_STREAMING_FOR_DISTRIBUTED_SERVICE);
     
-    String connectionString = dStorageFactory.getConnector().getClusterConnectString() + ":" + 
-            conf.getInt(YarnConfiguration.HOPS_EVENT_STREAMING_DB_PORT, 
-                    YarnConfiguration.DEFAULT_HOPS_EVENT_STREAMING_DB_PORT);
-    
-    dEventStreaming.init(connectionString, dStorageFactory.getConnector().getDatabaseName());
-    dEventStreaming.startHopsEvetAPISession(isLeader);
-    streaingRunning = true;
-  }
-  
-  public static synchronized void stopEventStreamingAPI() {
-    if(streaingRunning && dEventStreaming!=null){
-      streaingRunning = false;
-      dEventStreaming.closeHopsEventAPISession();
-    }
-  }
-  
   public static void setConfiguration(Configuration conf)
       throws StorageInitializtionException, IOException {
     if (isInitialized) {

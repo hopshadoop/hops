@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
@@ -51,6 +49,8 @@ import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.Random;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.http.HttpStatus;
 
 public class TestingRMAppSecurityActions implements RMAppSecurityActions, Configurable {
   private final static Logger LOG = LogManager.getLogger(TestingRMAppSecurityActions.class);

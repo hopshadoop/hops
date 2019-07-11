@@ -18,20 +18,23 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
+import java.util.Comparator;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities.ActivitiesManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerHealth;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.preemption.PreemptionManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
+import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
-
-import java.util.Comparator;
 
 /**
  * Read-only interface to {@link CapacityScheduler} context.
@@ -59,16 +62,16 @@ public interface CapacitySchedulerContext {
   Configuration getConf();
 
   ResourceCalculator getResourceCalculator();
-
-  Comparator<CSQueue> getNonPartitionedQueueComparator();
-  
-  PartitionedQueueComparator getPartitionedQueueComparator();
   
   FiCaSchedulerNode getNode(NodeId nodeId);
 
   FiCaSchedulerApp getApplicationAttempt(ApplicationAttemptId attemptId);
 
+  PreemptionManager getPreemptionManager();
+
   SchedulerHealth getSchedulerHealth();
+
+  long getLastNodeUpdateTime();
 
   /**
    * @return QueueCapacities root queue of the Capacity Scheduler Queue, root
@@ -77,7 +80,26 @@ public interface CapacitySchedulerContext {
    */
   ResourceUsage getClusterResourceUsage();
 
-  PreemptionManager getPreemptionManager();
+  ActivitiesManager getActivitiesManager();
 
-  long getLastNodeUpdateTime();
+  CapacitySchedulerQueueManager getCapacitySchedulerQueueManager();
+
+  /**
+   *
+   * @return Max Cluster level App priority.
+   */
+  Priority getMaxClusterLevelAppPriority();
+
+  /**
+   * Returns if configuration is mutable.
+   * @return if configuration is mutable
+   */
+  boolean isConfigurationMutable();
+
+  /**
+   * Get clock from scheduler
+   * @return Clock
+   */
+  Clock getClock();
+
 }

@@ -82,6 +82,8 @@ public class TestLeveldbRMStateStore extends RMStateStoreTestBase {
 
   @Test(timeout = 60000)
   public void testEpoch() throws Exception {
+    conf.setLong(YarnConfiguration.RM_EPOCH, epoch);
+    conf.setLong(YarnConfiguration.RM_EPOCH_RANGE, getEpochRange());
     LeveldbStateStoreTester tester = new LeveldbStateStoreTester();
     testEpoch(tester);
   }
@@ -102,6 +104,12 @@ public class TestLeveldbRMStateStore extends RMStateStoreTestBase {
   public void testRemoveApplication() throws Exception {
     LeveldbStateStoreTester tester = new LeveldbStateStoreTester();
     testRemoveApplication(tester);
+  }
+
+  @Test(timeout = 60000)
+  public void testRemoveAttempt() throws Exception {
+    LeveldbStateStoreTester tester = new LeveldbStateStoreTester();
+    testRemoveAttempt(tester);
   }
 
   @Test(timeout = 60000)
@@ -153,6 +161,7 @@ public class TestLeveldbRMStateStore extends RMStateStoreTestBase {
       stateStore = new LeveldbRMStateStore();
       stateStore.init(conf);
       stateStore.start();
+      stateStore.dispatcher.disableExitOnDispatchException();
       return stateStore;
     }
 
@@ -181,6 +190,15 @@ public class TestLeveldbRMStateStore extends RMStateStoreTestBase {
         getRMStateStore();
       }
       return stateStore.loadRMAppState(app.getApplicationId()) != null;
+    }
+
+    @Override
+    public boolean attemptExists(RMAppAttempt attempt) throws Exception {
+      if (stateStore.isClosed()) {
+        getRMStateStore();
+      }
+      return stateStore.loadRMAppAttemptState(attempt.getAppAttemptId())
+          != null;
     }
   }
 }

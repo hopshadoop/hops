@@ -51,7 +51,7 @@ public class TestAutoCloseableLock {
    */
   @Test
   public void testMultipleThread() throws Exception {
-    final AutoCloseableLock lock = new AutoCloseableLock();
+    AutoCloseableLock lock = new AutoCloseableLock();
     lock.acquire();
     assertTrue(lock.isLocked());
     Thread competingThread = new Thread() {
@@ -75,7 +75,7 @@ public class TestAutoCloseableLock {
    */
   @Test
   public void testTryWithResourceSyntax() throws Exception {
-    final AutoCloseableLock lock = new AutoCloseableLock();
+    AutoCloseableLock lock = new AutoCloseableLock();
     try(AutoCloseableLock localLock = lock.acquire()) {
       assertEquals(localLock, lock);
       assertTrue(lock.isLocked());

@@ -34,15 +34,13 @@ import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.InvalidJobConfException;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Task;
 import org.apache.hadoop.mapred.TaskLog;
@@ -67,12 +65,11 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
-import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
-import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.Apps;
-import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helper class for MR applications
@@ -80,7 +77,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 @Private
 @Unstable
 public class MRApps extends Apps {
-  public static final Log LOG = LogFactory.getLog(MRApps.class);
+  public static final Logger LOG = LoggerFactory.getLogger(MRApps.class);
 
   public static String toString(JobId jid) {
     return jid.toString();
@@ -114,7 +111,7 @@ public class MRApps extends Apps {
     throw new YarnRuntimeException("Unknown task type: "+ type.toString());
   }
 
-  public static enum TaskAttemptStateUI {
+  public enum TaskAttemptStateUI {
     NEW(
         new TaskAttemptState[] { TaskAttemptState.NEW,
             TaskAttemptState.STARTING }),
@@ -136,7 +133,7 @@ public class MRApps extends Apps {
     }
   }
 
-  public static enum TaskStateUI {
+  public enum TaskStateUI {
     RUNNING(
         new TaskState[]{TaskState.RUNNING}),
     PENDING(new TaskState[]{TaskState.SCHEDULED}),
@@ -235,7 +232,7 @@ public class MRApps extends Apps {
     }
     // TODO: Remove duplicates.
   }
-
+  
   @SuppressWarnings("deprecation")
   public static void setClasspath(Map<String, String> environment,
       Configuration conf) throws IOException {
@@ -246,56 +243,33 @@ public class MRApps extends Apps {
       conf.getBoolean(MRJobConfig.MAPREDUCE_JOB_CLASSLOADER, false)
         ? Environment.APP_CLASSPATH.name() : Environment.CLASSPATH.name();
 
-    String hadoopClasspathEnvVar = Environment.HADOOP_CLASSPATH.name();
-
     MRApps.addToEnvironment(environment,
       classpathEnvVar, crossPlatformifyMREnv(conf, Environment.PWD), conf);
-
-    MRApps.addToEnvironment(environment,
-        hadoopClasspathEnvVar, crossPlatformifyMREnv(conf, Environment.PWD),
-        conf);
-
     if (!userClassesTakesPrecedence) {
       MRApps.setMRFrameworkClasspath(environment, conf);
     }
-
-    addClasspathToEnv(environment, classpathEnvVar, conf);
-    addClasspathToEnv(environment, hadoopClasspathEnvVar, conf);
-
-    // MAPREDUCE-6619, retain $HADOOP_CLASSPATH
-    MRApps.addToEnvironment(environment, hadoopClasspathEnvVar,
-        System.getenv(hadoopClasspathEnvVar), conf);
-
-    if (userClassesTakesPrecedence) {
-      MRApps.setMRFrameworkClasspath(environment, conf);
-    }
-  }
-
-  @SuppressWarnings("deprecation")
-  public static void addClasspathToEnv(Map<String, String> environment,
-      String classpathEnvVar, Configuration conf) throws IOException {
+    /*
+     * We use "*" for the name of the JOB_JAR instead of MRJobConfig.JOB_JAR for
+     * the case where the job jar is not necessarily named "job.jar". This can
+     * happen, for example, when the job is leveraging a resource from the YARN
+     * shared cache.
+     */
     MRApps.addToEnvironment(
         environment,
         classpathEnvVar,
-        MRJobConfig.JOB_JAR + Path.SEPARATOR + MRJobConfig.JOB_JAR, conf);
+        MRJobConfig.JOB_JAR + Path.SEPARATOR + "*", conf);
     MRApps.addToEnvironment(
         environment,
         classpathEnvVar,
-        MRJobConfig.JOB_JAR + Path.SEPARATOR + "classes" + Path.SEPARATOR,
-        conf);
-
+        MRJobConfig.JOB_JAR + Path.SEPARATOR + "classes" + Path.SEPARATOR, conf);
     MRApps.addToEnvironment(
         environment,
         classpathEnvVar,
-        MRJobConfig.JOB_JAR + Path.SEPARATOR + "lib" + Path.SEPARATOR + "*",
-        conf);
-
+        MRJobConfig.JOB_JAR + Path.SEPARATOR + "lib" + Path.SEPARATOR + "*", conf);
     MRApps.addToEnvironment(
         environment,
         classpathEnvVar,
-        crossPlatformifyMREnv(conf, Environment.PWD) + Path.SEPARATOR + "*",
-        conf);
-
+        crossPlatformifyMREnv(conf, Environment.PWD) + Path.SEPARATOR + "*", conf);
     // a * in the classpath will only find a .jar, so we need to filter out
     // all .jars and add everything else
     addToClasspathIfNotJar(DistributedCache.getFileClassPaths(conf),
@@ -306,8 +280,11 @@ public class MRApps extends Apps {
         DistributedCache.getCacheArchives(conf),
         conf,
         environment, classpathEnvVar);
+    if (userClassesTakesPrecedence) {
+      MRApps.setMRFrameworkClasspath(environment, conf);
+    }
   }
-
+  
   /**
    * Add the paths to the classpath if they are not jars
    * @param paths the paths to add to the classpath
@@ -326,12 +303,36 @@ public class MRApps extends Apps {
         for (URI u: withLinks) {
           Path p = new Path(u);
           FileSystem remoteFS = p.getFileSystem(conf);
+          String name = p.getName();
+          String wildcard = null;
+
+          // If the path is wildcarded, resolve its parent directory instead
+          if (name.equals(DistributedCache.WILDCARD)) {
+            wildcard = name;
+            p = p.getParent();
+          }
+
           p = remoteFS.resolvePath(p.makeQualified(remoteFS.getUri(),
               remoteFS.getWorkingDirectory()));
-          String name = (null == u.getFragment())
-              ? p.getName() : u.getFragment();
+
+          if ((wildcard != null) && (u.getFragment() != null)) {
+            throw new IOException("Invalid path URI: " + p + " - cannot "
+                + "contain both a URI fragment and a wildcard");
+          } else if (wildcard != null) {
+            name = p.getName() + Path.SEPARATOR + wildcard;
+          } else if (u.getFragment() != null) {
+            name = u.getFragment();
+          }
+
+          // If it's not a JAR, add it to the link lookup.
           if (!StringUtils.toLowerCase(name).endsWith(".jar")) {
-            linkLookup.put(p, name);
+            String old = linkLookup.put(p, name);
+
+            if ((old != null) && !name.equals(old)) {
+              LOG.warn("The same path is included more than once "
+                  + "with different links or wildcards: " + p + " [" +
+                  name + ", " + old + "]");
+            }
           }
         }
       }
@@ -474,27 +475,31 @@ public class MRApps extends Apps {
   }
 
   @SuppressWarnings("deprecation")
-  public static void setupDistributedCache( 
-      Configuration conf, 
-      Map<String, LocalResource> localResources) 
-  throws IOException {
-    
+  public static void setupDistributedCache(Configuration conf,
+      Map<String, LocalResource> localResources) throws IOException {
+
+    LocalResourceBuilder lrb = new LocalResourceBuilder();
+    lrb.setConf(conf);
+
     // Cache archives
-    parseDistributedCacheArtifacts(conf, localResources,  
-        LocalResourceType.ARCHIVE, 
-        DistributedCache.getCacheArchives(conf), 
-        DistributedCache.getArchiveTimestamps(conf),
-        getFileSizes(conf, MRJobConfig.CACHE_ARCHIVES_SIZES), 
-        DistributedCache.getArchiveVisibilities(conf));
+    lrb.setType(LocalResourceType.ARCHIVE);
+    lrb.setUris(DistributedCache.getCacheArchives(conf));
+    lrb.setTimestamps(DistributedCache.getArchiveTimestamps(conf));
+    lrb.setSizes(getFileSizes(conf, MRJobConfig.CACHE_ARCHIVES_SIZES));
+    lrb.setVisibilities(DistributedCache.getArchiveVisibilities(conf));
+    lrb.setSharedCacheUploadPolicies(
+        Job.getArchiveSharedCacheUploadPolicies(conf));
+    lrb.createLocalResources(localResources);
     
     // Cache files
-    parseDistributedCacheArtifacts(conf, 
-        localResources,  
-        LocalResourceType.FILE, 
-        DistributedCache.getCacheFiles(conf),
-        DistributedCache.getFileTimestamps(conf),
-        getFileSizes(conf, MRJobConfig.CACHE_FILES_SIZES),
-        DistributedCache.getFileVisibilities(conf));
+    lrb.setType(LocalResourceType.FILE);
+    lrb.setUris(DistributedCache.getCacheFiles(conf));
+    lrb.setTimestamps(DistributedCache.getFileTimestamps(conf));
+    lrb.setSizes(getFileSizes(conf, MRJobConfig.CACHE_FILES_SIZES));
+    lrb.setVisibilities(DistributedCache.getFileVisibilities(conf));
+    lrb.setSharedCacheUploadPolicies(
+        Job.getFileSharedCacheUploadPolicies(conf));
+    lrb.createLocalResources(localResources);
   }
 
   /**
@@ -506,7 +511,6 @@ public class MRApps extends Apps {
    * @param conf
    * @throws java.io.IOException
    */
-  @SuppressWarnings("deprecation")
   public static void setupDistributedCacheLocal(Configuration conf)
       throws IOException {
 
@@ -554,78 +558,6 @@ public class MRApps extends Apps {
     }
   }
 
-  private static String getResourceDescription(LocalResourceType type) {
-    if(type == LocalResourceType.ARCHIVE || type == LocalResourceType.PATTERN) {
-      return "cache archive (" + MRJobConfig.CACHE_ARCHIVES + ") ";
-    }
-    return "cache file (" + MRJobConfig.CACHE_FILES + ") ";
-  }
-  
-  private static String toString(org.apache.hadoop.yarn.api.records.URL url) {
-    StringBuffer b = new StringBuffer();
-    b.append(url.getScheme()).append("://").append(url.getHost());
-    if(url.getPort() >= 0) {
-      b.append(":").append(url.getPort());
-    }
-    b.append(url.getFile());
-    return b.toString();
-  }
-  
-  // TODO - Move this to MR!
-  // Use TaskDistributedCacheManager.CacheFiles.makeCacheFiles(URI[], 
-  // long[], boolean[], Path[], FileType)
-  @SuppressWarnings("deprecation")
-  private static void parseDistributedCacheArtifacts(
-      Configuration conf,
-      Map<String, LocalResource> localResources,
-      LocalResourceType type,
-      URI[] uris, long[] timestamps, long[] sizes, boolean visibilities[])
-  throws IOException {
-
-    if (uris != null) {
-      // Sanity check
-      if ((uris.length != timestamps.length) || (uris.length != sizes.length) ||
-          (uris.length != visibilities.length)) {
-        throw new IllegalArgumentException("Invalid specification for " +
-            "distributed-cache artifacts of type " + type + " :" +
-            " #uris=" + uris.length +
-            " #timestamps=" + timestamps.length +
-            " #visibilities=" + visibilities.length
-            );
-      }
-      
-      for (int i = 0; i < uris.length; ++i) {
-        URI u = uris[i];
-        Path p = new Path(u);
-        FileSystem remoteFS = p.getFileSystem(conf);
-        p = remoteFS.resolvePath(p.makeQualified(remoteFS.getUri(),
-            remoteFS.getWorkingDirectory()));
-        // Add URI fragment or just the filename
-        Path name = new Path((null == u.getFragment())
-          ? p.getName()
-          : u.getFragment());
-        if (name.isAbsolute()) {
-          throw new IllegalArgumentException("Resource name must be relative");
-        }
-        String linkName = name.toUri().getPath();
-        LocalResource orig = localResources.get(linkName);
-        URL url = URL.fromURI(p.toUri());
-        if(orig != null && !orig.getResource().equals(url)) {
-          LOG.warn(
-              getResourceDescription(orig.getType()) + 
-              toString(orig.getResource()) + " conflicts with " + 
-              getResourceDescription(type) + toString(url) + 
-              " This will be an error in Hadoop 2.0");
-          continue;
-        }
-        localResources.put(linkName, LocalResource
-            .newInstance(URL.fromURI(p.toUri()), type, visibilities[i]
-            ? LocalResourceVisibility.PUBLIC : LocalResourceVisibility.PRIVATE,
-          sizes[i], timestamps[i]));
-      }
-    }
-  }
-  
   // TODO - Move this to MR!
   private static long[] getFileSizes(Configuration conf, String key) {
     String[] strs = conf.getStrings(key);
@@ -643,12 +575,12 @@ public class MRApps extends Apps {
     if (isMap) {
       return conf.get(
           MRJobConfig.MAP_LOG_LEVEL,
-          JobConf.DEFAULT_LOG_LEVEL.toString()
+          JobConf.DEFAULT_LOG_LEVEL
       );
     } else {
       return conf.get(
           MRJobConfig.REDUCE_LOG_LEVEL,
-          JobConf.DEFAULT_LOG_LEVEL.toString()
+          JobConf.DEFAULT_LOG_LEVEL
       );
     }
   }
@@ -736,33 +668,6 @@ public class MRApps extends Apps {
     }
   }
 
-  public static void setEnvFromInputString(Map<String, String> env,
-      String envString, Configuration conf) {
-    String classPathSeparator =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-          MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
-            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
-    Apps.setEnvFromInputString(env, envString, classPathSeparator);
-  }
-
-  @Public
-  @Unstable
-  public static void addToEnvironment(Map<String, String> environment,
-      String variable, String value, Configuration conf) {
-    String classPathSeparator =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-          MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
-            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
-    Apps.addToEnvironment(environment, variable, value, classPathSeparator);
-  }
-
-  public static String crossPlatformifyMREnv(Configuration conf, Environment env) {
-    boolean crossPlatform =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-            MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM);
-    return crossPlatform ? env.$$() : env.$();
-  }
-
   /**
    * Return lines for system property keys and values per configuration.
    *
@@ -792,5 +697,42 @@ public class MRApps extends Apps {
       }
     }
     return null;
+  }
+
+  public static void setEnvFromInputString(Map<String, String> env,
+      String envString, Configuration conf) {
+    String classPathSeparator =
+        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
+          MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
+            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
+    Apps.setEnvFromInputString(env, envString, classPathSeparator);
+  }
+
+  public static void setEnvFromInputProperty(Map<String, String> env,
+      String propName, String defaultPropValue, Configuration conf) {
+    String classPathSeparator =
+        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
+            MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
+            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
+    Apps.setEnvFromInputProperty(env, propName, defaultPropValue, conf,
+        classPathSeparator);
+  }
+
+  @Public
+  @Unstable
+  public static void addToEnvironment(Map<String, String> environment,
+      String variable, String value, Configuration conf) {
+    String classPathSeparator =
+        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
+          MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
+            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
+    Apps.addToEnvironment(environment, variable, value, classPathSeparator);
+  }
+
+  public static String crossPlatformifyMREnv(Configuration conf, Environment env) {
+    boolean crossPlatform =
+        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
+            MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM);
+    return crossPlatform ? env.$$() : env.$();
   }
 }

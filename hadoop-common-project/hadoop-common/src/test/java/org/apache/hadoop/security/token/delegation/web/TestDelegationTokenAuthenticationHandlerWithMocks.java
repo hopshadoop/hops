@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.security.token.delegation.web;
 
+import static org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthenticator.DelegationTokenOperation.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -25,7 +30,6 @@ import org.apache.hadoop.security.authentication.server.AuthenticationHandler;
 import org.apache.hadoop.security.authentication.server.AuthenticationToken;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -107,12 +111,21 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
 
   @Test
   public void testManagementOperations() throws Exception {
-      testNonManagementOperation();
-      testManagementOperationErrors();
-      testGetToken(null, new Text("foo"));
-      testGetToken("bar", new Text("foo"));
-      testCancelToken();
-      testRenewToken();
+    final Text testTokenKind = new Text("foo");
+    final String testRenewer = "bar";
+    final String testService = "192.168.64.101:8888";
+    testNonManagementOperation();
+    testManagementOperationErrors();
+    testGetToken(null, null, testTokenKind);
+    testGetToken(testRenewer, null, testTokenKind);
+    testCancelToken();
+    testRenewToken(testRenewer);
+
+    // Management operations against token requested with service parameter
+    Token<DelegationTokenIdentifier> testToken =
+        testGetToken(testRenewer, testService, testTokenKind);
+    testRenewToken(testToken, testRenewer);
+    testCancelToken(testToken);
   }
 
   private void testNonManagementOperation() throws Exception {
@@ -152,8 +165,8 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
         Mockito.eq("mock"));
   }
 
-  private void testGetToken(String renewer, Text expectedTokenKind)
-      throws Exception {
+  private Token<DelegationTokenIdentifier> testGetToken(String renewer,
+      String service, Text expectedTokenKind) throws Exception {
     DelegationTokenAuthenticator.DelegationTokenOperation op =
         DelegationTokenAuthenticator.DelegationTokenOperation.
             GETDELEGATIONTOKEN;
@@ -169,10 +182,14 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
         new StringWriter()));
     Assert.assertFalse(handler.managementOperation(token, request, response));
 
-    Mockito.when(request.getQueryString()).
-        thenReturn(DelegationTokenAuthenticator.OP_PARAM + "=" + op.toString() +
-        "&" + DelegationTokenAuthenticator.RENEWER_PARAM + "=" + renewer);
-
+    String queryString =
+        DelegationTokenAuthenticator.OP_PARAM + "=" + op.toString() + "&" +
+        DelegationTokenAuthenticator.RENEWER_PARAM + "=" + renewer;
+    if (service != null) {
+      queryString += "&" + DelegationTokenAuthenticator.SERVICE_PARAM + "="
+          + service;
+    }
+    Mockito.when(request.getQueryString()).thenReturn(queryString);
     Mockito.reset(response);
     Mockito.reset(token);
     Mockito.when(token.getUserName()).thenReturn("user");
@@ -204,10 +221,25 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
     dt.decodeFromUrlString(tokenStr);
     handler.getTokenManager().verifyToken(dt);
     Assert.assertEquals(expectedTokenKind, dt.getKind());
+    if (service != null) {
+      Assert.assertEquals(service, dt.getService().toString());
+    } else {
+      Assert.assertEquals(0, dt.getService().getLength());
+    }
+    return dt;
   }
 
   @SuppressWarnings("unchecked")
   private void testCancelToken() throws Exception {
+    Token<DelegationTokenIdentifier> token =
+        (Token<DelegationTokenIdentifier>) handler.getTokenManager()
+            .createToken(UserGroupInformation.getCurrentUser(), "foo");
+    testCancelToken(token);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void testCancelToken(Token<DelegationTokenIdentifier> token)
+      throws Exception {
     DelegationTokenAuthenticator.DelegationTokenOperation op =
         DelegationTokenAuthenticator.DelegationTokenOperation.
             CANCELDELEGATIONTOKEN;
@@ -224,9 +256,6 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
         Mockito.contains("requires the parameter [token]"));
 
     Mockito.reset(response);
-    Token<DelegationTokenIdentifier> token =
-        (Token<DelegationTokenIdentifier>) handler.getTokenManager().createToken(
-            UserGroupInformation.getCurrentUser(), "foo");
     Mockito.when(request.getQueryString()).thenReturn(
         DelegationTokenAuthenticator.OP_PARAM + "=" + op.toString() + "&" +
             DelegationTokenAuthenticator.TOKEN_PARAM + "=" +
@@ -245,7 +274,16 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
   }
 
   @SuppressWarnings("unchecked")
-  private void testRenewToken() throws Exception {
+  private void testRenewToken(String testRenewer) throws Exception {
+    Token<DelegationTokenIdentifier> dToken = (Token<DelegationTokenIdentifier>)
+        handler.getTokenManager().createToken(
+            UserGroupInformation.getCurrentUser(), testRenewer);
+    testRenewToken(dToken, testRenewer);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void testRenewToken(Token<DelegationTokenIdentifier> dToken,
+      String testRenewer) throws Exception {
     DelegationTokenAuthenticator.DelegationTokenOperation op =
         DelegationTokenAuthenticator.DelegationTokenOperation.
             RENEWDELEGATIONTOKEN;
@@ -266,7 +304,7 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
 
     Mockito.reset(response);
     AuthenticationToken token = Mockito.mock(AuthenticationToken.class);
-    Mockito.when(token.getUserName()).thenReturn("user");
+    Mockito.when(token.getUserName()).thenReturn(testRenewer);
     Assert.assertFalse(handler.managementOperation(token, request, response));
     Mockito.verify(response).sendError(
         Mockito.eq(HttpServletResponse.SC_BAD_REQUEST),
@@ -276,9 +314,7 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
     StringWriter writer = new StringWriter();
     PrintWriter pwriter = new PrintWriter(writer);
     Mockito.when(response.getWriter()).thenReturn(pwriter);
-    Token<DelegationTokenIdentifier> dToken =
-        (Token<DelegationTokenIdentifier>) handler.getTokenManager().createToken(
-            UserGroupInformation.getCurrentUser(), "user");
+
     Mockito.when(request.getQueryString()).
         thenReturn(DelegationTokenAuthenticator.OP_PARAM + "=" + op.toString() +
             "&" + DelegationTokenAuthenticator.TOKEN_PARAM + "=" +
@@ -457,5 +493,52 @@ public class TestDelegationTokenAuthenticationHandlerWithMocks {
     Mockito.when(response.getWriter()).thenReturn(pwriter);
     Assert.assertFalse(handler.managementOperation(null, request, response));
     Mockito.verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+  }
+
+  @Test
+  public void testWriterNotClosed() throws Exception {
+    Properties conf = new Properties();
+    conf.put(KerberosDelegationTokenAuthenticationHandler.TOKEN_KIND, "foo");
+    conf.put(DelegationTokenAuthenticationHandler.JSON_MAPPER_PREFIX
+        + "AUTO_CLOSE_TARGET", "false");
+    DelegationTokenAuthenticationHandler noAuthCloseHandler =
+        new MockDelegationTokenAuthenticationHandler();
+    try {
+      noAuthCloseHandler.initTokenManager(conf);
+      noAuthCloseHandler.initJsonFactory(conf);
+
+      DelegationTokenAuthenticator.DelegationTokenOperation op =
+          GETDELEGATIONTOKEN;
+      HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+      HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
+      Mockito.when(request.getQueryString()).thenReturn(
+          DelegationTokenAuthenticator.OP_PARAM + "=" + op.toString());
+      Mockito.when(request.getMethod()).thenReturn(op.getHttpMethod());
+
+      AuthenticationToken token = Mockito.mock(AuthenticationToken.class);
+      Mockito.when(token.getUserName()).thenReturn("user");
+      final MutableBoolean closed = new MutableBoolean();
+      PrintWriter printWriterCloseCount = new PrintWriter(new StringWriter()) {
+        @Override
+        public void close() {
+          closed.setValue(true);
+          super.close();
+        }
+
+        @Override
+        public void write(String str) {
+          if (closed.booleanValue()) {
+            throw new RuntimeException("already closed!");
+          }
+          super.write(str);
+        }
+
+      };
+      Mockito.when(response.getWriter()).thenReturn(printWriterCloseCount);
+      Assert.assertFalse(noAuthCloseHandler.managementOperation(token, request,
+          response));
+    } finally {
+      noAuthCloseHandler.destroy();
+    }
   }
 }

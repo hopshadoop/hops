@@ -26,6 +26,7 @@ import java.security.GeneralSecurityException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.CanSetDropBehind;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Syncable;
 
 import com.google.common.base.Preconditions;
@@ -47,7 +48,7 @@ import com.google.common.base.Preconditions;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class CryptoOutputStream extends FilterOutputStream implements 
-    Syncable, CanSetDropBehind {
+    Syncable, CanSetDropBehind, StreamCapabilities {
   private final byte[] oneByteBuf = new byte[1];
   private final CryptoCodec codec;
   private final Encryptor encryptor;
@@ -76,6 +77,7 @@ public class CryptoOutputStream extends FilterOutputStream implements
   private final byte[] key;
   private final byte[] initIV;
   private byte[] iv;
+  private boolean closeOutputStream;
   
   public CryptoOutputStream(OutputStream out, CryptoCodec codec, 
       int bufferSize, byte[] key, byte[] iv) throws IOException {
@@ -84,6 +86,13 @@ public class CryptoOutputStream extends FilterOutputStream implements
   
   public CryptoOutputStream(OutputStream out, CryptoCodec codec, 
       int bufferSize, byte[] key, byte[] iv, long streamOffset) 
+      throws IOException {
+    this(out, codec, bufferSize, key, iv, streamOffset, true);
+  }
+
+  public CryptoOutputStream(OutputStream out, CryptoCodec codec,
+      int bufferSize, byte[] key, byte[] iv, long streamOffset,
+      boolean closeOutputStream)
       throws IOException {
     super(out);
     CryptoStreamUtils.checkCodec(codec);
@@ -95,6 +104,7 @@ public class CryptoOutputStream extends FilterOutputStream implements
     inBuffer = ByteBuffer.allocateDirect(this.bufferSize);
     outBuffer = ByteBuffer.allocateDirect(this.bufferSize);
     this.streamOffset = streamOffset;
+    this.closeOutputStream = closeOutputStream;
     try {
       encryptor = codec.createEncryptor();
     } catch (GeneralSecurityException e) {
@@ -110,8 +120,14 @@ public class CryptoOutputStream extends FilterOutputStream implements
   
   public CryptoOutputStream(OutputStream out, CryptoCodec codec, 
       byte[] key, byte[] iv, long streamOffset) throws IOException {
+    this(out, codec, key, iv, streamOffset, true);
+  }
+
+  public CryptoOutputStream(OutputStream out, CryptoCodec codec,
+      byte[] key, byte[] iv, long streamOffset, boolean closeOutputStream)
+      throws IOException {
     this(out, codec, CryptoStreamUtils.getBufferSize(codec.getConf()), 
-        key, iv, streamOffset);
+        key, iv, streamOffset, closeOutputStream);
   }
   
   public OutputStream getWrappedStream() {
@@ -221,7 +237,11 @@ public class CryptoOutputStream extends FilterOutputStream implements
       return;
     }
     try {
-      super.close();
+      flush();
+      if (closeOutputStream) {
+        super.close();
+        codec.close();
+      }
       freeBuffers();
     } finally {
       closed = true;
@@ -234,7 +254,9 @@ public class CryptoOutputStream extends FilterOutputStream implements
    */
   @Override
   public synchronized void flush() throws IOException {
-    checkStream();
+    if (closed) {
+      return;
+    }
     encrypt();
     super.flush();
   }
@@ -263,12 +285,6 @@ public class CryptoOutputStream extends FilterOutputStream implements
   }
 
   @Override
-  @Deprecated
-  public void sync() throws IOException {
-    hflush();
-  }
-
-  @Override
   public void hflush() throws IOException {
     flush();
     if (out instanceof Syncable) {
@@ -288,5 +304,13 @@ public class CryptoOutputStream extends FilterOutputStream implements
   private void freeBuffers() {
     CryptoStreamUtils.freeDB(inBuffer);
     CryptoStreamUtils.freeDB(outBuffer);
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    if (out instanceof StreamCapabilities) {
+      return ((StreamCapabilities) out).hasCapability(capability);
+    }
+    return false;
   }
 }

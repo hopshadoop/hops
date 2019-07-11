@@ -25,9 +25,13 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.ResourceInformation;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationAttemptStateDataProto;
+import org.apache.hadoop.yarn.server.resourcemanager.RMServerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.util.Records;
+
+import java.util.Map;
 
 /*
  * Contains the state data that needs to be persisted for an ApplicationAttempt
@@ -35,13 +39,14 @@ import org.apache.hadoop.yarn.util.Records;
 @Public
 @Unstable
 public abstract class ApplicationAttemptStateData {
+
   public static ApplicationAttemptStateData newInstance(
       ApplicationAttemptId attemptId, Container container,
       Credentials attemptTokens, long startTime, RMAppAttemptState finalState,
       String finalTrackingUrl, String diagnostics,
       FinalApplicationStatus amUnregisteredFinalStatus, int exitStatus,
-      long finishTime, long memorySeconds, long vcoreSeconds,long gpuSeconds ,
-      long preemptedMemorySeconds, long preemptedVcoreSeconds,long preemptedGPUSeconds, String trackingUrl) {
+      long finishTime, Map<String, Long> resourceSecondsMap,
+      Map<String, Long> preemptedResourceSecondsMap, String trackingUrl) {
     ApplicationAttemptStateData attemptStateData =
         Records.newRecord(ApplicationAttemptStateData.class);
     attemptStateData.setAttemptId(attemptId);
@@ -54,26 +59,34 @@ public abstract class ApplicationAttemptStateData {
     attemptStateData.setFinalApplicationStatus(amUnregisteredFinalStatus);
     attemptStateData.setAMContainerExitStatus(exitStatus);
     attemptStateData.setFinishTime(finishTime);
-    attemptStateData.setMemorySeconds(memorySeconds);
-    attemptStateData.setVcoreSeconds(vcoreSeconds);
-	attemptStateData.setGPUSeconds(gpuSeconds);
-    attemptStateData.setPreemptedMemorySeconds(preemptedMemorySeconds);
-    attemptStateData.setPreemptedVcoreSeconds(preemptedVcoreSeconds);
-    attemptStateData.setPreemptedGPUSeconds(preemptedGPUSeconds);
+    attemptStateData.setMemorySeconds(RMServerUtils
+        .getOrDefault(resourceSecondsMap,
+            ResourceInformation.MEMORY_MB.getName(), 0L));
+    attemptStateData.setVcoreSeconds(RMServerUtils
+        .getOrDefault(resourceSecondsMap, ResourceInformation.VCORES.getName(),
+            0L));
+    attemptStateData.setPreemptedMemorySeconds(RMServerUtils
+        .getOrDefault(preemptedResourceSecondsMap,
+            ResourceInformation.MEMORY_MB.getName(), 0L));
+    attemptStateData.setPreemptedVcoreSeconds(RMServerUtils
+        .getOrDefault(preemptedResourceSecondsMap,
+            ResourceInformation.VCORES.getName(), 0L));
+    attemptStateData.setResourceSecondsMap(resourceSecondsMap);
+    attemptStateData
+        .setPreemptedResourceSecondsMap(preemptedResourceSecondsMap);
     attemptStateData.setTrackingUrl(trackingUrl);
     return attemptStateData;
   }
 
   public static ApplicationAttemptStateData newInstance(
       ApplicationAttemptId attemptId, Container masterContainer,
-      Credentials attemptTokens, long startTime, long memorySeconds,
-      long vcoreSeconds, long gpuSeconds, long preemptedMemorySeconds,
-      long preemptedVcoreSeconds, long preemptedGPUSeconds, String trackingUrl) {
-    return newInstance(attemptId, masterContainer, attemptTokens,
-        startTime, null, "N/A", "", null, ContainerExitStatus.INVALID, 0,
-        memorySeconds, vcoreSeconds, gpuSeconds,
-        preemptedMemorySeconds, preemptedVcoreSeconds, preemptedGPUSeconds, trackingUrl);
-    }
+      Credentials attemptTokens, long startTime,
+      Map<String, Long> resourceSeondsMap,
+      Map<String, Long> preemptedResourceSecondsMap, String trackingUrl) {
+    return newInstance(attemptId, masterContainer, attemptTokens, startTime,
+        null, "N/A", "", null, ContainerExitStatus.INVALID, 0,
+        resourceSeondsMap, preemptedResourceSecondsMap, trackingUrl);
+  }
 
 
   public abstract ApplicationAttemptStateDataProto getProto();
@@ -207,14 +220,6 @@ public abstract class ApplicationAttemptStateData {
   @Unstable
   public abstract void setVcoreSeconds(long vcoreSeconds);
 
-  @Public
-  @Unstable
-  public abstract long getGPUSeconds();
-  
-  @Public
-  @Unstable
-  public abstract void setGPUSeconds(long gpuSeconds);
-  
   /**
    * Get the <em>preempted memory seconds</em>
    * (in MB seconds) of the application.
@@ -243,17 +248,49 @@ public abstract class ApplicationAttemptStateData {
   @Unstable
   public abstract void setPreemptedVcoreSeconds(long vcoreSeconds);
 
-/**
-   * Get the <em>preempted gpu seconds</em>
-   * of the application.
-   * @return <em>preempted gpu seconds</em>
-   * of the application
+  /**
+   * Get the aggregated number of resources preempted that the application has
+   * allocated times the number of seconds the application has been running.
+   *
+   * @return map containing the resource name and aggregated preempted
+   * resource-seconds
    */
   @Public
   @Unstable
-  public abstract long getPreemptedGPUSeconds();
+  public abstract Map<String, Long> getResourceSecondsMap();
 
+  /**
+   * Set the aggregated number of resources that the application has
+   * allocated times the number of seconds the application has been running.
+   *
+   * @param resourceSecondsMap map containing the resource name and aggregated
+   *                           resource-seconds
+   */
   @Public
   @Unstable
-  public abstract void setPreemptedGPUSeconds(long gpuSeconds);
+  public abstract void setResourceSecondsMap(
+      Map<String, Long> resourceSecondsMap);
+
+  /**
+   * Get the aggregated number of resources preempted that the application has
+   * allocated times the number of seconds the application has been running.
+   *
+   * @return map containing the resource name and aggregated preempted
+   * resource-seconds
+   */
+  @Public
+  @Unstable
+  public abstract Map<String, Long> getPreemptedResourceSecondsMap();
+
+  /**
+   * Set the aggregated number of resources preempted that the application has
+   * allocated times the number of seconds the application has been running.
+   *
+   * @param preemptedResourceSecondsMap map containing the resource name and
+   *                                    aggregated preempted resource-seconds
+   */
+  @Public
+  @Unstable
+  public abstract void setPreemptedResourceSecondsMap(
+      Map<String, Long> preemptedResourceSecondsMap);
 }

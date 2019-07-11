@@ -45,8 +45,8 @@ public class ConfiguredRMFailoverProxyProvider<T>
   private int currentProxyIndex = 0;
   Map<String, T> proxies = new HashMap<String, T>();
 
-  private RMProxy<T> rmProxy;
-  private Class<T> protocol;
+  protected RMProxy<T> rmProxy;
+  protected Class<T> protocol;
   protected YarnConfiguration conf;
   protected String[] rmServiceIds;
 
@@ -71,10 +71,10 @@ public class ConfiguredRMFailoverProxyProvider<T>
             YarnConfiguration.DEFAULT_CLIENT_FAILOVER_RETRIES_ON_SOCKET_TIMEOUTS));
   }
 
-  private T getProxyInternal() {
+  protected T getProxyInternal() {
     try {
       final InetSocketAddress rmAddress = rmProxy.getRMAddress(conf, protocol);
-      return RMProxy.getProxy(conf, protocol, rmAddress);
+      return rmProxy.getProxy(conf, protocol, rmAddress);
     } catch (IOException ioe) {
       LOG.error("Unable to create proxy to the ResourceManager " +
           rmServiceIds[currentProxyIndex], ioe);

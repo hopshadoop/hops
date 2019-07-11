@@ -33,8 +33,6 @@ import static com.google.common.base.Preconditions.*;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricsFilter;
@@ -43,6 +41,8 @@ import org.apache.hadoop.metrics2.MetricsTag;
 import static org.apache.hadoop.metrics2.impl.MetricsConfig.*;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.metrics2.util.Contracts.*;
 
@@ -51,7 +51,8 @@ import static org.apache.hadoop.metrics2.util.Contracts.*;
  */
 class MetricsSourceAdapter implements DynamicMBean {
 
-  private static final Log LOG = LogFactory.getLog(MetricsSourceAdapter.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MetricsSourceAdapter.class);
 
   private final String prefix, name;
   private final MetricsSource source;
@@ -197,8 +198,7 @@ class MetricsSourceAdapter implements DynamicMBean {
     builder.setRecordFilter(recordFilter).setMetricFilter(metricFilter);
     try {
       source.getMetrics(builder, all);
-    }
-    catch (Exception e) {
+    } catch (Exception e) {
       LOG.error("Error getting metrics from source "+ name, e);
     }
     for (MetricsRecordBuilderImpl rb : builder) {

@@ -18,33 +18,30 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import java.io.IOException;
-
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ha.ClientBaseWithFixes;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.event.Dispatcher;
-import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.DBRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
-import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -68,9 +65,9 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
     configuration.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
     configuration.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     configuration.set(YarnConfiguration.RM_STORE,
-        ZKRMStateStore.class.getName());
-    configuration.set(YarnConfiguration.RM_ZK_ADDRESS, hostPort);
-    configuration.setInt(YarnConfiguration.RM_ZK_TIMEOUT_MS, ZK_TIMEOUT_MS);
+        DBRMStateStore.class.getName());
+    configuration.set(CommonConfigurationKeys.ZK_ADDRESS, hostPort);
+    configuration.setInt(CommonConfigurationKeys.ZK_TIMEOUT_MS, ZK_TIMEOUT_MS);
     configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
     configuration.set(YarnConfiguration.RM_CLUSTER_ID, "test-yarn-cluster");
     int base = 100;
@@ -111,6 +108,7 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
       throws Exception {
     RMAppAttempt attempt = app.getCurrentAppAttempt();
     nm.nodeHeartbeat(true);
+    ((AbstractYarnScheduler)rm.getResourceScheduler()).update();
     MockAM am = rm.sendAMLaunched(attempt.getAppAttemptId());
     am.registerAppAttempt();
     rm.waitForState(app.getApplicationId(), RMAppState.RUNNING);
@@ -119,21 +117,36 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
     return am;
   }
 
-  protected void startRMs() throws IOException {
-    rm1 = new MockRM(confForRM1, null, false, false){
+  private MockRM initMockRMWithOldConf(Configuration confForRM1) {
+    return new MockRM(confForRM1, null, false, false) {
       @Override
-      protected Dispatcher createDispatcher() {
-        return new DrainDispatcher();
-      }
-    };
-    rm2 = new MockRM(confForRM2, null, false, false){
-      @Override
-      protected Dispatcher createDispatcher() {
-        return new DrainDispatcher();
-      }
-    };
-    startRMs(rm1, confForRM1, rm2, confForRM2);
+      protected AdminService createAdminService() {
+        return new AdminService(this) {
+          @Override
+          protected void startServer() {
+            // override to not start rpc handler
+          }
 
+          @Override
+          protected void stopServer() {
+            // don't do anything
+          }
+
+          @Override
+          protected Configuration loadNewConfiguration()
+              throws IOException, YarnException {
+            return confForRM1;
+          }
+        };
+      }
+    };
+  }
+
+  protected void startRMs() throws IOException {
+    rm1 = initMockRMWithOldConf(confForRM1);
+    rm2 = initMockRMWithOldConf(confForRM2);
+
+    startRMs(rm1, confForRM1, rm2, confForRM2);
   }
 
   protected void startRMsWithCustomizedRMAppManager() throws IOException {
@@ -169,7 +182,6 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
     protected void submitApplication(
         ApplicationSubmissionContext submissionContext, long submitTime,
         String user) throws YarnException {
-      try{
       //Do nothing, just add the application to RMContext
       RMAppImpl application =
           new RMAppImpl(submissionContext.getApplicationId(), this.rmContext,
@@ -183,9 +195,6 @@ public abstract class RMHATestBase extends ClientBaseWithFixes{
           application);
       //Do not send RMAppEventType.START event
       //so the state of Application will not reach to NEW_SAVING state.
-      }catch(IOException e){
-        throw new YarnException(e);
-      }
     }
   }
 

@@ -52,11 +52,9 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.time.DateFormatUtils;
-import org.apache.commons.lang.time.DurationFormatUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HttpConfig.Policy;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -67,6 +65,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationsRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueStatistics;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -77,12 +76,15 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TopCLI extends YarnCLI {
 
   private static final String CLUSTER_INFO_URL = "/ws/v1/cluster/info";
 
-  private static final Log LOG = LogFactory.getLog(TopCLI.class);
+  private static final Logger LOG = LoggerFactory
+          .getLogger(TopCLI.class);
   private String CLEAR = "\u001b[2J";
   private String CLEAR_LINE = "\u001b[2K";
   private String SET_CURSOR_HOME = "\u001b[H";
@@ -158,7 +160,9 @@ public class TopCLI extends YarnCLI {
       displayStringsMap.put(Columns.NAME, name);
       queue = appReport.getQueue();
       displayStringsMap.put(Columns.QUEUE, queue);
-      priority = 0;
+      Priority appPriority = appReport.getPriority();
+      priority = null != appPriority ? appPriority.getPriority() : 0;
+      displayStringsMap.put(Columns.PRIORITY, String.valueOf(priority));
       usedContainers =
           appReport.getApplicationResourceUsageReport().getNumUsedContainers();
       displayStringsMap.put(Columns.CONT, String.valueOf(usedContainers));
@@ -320,6 +324,14 @@ public class TopCLI extends YarnCLI {
         public int
             compare(ApplicationInformation a1, ApplicationInformation a2) {
           return a1.name.compareTo(a2.name);
+        }
+      };
+  public static final Comparator<ApplicationInformation> AppPriorityComparator =
+      new Comparator<ApplicationInformation>() {
+        @Override
+        public int compare(ApplicationInformation a1,
+            ApplicationInformation a2) {
+          return a1.priority - a2.priority;
         }
       };
 
@@ -637,6 +649,8 @@ public class TopCLI extends YarnCLI {
       "%10s", true, "Application type", "t"));
     columnInformationEnumMap.put(Columns.QUEUE, new ColumnInformation("QUEUE",
       "%10s", true, "Application queue", "q"));
+    columnInformationEnumMap.put(Columns.PRIORITY, new ColumnInformation(
+        "PRIOR", "%5s", true, "Application priority", "l"));
     columnInformationEnumMap.put(Columns.CONT, new ColumnInformation("#CONT",
       "%7s", true, "Number of containers", "c"));
     columnInformationEnumMap.put(Columns.RCONT, new ColumnInformation("#RCONT",
@@ -761,13 +775,14 @@ public class TopCLI extends YarnCLI {
 
   private JSONObject getJSONObject(URLConnection conn)
       throws IOException, JSONException {
-    InputStream in = conn.getInputStream();
-    String encoding = conn.getContentEncoding();
-    encoding = encoding == null ? "UTF-8" : encoding;
-    String body = IOUtils.toString(in, encoding);
-    JSONObject obj = new JSONObject(body);
-    JSONObject clusterInfo = obj.getJSONObject("clusterInfo");
-    return clusterInfo;
+    try(InputStream in = conn.getInputStream()) {
+      String encoding = conn.getContentEncoding();
+      encoding = encoding == null ? "UTF-8" : encoding;
+      String body = IOUtils.toString(in, encoding);
+      JSONObject obj = new JSONObject(body);
+      JSONObject clusterInfo = obj.getJSONObject("clusterInfo");
+      return clusterInfo;
+    }
   }
 
   private URL getClusterUrl() throws Exception {
@@ -852,7 +867,8 @@ public class TopCLI extends YarnCLI {
         TimeUnit.MILLISECONDS.toMinutes(uptime)
             - TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(uptime));
     String uptimeStr = String.format("%dd, %d:%d", days, hours, minutes);
-    String currentTime = DateFormatUtils.ISO_TIME_NO_T_FORMAT.format(now);
+    String currentTime = DateFormatUtils.ISO_8601_EXTENDED_TIME_FORMAT
+        .format(now);
 
     ret.append(CLEAR_LINE);
     ret.append(limitLineLength(String.format(
@@ -963,8 +979,8 @@ public class TopCLI extends YarnCLI {
       System.out.println("Delay: " + (refreshPeriod / 1000)
           + " secs; Secure mode: " + UserGroupInformation.isSecurityEnabled());
       System.out.println("");
-      System.out.println("  s + Enter : Select sort field");
-      System.out.println("  f + Enter : Select fields to display");
+      System.out.println("  s + Enter: Select sort field");
+      System.out.println("  f + Enter: Select fields to display");
       System.out.println("  R + Enter: Reverse current sort order");
       System.out.println("  h + Enter: Display this screen");
       System.out.println("  q + Enter: Quit");
@@ -1097,6 +1113,9 @@ public class TopCLI extends YarnCLI {
       break;
     case "n":
       comparator = AppNameComparator;
+      break;
+    case "l":
+      comparator = AppPriorityComparator;
       break;
     default:
       // it wasn't a sort key

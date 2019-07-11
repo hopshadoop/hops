@@ -102,7 +102,7 @@ public class TestYarnStartupWithCRL {
     }
   }
   
-  @Test(timeout = 20000)
+  @Test//(timeout = 20000)
   public void testYarnStartup() throws Exception {
     String hostname = NetUtils.getLocalCanonicalHostname();
     Path keyStore = Paths.get(BASE_DIR, hostname + "__kstore.jks");
@@ -153,7 +153,7 @@ public class TestYarnStartupWithCRL {
     cluster.start();
     cluster.waitForNodeManagersToConnect(2000);
     
-    Assert.assertTrue(cluster.getResourceManager().areSchedulerServicesRunning());
+    Assert.assertTrue(cluster.getResourceManager().areActiveServicesRunning());
     Assert.assertEquals(1, cluster.getResourceManager().getResourceScheduler().getNumClusterNodes());
   }
 }

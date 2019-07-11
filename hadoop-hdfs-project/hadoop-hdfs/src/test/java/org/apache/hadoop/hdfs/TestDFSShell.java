@@ -65,6 +65,8 @@ import java.util.zip.GZIPOutputStream;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.*;
@@ -955,8 +957,13 @@ public class TestDFSShell {
 
       confirmPermissionChange("1666", "rw-rw-rwT", fs, shell, dir2);
 
-      confirmPermissionChange("777", "rwxrwxrwt", fs, shell, dir2);
+      confirmPermissionChange("1777", "rwxrwxrwt", fs, shell, dir2);
 
+      confirmPermissionChange("0777", "rwxrwxrwx", fs, shell, dir2);
+
+      confirmPermissionChange("1777", "rwxrwxrwt", fs, shell, dir2);
+
+      confirmPermissionChange("777", "rwxrwxrwx", fs, shell, dir2);
       fs.delete(dir2, true);
       fs.delete(dir, true);
 
@@ -1492,7 +1499,7 @@ public class TestDFSShell {
   
   @Test (timeout = 30000)
   public void testGet() throws IOException {
-    DFSTestUtil.setLogLevel2All(FSInputChecker.LOG);
+    GenericTestUtils.setLogLevel(FSInputChecker.LOG, Level.ALL);
     final Configuration conf = new HdfsConfiguration();
     // Set short retry timeouts so this test runs faster
     conf.setInt(HdfsClientConfigKeys.Retry.WINDOW_BASE_KEY, 10);

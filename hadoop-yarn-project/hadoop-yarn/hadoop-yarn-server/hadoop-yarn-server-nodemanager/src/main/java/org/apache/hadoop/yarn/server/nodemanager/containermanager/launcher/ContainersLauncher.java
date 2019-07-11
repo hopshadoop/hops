@@ -23,14 +23,19 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.util.Shell;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerExitEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -40,6 +45,7 @@ import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceLocalizationService;
 
@@ -55,7 +61,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 public class ContainersLauncher extends AbstractService
     implements EventHandler<ContainersLauncherEvent> {
 
-  private static final Log LOG = LogFactory.getLog(ContainersLauncher.class);
+  private static final Logger LOG =
+       LoggerFactory.getLogger(ContainersLauncher.class);
 
   private final Context context;
   private final ContainerExecutor exec;
@@ -65,7 +72,7 @@ public class ContainersLauncher extends AbstractService
   private LocalDirsHandlerService dirsHandler;
   @VisibleForTesting
   public ExecutorService containerLauncher =
-    Executors.newCachedThreadPool(
+      HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder()
           .setNameFormat("ContainersLauncher #%d")
           .build());
@@ -118,6 +125,16 @@ public class ContainersLauncher extends AbstractService
         containerLauncher.submit(launch);
         running.put(containerId, launch);
         break;
+      case RELAUNCH_CONTAINER:
+        app = context.getApplications().get(
+                containerId.getApplicationAttemptId().getApplicationId());
+
+        ContainerRelaunch relaunch =
+            new ContainerRelaunch(context, getConfig(), dispatcher, exec, app,
+                event.getContainer(), dirsHandler, containerManager);
+        containerLauncher.submit(relaunch);
+        running.put(containerId, relaunch);
+        break;
       case RECOVER_CONTAINER:
         app = context.getApplications().get(
             containerId.getApplicationAttemptId().getApplicationId());
@@ -126,21 +143,34 @@ public class ContainersLauncher extends AbstractService
         containerLauncher.submit(launch);
         running.put(containerId, launch);
         break;
+      case RECOVER_PAUSED_CONTAINER:
+        app = context.getApplications().get(
+            containerId.getApplicationAttemptId().getApplicationId());
+        launch = new RecoverPausedContainerLaunch(context, getConfig(),
+            dispatcher, exec, app, event.getContainer(), dirsHandler,
+            containerManager);
+        containerLauncher.submit(launch);
+        break;
       case CLEANUP_CONTAINER:
-        ContainerLaunch launcher = running.remove(containerId);
-        if (launcher == null) {
-          // Container not launched. So nothing needs to be done.
+      case CLEANUP_CONTAINER_FOR_REINIT:
+        ContainerLaunch existingLaunch = running.remove(containerId);
+        if (existingLaunch == null) {
+          // Container not launched.
+          // triggering KILLING to CONTAINER_CLEANEDUP_AFTER_KILL transition.
+          dispatcher.getEventHandler().handle(
+              new ContainerExitEvent(containerId,
+                  ContainerEventType.CONTAINER_KILLED_ON_REQUEST,
+                  Shell.WINDOWS ? ContainerExecutor.ExitCode.FORCE_KILLED.getExitCode() :
+                  ContainerExecutor.ExitCode.TERMINATED.getExitCode(),
+                  "Container terminated before launch."));
           return;
         }
 
         // Cleanup a container whether it is running/killed/completed, so that
         // no sub-processes are alive.
-        try {
-          launcher.cleanupContainer();
-        } catch (IOException e) {
-          LOG.warn("Got exception while cleaning container " + containerId
-              + ". Ignoring.");
-        }
+        ContainerCleanup cleanup = new ContainerCleanup(context, getConfig(),
+            dispatcher, exec, event.getContainer(), existingLaunch);
+        containerLauncher.submit(cleanup);
         break;
       case SIGNAL_CONTAINER:
         SignalContainersLauncherEvent signalEvent =
@@ -157,6 +187,36 @@ public class ContainersLauncher extends AbstractService
         } catch (IOException e) {
           LOG.warn("Got exception while signaling container " + containerId
               + " with command " + signalEvent.getCommand());
+        }
+        break;
+      case PAUSE_CONTAINER:
+        ContainerLaunch launchedContainer = running.get(containerId);
+        if (launchedContainer == null) {
+          // Container not launched. So nothing needs to be done.
+          return;
+        }
+
+        // Pause the container
+        try {
+          launchedContainer.pauseContainer();
+        } catch (Exception e) {
+          LOG.info("Got exception while pausing container: " +
+            StringUtils.stringifyException(e));
+        }
+        break;
+      case RESUME_CONTAINER:
+        ContainerLaunch launchCont = running.get(containerId);
+        if (launchCont == null) {
+          // Container not launched. So nothing needs to be done.
+          return;
+        }
+
+        // Resume the container.
+        try {
+          launchCont.resumeContainer();
+        } catch (Exception e) {
+          LOG.info("Got exception while resuming container: " +
+            StringUtils.stringifyException(e));
         }
         break;
     }

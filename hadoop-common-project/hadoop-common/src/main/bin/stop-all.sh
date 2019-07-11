@@ -15,24 +15,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+## @description  catch the ctrl-c
+## @audience     private
+## @stability    evolving
+## @replaceable  no
+function hadoop_abort_stopall()
+{
+  exit 1
+}
 
 # Stop all hadoop daemons.  Run this on master node.
 
-echo "This script is Deprecated. Instead use stop-dfs.sh and stop-yarn.sh"
+# let's locate libexec...
+if [[ -n "${HADOOP_HOME}" ]]; then
+  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
+else
+  this="${BASH_SOURCE-$0}"
+  bin=$(cd -P -- "$(dirname -- "${this}")" >/dev/null && pwd -P)
+  HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
+fi
 
-bin=`dirname "${BASH_SOURCE-$0}"`
-bin=`cd "$bin"; pwd`
+HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
+# shellcheck disable=SC2034
+HADOOP_NEW_CONFIG=true
+if [[ -f "${HADOOP_LIBEXEC_DIR}/hadoop-config.sh" ]]; then
+  . "${HADOOP_LIBEXEC_DIR}/hadoop-config.sh"
+else
+  echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/hadoop-config.sh." 2>&1
+  exit 1
+fi
 
-DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+if ! hadoop_privilege_check; then
+  trap hadoop_abort_stopall INT
+  hadoop_error "WARNING: Stopping all Apache Hadoop daemons as ${USER} in 10 seconds."
+  hadoop_error "WARNING: Use CTRL-C to abort."
+  sleep 10
+  trap - INT
+fi
 
 # stop hdfs daemons if hdfs is present
-if [ -f "${HADOOP_HDFS_HOME}"/sbin/stop-dfs.sh ]; then
-  "${HADOOP_HDFS_HOME}"/sbin/stop-dfs.sh --config $HADOOP_CONF_DIR
+if [[ -f "${HADOOP_HDFS_HOME}/sbin/stop-dfs.sh" ]]; then
+  "${HADOOP_HDFS_HOME}/sbin/stop-dfs.sh" --config "${HADOOP_CONF_DIR}"
 fi
 
 # stop yarn daemons if yarn is present
-if [ -f "${HADOOP_HDFS_HOME}"/sbin/stop-yarn.sh ]; then
-  "${HADOOP_HDFS_HOME}"/sbin/stop-yarn.sh --config $HADOOP_CONF_DIR
+if [[ -f "${HADOOP_HDFS_HOME}/sbin/stop-yarn.sh" ]]; then
+  "${HADOOP_HDFS_HOME}/sbin/stop-yarn.sh" --config "${HADOOP_CONF_DIR}"
 fi
+

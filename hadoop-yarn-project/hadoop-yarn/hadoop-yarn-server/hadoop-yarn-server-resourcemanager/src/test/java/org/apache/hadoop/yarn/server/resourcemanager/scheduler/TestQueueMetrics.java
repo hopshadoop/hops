@@ -21,15 +21,10 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.apache.hadoop.test.MockitoMaker.make;
-import static org.apache.hadoop.test.MockitoMaker.stub;
 import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -40,6 +35,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
@@ -48,14 +44,12 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-
 public class TestQueueMetrics {
   static final int GB = 1024; // MB
   private static final Configuration conf = new Configuration();
-  
+
   private MetricsSystem ms;
-  
+
   @Before
   public void setUp() {
     ms = new MetricsSystemImpl();
@@ -65,40 +59,46 @@ public class TestQueueMetrics {
   @Test public void testDefaultSingleQueueMetrics() {
     String queueName = "single";
     String user = "alice";
-    
+
     QueueMetrics metrics = QueueMetrics.forQueue(ms, queueName, null, false,
-        conf);
+						 conf);
     MetricsSource queueSource= queueSource(ms, queueName);
     AppSchedulingInfo app = mockApp(user);
-    
+
     metrics.submitApp(user);
     MetricsSource userSource = userSource(ms, queueName, user);
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
-    
-    metrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100, 100));
-    metrics.incrPendingResources(user, 5, Resources.createResource(3*GB, 3, 3));
+
+    metrics.setAvailableResourcesToQueue(RMNodeLabelsManager.NO_LABEL,
+        Resources.createResource(100*GB, 100));
+    metrics.incrPendingResources(RMNodeLabelsManager.NO_LABEL,
+        user, 5, Resources.createResource(3*GB, 3));
     // Available resources is set externally, as it depends on dynamic
     // configurable cluster/queue resources
-    checkResources(queueSource, 0, 0, 0, 0, 0, 0, 100*GB, 100, 100, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    
+    checkResources(queueSource, 0, 0, 0, 0, 0, 100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
 
-    metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2, 2), true);
-    checkResources(queueSource, 6*GB, 6, 6, 3, 3, 0, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
+    metrics.allocateResources(RMNodeLabelsManager.NO_LABEL,
+        user, 3, Resources.createResource(2*GB, 2), true);
+    checkResources(queueSource, 6*GB, 6, 3, 3, 0, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2, 2));
-    checkResources(queueSource, 4*GB, 4, 4, 2, 3, 1, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
+    metrics.releaseResources(RMNodeLabelsManager.NO_LABEL,
+        user, 1, Resources.createResource(2*GB, 2));
+    checkResources(queueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
 
-    metrics.incrPendingResources(user, 0, Resources.createResource(2 * GB, 2, 2));
-    checkResources(queueSource, 4 * GB, 4, 4, 2, 3, 1, 100 * GB, 100, 100, 9 * GB, 9, 9, 2,
-        0, 0, 0, 0);
+    metrics.incrPendingResources(RMNodeLabelsManager.NO_LABEL,
+        user, 0, Resources.createResource(2 * GB, 2));
+    checkResources(queueSource, 4 * GB, 4, 2, 3, 1, 100 * GB, 100, 9 * GB, 9, 2,
+        0, 0, 0);
 
-    metrics.decrPendingResources(user, 0, Resources.createResource(2 * GB, 2, 2));
-    checkResources(queueSource, 4 * GB, 4, 4, 2, 3, 1, 100 * GB, 100, 100, 9 * GB, 9, 9, 2,
-        0, 0, 0, 0);
+    metrics.decrPendingResources(RMNodeLabelsManager.NO_LABEL,
+        user, 0, Resources.createResource(2 * GB, 2));
+    checkResources(queueSource, 4 * GB, 4, 2, 3, 1, 100 * GB, 100, 9 * GB, 9, 2,
+        0, 0, 0);
 
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
@@ -112,96 +112,101 @@ public class TestQueueMetrics {
   public void testQueueAppMetricsForMultipleFailures() {
     String queueName = "single";
     String user = "alice";
-    
+
     QueueMetrics metrics = QueueMetrics.forQueue(ms, queueName, null, false,
         new Configuration());
     MetricsSource queueSource = queueSource(ms, queueName);
     AppSchedulingInfo app = mockApp(user);
-    
+
     metrics.submitApp(user);
     MetricsSource userSource = userSource(ms, queueName, user);
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
-    
+
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
-    
+
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
-    
+
     // As the application has failed, framework retries the same application
     // based on configuration
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
-    
+
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
-    
+
     // Suppose say application has failed this time as well.
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
-    
+
     // As the application has failed, framework retries the same application
     // based on configuration
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
-    
+
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
-    
+
     // Suppose say application has failed, and there's no more retries.
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
-    
+
     metrics.finishApp(user, RMAppState.FAILED);
     checkApps(queueSource, 1, 0, 0, 0, 1, 0, true);
-    
+
     assertNull(userSource);
   }
-  
+
   @Test public void testSingleQueueWithUserMetrics() {
     String queueName = "single2";
     String user = "dodo";
-    
+
     QueueMetrics metrics = QueueMetrics.forQueue(ms, queueName, null, true,
-        conf);
+						 conf);
     MetricsSource queueSource = queueSource(ms, queueName);
     AppSchedulingInfo app = mockApp(user);
-    
+
     metrics.submitApp(user);
     MetricsSource userSource = userSource(ms, queueName, user);
-    
+
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 0, 0, 0, 0, true);
-    
+
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 1, 0, 0, 0, 0, true);
-    
-    metrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100, 100));
-    metrics.setAvailableResourcesToUser(user, Resources.createResource(10*GB, 10, 10));
-    metrics.incrPendingResources(user, 5, Resources.createResource(3*GB, 3, 3));
+
+    metrics.setAvailableResourcesToQueue(RMNodeLabelsManager.NO_LABEL,
+        Resources.createResource(100*GB, 100));
+    metrics.setAvailableResourcesToUser(RMNodeLabelsManager.NO_LABEL,
+        user, Resources.createResource(10*GB, 10));
+    metrics.incrPendingResources(RMNodeLabelsManager.NO_LABEL,
+        user, 5, Resources.createResource(3*GB, 3));
     // Available resources is set externally, as it depends on dynamic
     // configurable cluster/queue resources
-    checkResources(queueSource, 0, 0, 0, 0, 0, 0,  100*GB, 100, 100, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    checkResources(userSource, 0, 0, 0, 0, 0, 0, 10*GB, 10, 10, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    
+    checkResources(queueSource, 0, 0, 0, 0, 0,  100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(userSource, 0, 0, 0, 0, 0, 10*GB, 10, 15*GB, 15, 5, 0, 0, 0);
+
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 1, 0, 0, 0, true);
-    
-    metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2, 2), true);
-    checkResources(queueSource, 6*GB, 6, 6, 3, 3, 0, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    checkResources(userSource, 6*GB, 6, 6, 3, 3, 0, 10*GB, 10, 10, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    
-    metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2, 2));
-    checkResources(queueSource, 4*GB, 4, 4, 2, 3, 1, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    checkResources(userSource, 4*GB, 4, 4, 2, 3, 1, 10*GB, 10, 10, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    
+
+    metrics.allocateResources(RMNodeLabelsManager.NO_LABEL,
+        user, 3, Resources.createResource(2*GB, 2), true);
+    checkResources(queueSource, 6*GB, 6, 3, 3, 0, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(userSource, 6*GB, 6, 3, 3, 0, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
+
+    metrics.releaseResources(RMNodeLabelsManager.NO_LABEL,
+        user, 1, Resources.createResource(2*GB, 2));
+    checkResources(queueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(userSource, 4*GB, 4, 2, 3, 1, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
+
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
@@ -219,8 +224,8 @@ public class TestQueueMetrics {
 
     QueueMetrics parentMetrics =
       QueueMetrics.forQueue(ms, parentQueueName, null, true, conf);
-    Queue parentQueue = make(stub(Queue.class).returning(parentMetrics).
-        from.getMetrics());
+    Queue parentQueue = mock(Queue.class);
+    when(parentQueue.getMetrics()).thenReturn(parentMetrics);
     QueueMetrics metrics =
       QueueMetrics.forQueue(ms, leafQueueName, parentQueue, true, conf);
     MetricsSource parentQueueSource = queueSource(ms, parentQueueName);
@@ -262,70 +267,78 @@ public class TestQueueMetrics {
     String parentQueueName = "root";
     String leafQueueName = "root.leaf";
     String user = "alice";
-    
+
     QueueMetrics parentMetrics =
-        QueueMetrics.forQueue(ms, parentQueueName, null, true, conf);
-    Queue parentQueue = make(stub(Queue.class).returning(parentMetrics).
-        from.getMetrics());
+      QueueMetrics.forQueue(ms, parentQueueName, null, true, conf);
+    Queue parentQueue = mock(Queue.class);
+    when(parentQueue.getMetrics()).thenReturn(parentMetrics);
     QueueMetrics metrics =
-        QueueMetrics.forQueue(ms, leafQueueName, parentQueue, true, conf);
+      QueueMetrics.forQueue(ms, leafQueueName, parentQueue, true, conf);
     MetricsSource parentQueueSource = queueSource(ms, parentQueueName);
     MetricsSource queueSource = queueSource(ms, leafQueueName);
     AppSchedulingInfo app = mockApp(user);
-    
+
     metrics.submitApp(user);
     MetricsSource userSource = userSource(ms, leafQueueName, user);
     MetricsSource parentUserSource = userSource(ms, parentQueueName, user);
-    
+
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(parentQueueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(parentUserSource, 1, 0, 0, 0, 0, 0, true);
-    
+
     metrics.submitAppAttempt(user);
     checkApps(queueSource, 1, 1, 0, 0, 0, 0, true);
     checkApps(parentQueueSource, 1, 1, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 1, 0, 0, 0, 0, true);
     checkApps(parentUserSource, 1, 1, 0, 0, 0, 0, true);
-    
-    parentMetrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100, 100));
-    metrics.setAvailableResourcesToQueue(Resources.createResource(100*GB, 100, 100));
-    parentMetrics.setAvailableResourcesToUser(user, Resources.createResource(10*GB, 10, 10));
-    metrics.setAvailableResourcesToUser(user, Resources.createResource(10*GB, 10, 10));
-    metrics.incrPendingResources(user, 5, Resources.createResource(3*GB, 3, 3));
-    checkResources(queueSource, 0, 0, 0, 0, 0, 0, 100*GB, 100, 100, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    checkResources(parentQueueSource, 0, 0, 0, 0, 0, 0, 100*GB, 100, 100, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    checkResources(userSource, 0, 0, 0, 0, 0, 0, 10*GB, 10, 10, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    checkResources(parentUserSource, 0, 0, 0, 0, 0, 0, 10*GB, 10, 10, 15*GB, 15, 15, 5, 0, 0, 0, 0);
-    
+
+    parentMetrics.setAvailableResourcesToQueue(RMNodeLabelsManager.NO_LABEL,
+        Resources.createResource(100*GB, 100));
+    metrics.setAvailableResourcesToQueue(RMNodeLabelsManager.NO_LABEL,
+        Resources.createResource(100*GB, 100));
+    parentMetrics.setAvailableResourcesToUser(RMNodeLabelsManager.NO_LABEL,
+        user, Resources.createResource(10*GB, 10));
+    metrics.setAvailableResourcesToUser(RMNodeLabelsManager.NO_LABEL,
+        user, Resources.createResource(10*GB, 10));
+    metrics.incrPendingResources(RMNodeLabelsManager.NO_LABEL,
+        user, 5, Resources.createResource(3*GB, 3));
+    checkResources(queueSource, 0, 0, 0, 0, 0, 100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(parentQueueSource, 0, 0, 0, 0, 0, 100*GB, 100, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(userSource, 0, 0, 0, 0, 0, 10*GB, 10, 15*GB, 15, 5, 0, 0, 0);
+    checkResources(parentUserSource, 0, 0, 0, 0, 0, 10*GB, 10, 15*GB, 15, 5, 0, 0, 0);
+
     metrics.runAppAttempt(app.getApplicationId(), user);
     checkApps(queueSource, 1, 0, 1, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 1, 0, 0, 0, true);
-    
-    metrics.allocateResources(user, 3, Resources.createResource(2*GB, 2, 2), true);
-    metrics.reserveResource(user, Resources.createResource(3*GB, 3, 3));
+
+    metrics.allocateResources(RMNodeLabelsManager.NO_LABEL,
+        user, 3, Resources.createResource(2*GB, 2), true);
+    metrics.reserveResource(RMNodeLabelsManager.NO_LABEL,
+        user, Resources.createResource(3*GB, 3));
     // Available resources is set externally, as it depends on dynamic
     // configurable cluster/queue resources
-    checkResources(queueSource, 6*GB, 6, 6, 3, 3, 0, 100*GB, 100, 100, 9*GB, 9, 9, 2, 3*GB, 3, 3, 1);
-    checkResources(parentQueueSource, 6*GB, 6, 6, 3, 3, 0,  100*GB, 100, 100, 9*GB, 9, 9, 2, 3*GB, 3, 3, 1);
-    checkResources(userSource, 6*GB, 6, 6, 3, 3, 0, 10*GB, 10, 10, 9*GB, 9, 9, 2, 3*GB, 3, 3, 1);
-    checkResources(parentUserSource, 6*GB, 6, 6, 3, 3, 0, 10*GB, 10, 10, 9*GB, 9, 9, 2, 3*GB, 3, 3, 1);
-    
-    metrics.releaseResources(user, 1, Resources.createResource(2*GB, 2, 2));
-    metrics.unreserveResource(user, Resources.createResource(3*GB, 3, 3));
-    checkResources(queueSource, 4*GB, 4, 4, 2, 3, 1, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    checkResources(parentQueueSource, 4*GB, 4, 4, 2, 3, 1, 100*GB, 100, 100, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    checkResources(userSource, 4*GB, 4, 4, 2, 3, 1, 10*GB, 10, 10, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    
-    checkResources(parentUserSource, 4*GB, 4, 4, 2, 3, 1, 10*GB, 10, 10, 9*GB, 9, 9, 2, 0, 0, 0, 0);
-    
+    checkResources(queueSource, 6*GB, 6, 3, 3, 0, 100*GB, 100, 9*GB, 9, 2, 3*GB, 3, 1);
+    checkResources(parentQueueSource, 6*GB, 6, 3, 3, 0,  100*GB, 100, 9*GB, 9, 2, 3*GB, 3, 1);
+    checkResources(userSource, 6*GB, 6, 3, 3, 0, 10*GB, 10, 9*GB, 9, 2, 3*GB, 3, 1);
+    checkResources(parentUserSource, 6*GB, 6, 3, 3, 0, 10*GB, 10, 9*GB, 9, 2, 3*GB, 3, 1);
+
+    metrics.releaseResources(RMNodeLabelsManager.NO_LABEL,
+        user, 1, Resources.createResource(2*GB, 2));
+    metrics.unreserveResource(RMNodeLabelsManager.NO_LABEL,
+          user, Resources.createResource(3*GB, 3));
+    checkResources(queueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(parentQueueSource, 4*GB, 4, 2, 3, 1, 100*GB, 100, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(userSource, 4*GB, 4, 2, 3, 1, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
+    checkResources(parentUserSource, 4*GB, 4, 2, 3, 1, 10*GB, 10, 9*GB, 9, 2, 0, 0, 0);
+
     metrics.finishAppAttempt(
         app.getApplicationId(), app.isPending(), app.getUser());
     checkApps(queueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(parentQueueSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(userSource, 1, 0, 0, 0, 0, 0, true);
     checkApps(parentUserSource, 1, 0, 0, 0, 0, 0, true);
-    
+
     metrics.finishApp(user, RMAppState.FINISHED);
     checkApps(queueSource, 1, 0, 0, 1, 0, 0, true);
     checkApps(parentQueueSource, 1, 0, 0, 1, 0, 0, true);
@@ -333,7 +346,7 @@ public class TestQueueMetrics {
     checkApps(parentUserSource, 1, 0, 0, 1, 0, 0, true);
   }
   
-  @Test
+  @Test 
   public void testMetricsCache() {
     MetricsSystem ms = new MetricsSystemImpl("cache");
     ms.start();
@@ -341,43 +354,39 @@ public class TestQueueMetrics {
     try {
       String p1 = "root1";
       String leafQueueName = "root1.leaf";
-      
+
       QueueMetrics p1Metrics =
           QueueMetrics.forQueue(ms, p1, null, true, conf);
-      Queue parentQueue1 = make(stub(Queue.class).returning(p1Metrics).
-          from.getMetrics());
+      Queue parentQueue1 = mock(Queue.class);
+      when(parentQueue1.getMetrics()).thenReturn(p1Metrics);
       QueueMetrics metrics =
           QueueMetrics.forQueue(ms, leafQueueName, parentQueue1, true, conf);
-      
+
       Assert.assertNotNull("QueueMetrics for A shoudn't be null", metrics);
-      
+
       // Re-register to check for cache hit, shouldn't blow up metrics-system...
       // also, verify parent-metrics
       QueueMetrics alterMetrics =
           QueueMetrics.forQueue(ms, leafQueueName, parentQueue1, true, conf);
-      
-      Assert.assertNotNull("QueueMetrics for alterMetrics shoudn't be null",
+
+      Assert.assertNotNull("QueueMetrics for alterMetrics shoudn't be null", 
           alterMetrics);
     } finally {
       ms.shutdown();
     }
   }
-  
+
   @Test
-  public void testMetricsInitializedOnRMInit() throws IOException {
+  public void testMetricsInitializedOnRMInit() {
     YarnConfiguration conf = new YarnConfiguration();
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
-    
     conf.setClass(YarnConfiguration.RM_SCHEDULER,
-        FifoScheduler.class, ResourceScheduler.class);
+      FifoScheduler.class, ResourceScheduler.class);
     MockRM rm = new MockRM(conf);
     QueueMetrics metrics = rm.getResourceScheduler().getRootQueueMetrics();
     checkApps(metrics, 0, 0, 0, 0, 0, 0, true);
     MetricsAsserts.assertGauge("ReservedContainers", 0, metrics);
   }
-  
+
   // This is to test all metrics can consistently show up if specified true to
   // collect all metrics, even though they are not modified from last time they
   // are collected. If not collecting all metrics, only modified metrics will show up.
@@ -386,7 +395,7 @@ public class TestQueueMetrics {
     String queueName = "single";
     QueueMetrics.forQueue(ms, queueName, null, false, conf);
     MetricsSource queueSource = queueSource(ms, queueName);
-    
+
     checkApps(queueSource, 0, 0, 0, 0, 0, 0, true);
     try {
       // do not collect all metrics
@@ -394,12 +403,12 @@ public class TestQueueMetrics {
       Assert.fail();
     } catch (AssertionError e) {
       Assert.assertTrue(e.getMessage().contains(
-          "Expected exactly one metric for name "));
+        "Expected exactly one metric for name "));
     }
     // collect all metrics
     checkApps(queueSource, 0, 0, 0, 0, 0, 0, true);
   }
-  
+
   public static void checkApps(MetricsSource source, int submitted, int pending,
       int running, int completed, int failed, int killed, boolean all) {
     MetricsRecordBuilder rb = getMetrics(source, all);
@@ -412,27 +421,23 @@ public class TestQueueMetrics {
   }
 
   public static void checkResources(MetricsSource source, long allocatedMB,
-      int allocatedCores, int allocatedGPUs, int allocCtnrs, long aggreAllocCtnrs,
-      long aggreReleasedCtnrs, long availableMB, int availableCores, int availableGPUs, long pendingMB,
-      int pendingCores, int pendingGPUs, int pendingCtnrs, long reservedMB, int reservedCores, int reservedGPUs,
+      int allocatedCores, int allocCtnrs, long aggreAllocCtnrs,
+      long aggreReleasedCtnrs, long availableMB, int availableCores, long pendingMB,
+      int pendingCores, int pendingCtnrs, long reservedMB, int reservedCores,
       int reservedCtnrs) {
     MetricsRecordBuilder rb = getMetrics(source);
     assertGauge("AllocatedMB", allocatedMB, rb);
     assertGauge("AllocatedVCores", allocatedCores, rb);
-    assertGauge("AllocatedGPUs", allocatedGPUs, rb);
     assertGauge("AllocatedContainers", allocCtnrs, rb);
     assertCounter("AggregateContainersAllocated", aggreAllocCtnrs, rb);
     assertCounter("AggregateContainersReleased", aggreReleasedCtnrs, rb);
     assertGauge("AvailableMB", availableMB, rb);
     assertGauge("AvailableVCores", availableCores, rb);
-    assertGauge("AvailableGPUs", availableGPUs, rb);
     assertGauge("PendingMB", pendingMB, rb);
     assertGauge("PendingVCores", pendingCores, rb);
-    assertGauge("PendingGPUs", pendingGPUs, rb);
     assertGauge("PendingContainers", pendingCtnrs, rb);
     assertGauge("ReservedMB", reservedMB, rb);
     assertGauge("ReservedVCores", reservedCores, rb);
-    assertGauge("ReservedGPUs", reservedGPUs, rb);
     assertGauge("ReservedContainers", reservedCtnrs, rb);
   }
 
@@ -452,14 +457,14 @@ public class TestQueueMetrics {
     when(app.getApplicationAttemptId()).thenReturn(id);
     return app;
   }
-  
+
   public static MetricsSource queueSource(MetricsSystem ms, String queue) {
     MetricsSource s = ms.getSource(QueueMetrics.sourceName(queue).toString());
     return s;
   }
-  
+
   public static MetricsSource userSource(MetricsSystem ms, String queue,
-      String user) {
+                                         String user) {
     MetricsSource s = ms.getSource(QueueMetrics.sourceName(queue).
         append(",user=").append(user).toString());
     return s;

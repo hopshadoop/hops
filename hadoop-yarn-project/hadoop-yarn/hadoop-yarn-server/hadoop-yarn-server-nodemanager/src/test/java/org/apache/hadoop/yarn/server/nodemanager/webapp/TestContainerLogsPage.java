@@ -21,8 +21,8 @@ package org.apache.hadoop.yarn.server.nodemanager.webapp;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -47,10 +47,9 @@ import org.apache.hadoop.util.NodeHealthScriptRunner;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationAttemptIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationIdPBImpl;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerIdPBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -63,6 +62,7 @@ import org.apache.hadoop.yarn.server.nodemanager.NodeManager;
 import org.apache.hadoop.yarn.server.nodemanager.NodeManager.NMContext;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerImpl;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainerLaunch;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMNullStateStoreService;
@@ -96,11 +96,11 @@ public class TestContainerLogsPage {
     healthChecker.init(conf);
     LocalDirsHandlerService dirsHandler = healthChecker.getDiskHandler();
     NMContext nmContext = new NodeManager.NMContext(null, null, dirsHandler,
-        new ApplicationACLsManager(conf), new NMNullStateStoreService());
+        new ApplicationACLsManager(conf), new NMNullStateStoreService(), false,
+            conf);
     // Add an application and the corresponding containers
     RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(conf);
     String user = "nobody";
-    String userFolder = "nobodysFolder";
     long clusterTimeStamp = 1234;
     ApplicationId appId = BuilderUtils.newApplicationId(recordFactory,
         clusterTimeStamp, 1);
@@ -115,7 +115,7 @@ public class TestContainerLogsPage {
 
     MockContainer container =
         new MockContainer(appAttemptId, new AsyncDispatcher(), conf, user,
-            appId, 1, userFolder);
+            appId, 1);
     container.setState(ContainerState.RUNNING);
     nmContext.getContainers().put(container1, container);   
     List<File> files = null;
@@ -137,7 +137,8 @@ public class TestContainerLogsPage {
     when(dirsHandlerForFullDisk.getLogDirsForRead()).
         thenReturn(Arrays.asList(new String[] {absLogDir.getAbsolutePath()}));
     nmContext = new NodeManager.NMContext(null, null, dirsHandlerForFullDisk,
-        new ApplicationACLsManager(conf), new NMNullStateStoreService());
+        new ApplicationACLsManager(conf), new NMNullStateStoreService(), false,
+        conf);
     nmContext.getApplications().put(appId, app);
     container.setState(ContainerState.RUNNING);
     nmContext.getContainers().put(container1, container);
@@ -159,10 +160,10 @@ public class TestContainerLogsPage {
     LocalDirsHandlerService dirsHandler = new LocalDirsHandlerService();
     dirsHandler.init(conf);
     NMContext nmContext = new NodeManager.NMContext(null, null, dirsHandler,
-        new ApplicationACLsManager(conf), new NMNullStateStoreService());
+        new ApplicationACLsManager(conf), new NMNullStateStoreService(), false,
+        conf);
     // Add an application and the corresponding containers
     String user = "nobody";
-    String userFolder = "nobodysFolder";
     long clusterTimeStamp = 1234;
     ApplicationId appId = BuilderUtils.newApplicationId(
         clusterTimeStamp, 1);
@@ -177,18 +178,18 @@ public class TestContainerLogsPage {
 
     MockContainer container =
         new MockContainer(appAttemptId, new AsyncDispatcher(), conf, user,
-            appId, 1, userFolder);
+            appId, 1);
     container.setState(ContainerState.RUNNING);
     nmContext.getContainers().put(containerId, container);
     File containerLogDir = new File(absLogDir,
         ContainerLaunch.getRelativeContainerLogDir(appId.toString(),
-            containerId.toString(), userFolder));
+            containerId.toString()));
     containerLogDir.mkdirs();
     String fileName = "fileName";
     File containerLogFile = new File(containerLogDir, fileName);
     containerLogFile.createNewFile();
     File file = ContainerLogsUtils.getContainerLogFile(containerId,
-        fileName, user, nmContext, userFolder);
+        fileName, user, nmContext);
     Assert.assertEquals(containerLogFile.toURI().toString(),
         file.toURI().toString());
     FileUtil.fullyDelete(absLogDir);
@@ -200,7 +201,6 @@ public class TestContainerLogsPage {
     // only if it is enabled.
     assumeTrue(NativeIO.isAvailable());
     String user = "randomUser" + System.currentTimeMillis();
-    String userFolder = user + "Folder";
     File absLogDir = null, appDir = null, containerDir = null, syslog = null;
     try {
       // target log directory
@@ -230,7 +230,6 @@ public class TestContainerLogsPage {
       // Making sure that application returns a random user. This is required
       // for SecureIOUtils' file owner check.
       when(app.getUser()).thenReturn(user);
-      when(app.getUserFolder()).thenReturn(userFolder);
 
       ApplicationAttemptId appAttemptId =
           BuilderUtils.newApplicationAttemptId(appId, 1);
@@ -240,9 +239,7 @@ public class TestContainerLogsPage {
       // Testing secure read access for log files
 
       // Creating application and container directory and syslog file.
-      File userDir = new File(absLogDir, userFolder);
-      userDir.mkdir();
-      appDir = new File(userDir, appId.toString());
+      appDir = new File(absLogDir, appId.toString());
       appDir.mkdir();
       containerDir = new File(appDir, container1.toString());
       containerDir.mkdir();
@@ -262,9 +259,10 @@ public class TestContainerLogsPage {
           new ConcurrentHashMap<ContainerId, Container>();
       when(context.getContainers()).thenReturn(containers);
       when(context.getLocalDirsHandler()).thenReturn(dirsHandler);
+      when(context.getConf()).thenReturn(conf);
 
       MockContainer container = new MockContainer(appAttemptId,
-        new AsyncDispatcher(), conf, user, appId, 1, userFolder);
+        new AsyncDispatcher(), conf, user, appId, 1);
       container.setState(ContainerState.RUNNING);
       context.getContainers().put(container1, container);
 
@@ -355,9 +353,9 @@ public class TestContainerLogsPage {
     containers.put(containerId, container);
     
     LocalDirsHandlerService localDirs = mock(LocalDirsHandlerService.class);
-    when(localDirs.getLogPathToRead("userFolder" + Path.SEPARATOR + "appId"
-            + Path.SEPARATOR + "containerId" + Path.SEPARATOR + "fileName"))
-            .thenReturn(new Path("F:/nmlogs/appId/containerId/fileName"));
+    when(localDirs.getLogPathToRead("appId" + Path.SEPARATOR + "containerId" +
+      Path.SEPARATOR + "fileName"))
+      .thenReturn(new Path("F:/nmlogs/appId/containerId/fileName"));
     
     NMContext context = mock(NMContext.class);
     when(context.getLocalDirsHandler()).thenReturn(localDirs);
@@ -365,7 +363,7 @@ public class TestContainerLogsPage {
     when(context.getContainers()).thenReturn(containers);
     
     File logFile = ContainerLogsUtils.getContainerLogFile(containerId,
-      "fileName", null, context, "userFolder");
+      "fileName", null, context);
       
     Assert.assertTrue("logFile lost drive letter " +
       logFile,

@@ -22,12 +22,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.IOException;
 import java.util.List;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -66,15 +62,12 @@ public class TestCapacitySchedulerDynamicBehavior {
   private MockRM rm;
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() {
     CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
     setupPlanQueueConfiguration(conf);
     conf.setClass(YarnConfiguration.RM_SCHEDULER, CapacityScheduler.class,
         ResourceScheduler.class);
     conf.setBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE, false);
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
     rm = new MockRM(conf);
     rm.start();
   }
@@ -82,6 +75,12 @@ public class TestCapacitySchedulerDynamicBehavior {
   @Test
   public void testRefreshQueuesWithReservations() throws Exception {
     CapacityScheduler cs = (CapacityScheduler) rm.getResourceScheduler();
+
+    //set default queue capacity to zero
+    ((ReservationQueue) cs
+            .getQueue("a" + ReservationConstants.DEFAULT_QUEUE_SUFFIX))
+            .setEntitlement(
+                    new QueueEntitlement(0f, 1f));
 
     // Test add one reservation dynamically and manually modify capacity
     ReservationQueue a1 =
@@ -127,6 +126,11 @@ public class TestCapacitySchedulerDynamicBehavior {
     ReservationQueue a1 =
         new ReservationQueue(cs, "a1", (PlanQueue) cs.getQueue("a"));
     cs.addQueue(a1);
+    //set default queue capacity to zero
+    ((ReservationQueue) cs
+        .getQueue("a" + ReservationConstants.DEFAULT_QUEUE_SUFFIX))
+            .setEntitlement(
+                new QueueEntitlement(0f, 1f));
     a1.setEntitlement(new QueueEntitlement(A1_CAPACITY / 100, 1f));
 
     // Test add another reservation queue and use setEntitlement to modify
@@ -218,7 +222,7 @@ public class TestCapacitySchedulerDynamicBehavior {
     String queue =
         scheduler.getApplicationAttempt(appsInB1.get(0)).getQueue()
             .getQueueName();
-    Assert.assertTrue(queue.equals("b1"));
+    Assert.assertEquals("b1", queue);
 
     List<ApplicationAttemptId> appsInRoot = scheduler.getAppsInQueue("root");
     assertTrue(appsInRoot.contains(appAttemptId));

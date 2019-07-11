@@ -42,7 +42,6 @@ import org.apache.hadoop.yarn.exceptions.NMNotYetReadyException;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 
 import com.google.common.base.Preconditions;
-
 import javax.net.ssl.SSLException;
 
 @Public
@@ -84,6 +83,11 @@ public class ServerProxy {
     exceptionToPolicyMap.put(SocketException.class, retryPolicy);
     // When client got an SSLException should not retry to connect
     exceptionToPolicyMap.put(SSLException.class, RetryPolicies.TRY_ONCE_THEN_FAIL);
+    
+    /*
+     * Still keeping this to cover case like newer client talking
+     * to an older version of server
+     */
     exceptionToPolicyMap.put(NMNotYetReadyException.class, retryPolicy);
 
     return RetryPolicies.retryByException(RetryPolicies.TRY_ONCE_THEN_FAIL,

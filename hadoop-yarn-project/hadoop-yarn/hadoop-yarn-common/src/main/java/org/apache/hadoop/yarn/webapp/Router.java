@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,17 +74,32 @@ class Router {
 
   final TreeMap<String, Dest> routes = Maps.newTreeMap(); // path->dest
 
+  synchronized Dest add(WebApp.HTTP httpMethod, String path,
+                        Class<? extends Controller> cls,
+                        String action, List<String> names){
+    return addWithOptionalDefaultView(
+        httpMethod, path, cls, action, names, true);
+  }
+
+  synchronized Dest addWithoutDefaultView(WebApp.HTTP httpMethod,
+      String path, Class<? extends Controller> cls, String action,
+      List<String> names){
+    return addWithOptionalDefaultView(httpMethod, path, cls, action,
+        names, false);
+  }
   /**
    * Add a route to the router.
    * e.g., add(GET, "/foo/show", FooController.class, "show", [name...]);
    * The name list is from /foo/show/:name/...
    */
-  synchronized Dest add(WebApp.HTTP httpMethod, String path,
-                        Class<? extends Controller> cls,
-                        String action, List<String> names) {
+  synchronized Dest addWithOptionalDefaultView(WebApp.HTTP httpMethod,
+      String path, Class<? extends Controller> cls,
+      String action, List<String> names, boolean defaultViewNeeded) {
     LOG.debug("adding {}({})->{}#{}", new Object[]{path, names, cls, action});
     Dest dest = addController(httpMethod, path, cls, action, names);
-    addDefaultView(dest);
+    if (defaultViewNeeded) {
+      addDefaultView(dest);
+    }
     return dest;
   }
 
@@ -97,7 +112,7 @@ class Router {
       // Note: this does not distinguish methods with the same signature
       // but different return types.
       // TODO: We may want to deal with methods that take parameters in the future
-      Method method = cls.getMethod(action, null);
+      Method method = cls.getMethod(action);
       Dest dest = routes.get(path);
       if (dest == null) {
         method.setAccessible(true); // avoid any runtime checks

@@ -44,8 +44,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import javax.net.SocketFactory;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.util.SubnetUtils;
 import org.apache.commons.net.util.SubnetUtils.SubnetInfo;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -61,11 +59,13 @@ import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Unstable
 public class NetUtils {
-  private static final Log LOG = LogFactory.getLog(NetUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
   
   private static Map<String, String> hostToResolved = 
                                      new HashMap<String, String>();
@@ -123,13 +123,13 @@ public class NetUtils {
         CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_DEFAULT);
     if ((propValue == null) || (propValue.length() == 0))
       return SocketFactory.getDefault();
-    
+
     SocketFactory factory = getSocketFactoryFromProperty(conf, propValue);
     configureCryptoMaterial(factory, conf);
     
     return factory;
   }
-  
+
   private static void configureCryptoMaterial(SocketFactory factory,
       Configuration conf) throws SSLCertificateException {
     if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
@@ -257,7 +257,7 @@ public class NetUtils {
       InetAddress iaddr;
 
       // HOP :: Trick for evaluation
-      if (host.contains(".smile.com")) {
+      if (host!=null && host.contains(".smile.com")) {
         iaddr = InetAddress.getByName("72.52.4.119");
       } else {
         iaddr = SecurityUtil.getByName(resolveHost);
@@ -669,6 +669,20 @@ public class NetUtils {
 
   /**
    * Return hostname without throwing exception.
+   * The returned hostname String format is "hostname".
+   * @return hostname
+   */
+  public static String getLocalHostname() {
+    try {
+      return InetAddress.getLocalHost().getHostName();
+    } catch(UnknownHostException uhe) {
+      return "" + uhe;
+    }
+  }
+
+  /**
+   * Return hostname without throwing exception.
+   * The returned hostname String format is "hostname/ip address".
    * @return hostname
    */
   public static String getHostname() {
@@ -676,7 +690,7 @@ public class NetUtils {
     catch(UnknownHostException uhe) {return "" + uhe;}
   }
 
-  /**
+    /**
    * Return the FQDN of the local host as a string
    * @return hostname
    * @throws UnknownHostException
@@ -688,7 +702,7 @@ public class NetUtils {
       return "localhost";
     }
   }
-
+  
   /**
    * Compose a "host:port" string from the address.
    */
@@ -745,9 +759,9 @@ public class NetUtils {
    * return an IOException with the input exception as the cause and also
    * include the host details. The new exception provides the stack trace of the
    * place where the exception is thrown and some extra diagnostics information.
-   * If the exception is BindException or ConnectException or
-   * UnknownHostException or SocketTimeoutException, return a new one of the
-   * same type; Otherwise return an IOException.
+   * If the exception is of type BindException, ConnectException,
+   * UnknownHostException, SocketTimeoutException or has a String constructor,
+   * return a new one of the same type; Otherwise return an IOException.
    *
    * @param destHost target host (nullable)
    * @param destPort target port
@@ -761,74 +775,90 @@ public class NetUtils {
                                           final String localHost,
                                           final int localPort,
                                           final IOException exception) {
-    if (exception instanceof BindException) {
-      return wrapWithMessage(exception,
-          "Problem binding to ["
-              + localHost
-              + ":"
-              + localPort
-              + "] "
-              + exception
-              + ";"
-              + see("BindException"));
-    } else if (exception instanceof ConnectException) {
-      // connection refused; include the host:port in the error
-      return wrapWithMessage(exception, 
-          "Call From "
-              + localHost
-              + " to "
-              + destHost
-              + ":"
-              + destPort
-              + " failed on connection exception: "
-              + exception
-              + ";"
-              + see("ConnectionRefused"));
-    } else if (exception instanceof UnknownHostException) {
-      return wrapWithMessage(exception,
-          "Invalid host name: "
-              + getHostDetailsAsString(destHost, destPort, localHost)
-              + exception
-              + ";"
-              + see("UnknownHost"));
-    } else if (exception instanceof SocketTimeoutException) {
-      return wrapWithMessage(exception,
-          "Call From "
-              + localHost + " to " + destHost + ":" + destPort
-              + " failed on socket timeout exception: " + exception
-              + ";"
-              + see("SocketTimeout"));
-    } else if (exception instanceof NoRouteToHostException) {
-      return wrapWithMessage(exception,
-          "No Route to Host from  "
-              + localHost + " to " + destHost + ":" + destPort
-              + " failed on socket timeout exception: " + exception
-              + ";"
-              + see("NoRouteToHost"));
-    } else if (exception instanceof EOFException) {
-      return wrapWithMessage(exception,
-          "End of File Exception between "
-              + getHostDetailsAsString(destHost,  destPort, localHost)
-              + ": " + exception
-              + ";"
-              + see("EOFException"));
-    } else if (exception instanceof SocketException) {
-      // Many of the predecessor exceptions are subclasses of SocketException,
-      // so must be handled before this
-      return wrapWithMessage(exception,
-          "Call From "
-              + localHost + " to " + destHost + ":" + destPort
-              + " failed on socket exception: " + exception
-              + ";"
-              + see("SocketException"));
-    }
-    else {
-      return (IOException) new IOException("Failed on local exception: "
-             + exception
-             + "; Host Details : "
-             + getHostDetailsAsString(destHost, destPort, localHost))
-          .initCause(exception);
+    try {
+      if (exception instanceof BindException) {
+        return wrapWithMessage(exception,
+            "Problem binding to ["
+                + localHost
+                + ":"
+                + localPort
+                + "] "
+                + exception
+                + ";"
+                + see("BindException"));
+      } else if (exception instanceof ConnectException) {
+        // Check if client was trying to connect to an unspecified IPv4 address
+        // (0.0.0.0) or IPv6 address(0:0:0:0:0:0:0:0 or ::)
+        if ((destHost != null && (destHost.equals("0.0.0.0") ||
+            destHost.equals("0:0:0:0:0:0:0:0") || destHost.equals("::")))
+            || destPort == 0) {
+          return wrapWithMessage(exception, "Your endpoint configuration" +
+              " is wrong;" + see("UnsetHostnameOrPort"));
+        } else {
+          // connection refused; include the host:port in the error
+          return wrapWithMessage(exception,
+              "Call From "
+                  + localHost
+                  + " to "
+                  + destHost
+                  + ":"
+                  + destPort
+                  + " failed on connection exception: "
+                  + exception
+                  + ";"
+                  + see("ConnectionRefused"));
+        }
+      } else if (exception instanceof UnknownHostException) {
+        return wrapWithMessage(exception,
+            "Invalid host name: "
+                + getHostDetailsAsString(destHost, destPort, localHost)
+                + exception
+                + ";"
+                + see("UnknownHost"));
+      } else if (exception instanceof SocketTimeoutException) {
+        return wrapWithMessage(exception,
+            "Call From "
+                + localHost + " to " + destHost + ":" + destPort
+                + " failed on socket timeout exception: " + exception
+                + ";"
+                + see("SocketTimeout"));
+      } else if (exception instanceof NoRouteToHostException) {
+        return wrapWithMessage(exception,
+            "No Route to Host from  "
+                + localHost + " to " + destHost + ":" + destPort
+                + " failed on socket timeout exception: " + exception
+                + ";"
+                + see("NoRouteToHost"));
+      } else if (exception instanceof EOFException) {
+        return wrapWithMessage(exception,
+            "End of File Exception between "
+                + getHostDetailsAsString(destHost, destPort, localHost)
+                + ": " + exception
+                + ";"
+                + see("EOFException"));
+      } else if (exception instanceof SocketException) {
+        // Many of the predecessor exceptions are subclasses of SocketException,
+        // so must be handled before this
+        return wrapWithMessage(exception,
+            "Call From "
+                + localHost + " to " + destHost + ":" + destPort
+                + " failed on socket exception: " + exception
+                + ";"
+                + see("SocketException"));
+      } else {
+        // Return instance of same type if Exception has a String constructor
+        return wrapWithMessage(exception,
+            "DestHost:destPort " + destHost + ":" + destPort
+                + " , LocalHost:localPort " + localHost
+                + ":" + localPort + ". Failed on local exception: " +
+                exception);
 
+      }
+    } catch (IOException ex) {
+      return (IOException) new IOException("Failed on local exception: "
+          + exception + "; Host Details : "
+          + getHostDetailsAsString(destHost, destPort, localHost))
+          .initCause(exception);
     }
   }
 
@@ -838,16 +868,16 @@ public class NetUtils {
   
   @SuppressWarnings("unchecked")
   private static <T extends IOException> T wrapWithMessage(
-      T exception, String msg) {
+      T exception, String msg) throws T {
     Class<? extends Throwable> clazz = exception.getClass();
     try {
       Constructor<? extends Throwable> ctor = clazz.getConstructor(String.class);
       Throwable t = ctor.newInstance(msg);
       return (T)(t.initCause(exception));
     } catch (Throwable e) {
-      LOG.warn("Unable to wrap exception of type " +
-          clazz + ": it has no (String) constructor", e);
-      return exception;
+      LOG.warn("Unable to wrap exception of type {}: it has no (String) "
+          + "constructor", clazz, e);
+      throw exception;
     }
   }
 
@@ -965,5 +995,21 @@ public class NetUtils {
       // Could not get a free port. Return default port 0.
     }
     return port;
+  }
+
+  /**
+   * Return an @{@link InetAddress} to bind to. If bindWildCardAddress is true
+   * than returns null.
+   *
+   * @param localAddr
+   * @param bindWildCardAddress
+   * @returns InetAddress
+   */
+  public static InetAddress bindToLocalAddress(InetAddress localAddr, boolean
+      bindWildCardAddress) {
+    if (!bindWildCardAddress) {
+      return localAddr;
+    }
+    return null;
   }
 }

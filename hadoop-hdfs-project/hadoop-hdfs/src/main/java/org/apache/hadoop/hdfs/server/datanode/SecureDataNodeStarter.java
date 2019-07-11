@@ -22,8 +22,6 @@ import org.apache.commons.daemon.DaemonContext;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
-import org.apache.hadoop.http.HttpServer3;
-import org.mortbay.jetty.Connector;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.http.HttpConfig;

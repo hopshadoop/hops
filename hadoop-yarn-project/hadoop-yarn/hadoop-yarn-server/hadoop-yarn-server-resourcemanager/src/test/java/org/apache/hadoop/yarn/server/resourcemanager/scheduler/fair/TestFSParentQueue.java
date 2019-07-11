@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
 import org.apache.hadoop.yarn.util.SystemClock;
+import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -42,7 +43,9 @@ public class TestFSParentQueue {
     AllocationConfiguration allocConf = new AllocationConfiguration(conf);
     when(scheduler.getAllocationConfiguration()).thenReturn(allocConf);
     when(scheduler.getConf()).thenReturn(conf);
-    SystemClock clock = new SystemClock();
+    when(scheduler.getResourceCalculator()).thenReturn(
+        new DefaultResourceCalculator());
+    SystemClock clock = SystemClock.getInstance();
     when(scheduler.getClock()).thenReturn(clock);
     notEmptyQueues = new HashSet<FSQueue>();
     queueManager = new QueueManager(scheduler) {

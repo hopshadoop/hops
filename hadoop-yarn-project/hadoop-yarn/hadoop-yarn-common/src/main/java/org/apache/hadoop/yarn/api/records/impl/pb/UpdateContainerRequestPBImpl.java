@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.api.records.impl.pb;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerUpdateType;
+import org.apache.hadoop.yarn.api.records.ExecutionType;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos;
@@ -113,6 +114,26 @@ public class UpdateContainerRequestPBImpl extends UpdateContainerRequest {
       builder.clearCapability();
     }
     this.targetCapability = capability;
+  }
+
+  @Override
+  public ExecutionType getExecutionType() {
+    YarnServiceProtos.UpdateContainerRequestProtoOrBuilder p =
+        viaProto ? proto : builder;
+    if (!p.hasExecutionType()) {
+      return null;
+    }
+    return ProtoUtils.convertFromProtoFormat(p.getExecutionType());
+  }
+
+  @Override
+  public void setExecutionType(ExecutionType execType) {
+    maybeInitBuilder();
+    if (execType == null) {
+      builder.clearExecutionType();
+      return;
+    }
+    builder.setExecutionType(ProtoUtils.convertToProtoFormat(execType));
   }
 
   @Override

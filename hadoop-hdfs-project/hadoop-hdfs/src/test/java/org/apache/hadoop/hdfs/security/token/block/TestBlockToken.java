@@ -24,8 +24,6 @@ import com.google.protobuf.ServiceException;
 import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.security.token.block.NameNodeBlockTokenSecretManager;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -83,27 +81,30 @@ import java.util.Set;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
+import org.apache.hadoop.test.GenericTestUtils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for block tokens
  */
 public class TestBlockToken {
-  public static final Log LOG = LogFactory.getLog(TestBlockToken.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestBlockToken.class);
   private static final String ADDRESS = "0.0.0.0";
 
   static {
-    ((Log4JLogger) Client.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) Server.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslRpcClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslRpcServer.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslInputStream.LOG).getLogger().setLevel(Level.ALL);
-  }
+    GenericTestUtils.setLogLevel(Client.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(Server.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(SaslRpcClient.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(SaslRpcServer.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(SaslInputStream.LOG, Level.ALL);
+}
 
   /**
    * Directory where we can count our open file descriptors under Linux

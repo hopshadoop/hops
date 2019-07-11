@@ -37,7 +37,6 @@ public final class LocalizerStartContext {
   private final Path nmPrivateContainerTokens;
   private final InetSocketAddress nmAddr;
   private final String user;
-  private final String userFolder;
   private final String appId;
   private final String locId;
   private final LocalDirsHandlerService dirsHandler;
@@ -46,7 +45,6 @@ public final class LocalizerStartContext {
     private Path nmPrivateContainerTokens;
     private InetSocketAddress nmAddr;
     private String user;
-    private String userFolder;
     private String appId;
     private String locId;
     private LocalDirsHandlerService dirsHandler;
@@ -69,11 +67,6 @@ public final class LocalizerStartContext {
       return this;
     }
 
-    public Builder setUserFolder(String userFolder) {
-      this.userFolder = userFolder;
-      return this;
-    }
-    
     public Builder setAppId(String appId) {
       this.appId = appId;
       return this;
@@ -98,7 +91,6 @@ public final class LocalizerStartContext {
     this.nmPrivateContainerTokens = builder.nmPrivateContainerTokens;
     this.nmAddr = builder.nmAddr;
     this.user = builder.user;
-    this.userFolder = builder.userFolder;
     this.appId = builder.appId;
     this.locId = builder.locId;
     this.dirsHandler = builder.dirsHandler;
@@ -116,10 +108,6 @@ public final class LocalizerStartContext {
     return this.user;
   }
 
-  public String getUserFolder() {
-    return this.userFolder;
-  }
-  
   public String getAppId() {
     return this.appId;
   }

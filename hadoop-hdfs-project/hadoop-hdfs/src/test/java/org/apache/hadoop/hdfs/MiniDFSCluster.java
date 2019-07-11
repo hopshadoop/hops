@@ -76,7 +76,6 @@ import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
-import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -558,6 +557,185 @@ public class MiniDFSCluster {
       instanceId = instanceCount++;
     }
   }
+  
+  /**
+   * Modify the config and start up the servers with the given operation.
+   * Servers will be started on free ports.
+   * <p>
+   * The caller must manage the creation of NameNode and DataNode directories
+   * and have already set {@link DFSConfigKeys#DFS_NAMENODE_NAME_DIR_KEY} and
+   * {@link DFSConfigKeys#DFS_DATANODE_DATA_DIR_KEY} in the given conf.
+   * 
+   * @param conf the base configuration to use in starting the servers.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param nameNodeOperation the operation with which to start the servers.  If null
+   *          or StartupOption.FORMAT, then StartupOption.REGULAR will be used.
+   */
+  @Deprecated // in 22 to be removed in 24. Use MiniDFSCluster.Builder instead
+  public MiniDFSCluster(Configuration conf,
+                        int numDataNodes,
+                        StartupOption nameNodeOperation) throws IOException {
+    this(0, conf, numDataNodes, false, false, false,  nameNodeOperation, 
+          null, null, null);
+  }
+  
+  /**
+   * Modify the config and start up the servers.  The rpc and info ports for
+   * servers are guaranteed to use free ports.
+   * <p>
+   * NameNode and DataNode directory creation and configuration will be
+   * managed by this class.
+   *
+   * @param conf the base configuration to use in starting the servers.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param format if true, format the NameNode and DataNodes before starting up
+   * @param racks array of strings indicating the rack that each DataNode is on
+   */
+  @Deprecated // in 22 to be removed in 24. Use MiniDFSCluster.Builder instead
+  public MiniDFSCluster(Configuration conf,
+                        int numDataNodes,
+                        boolean format,
+                        String[] racks) throws IOException {
+    this(0, conf, numDataNodes, format, true, true, null,
+        racks, null, null);
+  }
+  
+  /**
+   * Modify the config and start up the servers.  The rpc and info ports for
+   * servers are guaranteed to use free ports.
+   * <p>
+   * NameNode and DataNode directory creation and configuration will be
+   * managed by this class.
+   *
+   * @param conf the base configuration to use in starting the servers.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param format if true, format the NameNode and DataNodes before starting up
+   * @param racks array of strings indicating the rack that each DataNode is on
+   * @param hosts array of strings indicating the hostname for each DataNode
+   */
+  @Deprecated // in 22 to be removed in 24. Use MiniDFSCluster.Builder instead
+  public MiniDFSCluster(Configuration conf,
+                        int numDataNodes,
+                        boolean format,
+                        String[] racks, String[] hosts) throws IOException {
+    this(0, conf, numDataNodes, format, true, true, null,
+        racks, hosts, null);
+  }
+  
+  /**
+   * NOTE: if possible, the other constructors that don't have nameNode port 
+   * parameter should be used as they will ensure that the servers use free 
+   * ports.
+   * <p>
+   * Modify the config and start up the servers.  
+   * 
+   * @param nameNodePort suggestion for which rpc port to use.  caller should
+   *          use getNameNodePort() to get the actual port used.
+   * @param conf the base configuration to use in starting the servers.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param format if true, format the NameNode and DataNodes before starting 
+   *          up
+   * @param manageDfsDirs if true, the data directories for servers will be
+   *          created and {@link DFSConfigKeys#DFS_NAMENODE_NAME_DIR_KEY} and
+   *          {@link DFSConfigKeys#DFS_DATANODE_DATA_DIR_KEY} will be set in
+   *          the conf
+   * @param operation the operation with which to start the servers.  If null
+   *          or StartupOption.FORMAT, then StartupOption.REGULAR will be used.
+   * @param racks array of strings indicating the rack that each DataNode is on
+   */
+  @Deprecated // in 22 to be removed in 24. Use MiniDFSCluster.Builder instead
+  public MiniDFSCluster(int nameNodePort, 
+                        Configuration conf,
+                        int numDataNodes,
+                        boolean format,
+                        boolean manageDfsDirs,
+                        StartupOption operation,
+                        String[] racks) throws IOException {
+    this(nameNodePort, conf, numDataNodes, format, manageDfsDirs,
+        manageDfsDirs, operation, racks, null, null);
+  }
+
+  /**
+   * NOTE: if possible, the other constructors that don't have nameNode port 
+   * parameter should be used as they will ensure that the servers use free ports.
+   * <p>
+   * Modify the config and start up the servers.  
+   * 
+   * @param nameNodePort suggestion for which rpc port to use.  caller should
+   *          use getNameNodePort() to get the actual port used.
+   * @param conf the base configuration to use in starting the servers.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param format if true, format the NameNode and DataNodes before starting up
+   * @param manageDfsDirs if true, the data directories for servers will be
+   *          created and {@link DFSConfigKeys#DFS_NAMENODE_NAME_DIR_KEY} and
+   *          {@link DFSConfigKeys#DFS_DATANODE_DATA_DIR_KEY} will be set in
+   *          the conf
+   * @param operation the operation with which to start the servers.  If null
+   *          or StartupOption.FORMAT, then StartupOption.REGULAR will be used.
+   * @param racks array of strings indicating the rack that each DataNode is on
+   * @param simulatedCapacities array of capacities of the simulated data nodes
+   */
+  @Deprecated // in 22 to be removed in 24. Use MiniDFSCluster.Builder instead
+  public MiniDFSCluster(int nameNodePort, 
+                        Configuration conf,
+                        int numDataNodes,
+                        boolean format,
+                        boolean manageDfsDirs,
+                        StartupOption operation,
+                        String[] racks,
+                        long[] simulatedCapacities) throws IOException {
+    this(nameNodePort, conf, numDataNodes, format, manageDfsDirs, 
+        manageDfsDirs, operation, racks, null, simulatedCapacities);
+  }
+  
+  /**
+   * NOTE: if possible, the other constructors that don't have nameNode port 
+   * parameter should be used as they will ensure that the servers use free ports.
+   * <p>
+   * Modify the config and start up the servers.  
+   * 
+   * @param nameNodePort suggestion for which rpc port to use.  caller should
+   *          use getNameNodePort() to get the actual port used.
+   * @param conf the base configuration to use in starting the servers.  This
+   *          will be modified as necessary.
+   * @param numDataNodes Number of DataNodes to start; may be zero
+   * @param format if true, format the NameNode and DataNodes before starting up
+   * @param manageNameDfsDirs if true, the data directories for servers will be
+   *          created and {@link DFSConfigKeys#DFS_NAMENODE_NAME_DIR_KEY} and
+   *          {@link DFSConfigKeys#DFS_DATANODE_DATA_DIR_KEY} will be set in
+   *          the conf
+   * @param manageDataDfsDirs if true, the data directories for datanodes will
+   *          be created and {@link DFSConfigKeys#DFS_DATANODE_DATA_DIR_KEY}
+   *          set to same in the conf
+   * @param operation the operation with which to start the servers.  If null
+   *          or StartupOption.FORMAT, then StartupOption.REGULAR will be used.
+   * @param racks array of strings indicating the rack that each DataNode is on
+   * @param hosts array of strings indicating the hostnames of each DataNode
+   * @param simulatedCapacities array of capacities of the simulated data nodes
+   */
+  @Deprecated // in 22 to be removed in 24. Use MiniDFSCluster.Builder instead
+  public MiniDFSCluster(int nameNodePort, 
+                        Configuration conf,
+                        int numDataNodes,
+                        boolean format,
+                        boolean manageNameDfsDirs,
+                        boolean manageDataDfsDirs,
+                        StartupOption operation,
+                        String[] racks, String hosts[],
+                        long[] simulatedCapacities) throws IOException {
+    this.storagesPerDatanode = DEFAULT_STORAGES_PER_DATANODE;
+    initMiniDFSCluster(conf, numDataNodes, null, format,
+                       manageNameDfsDirs, true, manageDataDfsDirs, manageDataDfsDirs,
+                       operation, null, racks, hosts,
+                       null, simulatedCapacities, null, true, false,
+                       MiniDFSNNTopology.simpleSingleNN(nameNodePort, 0),
+                       true, false, false, null, true);
+  }
 
   private void initMiniDFSCluster(
       Configuration conf,
@@ -699,6 +877,9 @@ public class MiniDFSCluster {
     Preconditions.checkArgument(nnTopology.countNameNodes() > 0,
         "empty NN topology: no namenodes specified!");
 
+    if(nameNodes == null){
+        nameNodes = new NameNodeInfo[nnTopology.countNameNodes()];
+    }
     if (nnTopology.countNameNodes() == 1) {
       NNConf onlyNN = nnTopology.getOnlyNameNode();
       // we only had one NN, set DEFAULT_NAME for it
@@ -1900,35 +2081,6 @@ public class MiniDFSCluster {
   public String getHttpUri(int nnIndex) {
     return "http://" +
         nameNodes[nnIndex].conf.get(DFS_NAMENODE_HTTP_ADDRESS_KEY);
-  }
-  
-  /**
-   * @return a {@link HftpFileSystem} object.
-   */
-  public HftpFileSystem getHftpFileSystem(int nnIndex) throws IOException {
-    String uri =
-        "hftp://" + nameNodes[nnIndex].conf.get(DFS_NAMENODE_HTTP_ADDRESS_KEY);
-    try {
-      return (HftpFileSystem) FileSystem.get(new URI(uri), conf);
-    } catch (URISyntaxException e) {
-      throw new IOException(e);
-    }
-  }
-
-  /**
-   * @return a {@link HftpFileSystem} object as specified user.
-   */
-  public HftpFileSystem getHftpFileSystemAs(final String username,
-      final Configuration conf, final int nnIndex, final String... groups)
-      throws IOException, InterruptedException {
-    final UserGroupInformation ugi =
-        UserGroupInformation.createUserForTesting(username, groups);
-    return ugi.doAs(new PrivilegedExceptionAction<HftpFileSystem>() {
-      @Override
-      public HftpFileSystem run() throws Exception {
-        return getHftpFileSystem(nnIndex);
-      }
-    });
   }
 
   public void triggerBlockReports() throws IOException {

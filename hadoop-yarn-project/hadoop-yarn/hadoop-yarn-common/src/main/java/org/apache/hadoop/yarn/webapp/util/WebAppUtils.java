@@ -25,6 +25,8 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -125,6 +127,20 @@ public class WebAppUtils {
 
   public static String getRMWebAppURLWithoutScheme(Configuration conf) {
     return getRMWebAppURLWithoutScheme(conf, false);
+  }
+
+  public static String getRouterWebAppURLWithScheme(Configuration conf) {
+    return getHttpSchemePrefix(conf) + getRouterWebAppURLWithoutScheme(conf);
+  }
+
+  public static String getRouterWebAppURLWithoutScheme(Configuration conf) {
+    if (YarnConfiguration.useHttps(conf)) {
+      return conf.get(YarnConfiguration.ROUTER_WEBAPP_HTTPS_ADDRESS,
+          YarnConfiguration.DEFAULT_ROUTER_WEBAPP_HTTPS_ADDRESS);
+    } else {
+      return conf.get(YarnConfiguration.ROUTER_WEBAPP_ADDRESS,
+          YarnConfiguration.DEFAULT_ROUTER_WEBAPP_ADDRESS);
+    }
   }
 
   public static List<String> getProxyHostsAndPortsForAmFilter(
@@ -236,7 +252,7 @@ public class WebAppUtils {
     return getResolvedAddress(address);
   }
 
-  private static String getResolvedAddress(InetSocketAddress address) {
+  public static String getResolvedAddress(InetSocketAddress address) {
     address = NetUtils.getConnectAddress(address);
     StringBuilder sb = new StringBuilder();
     InetAddress resolved = address.getAddress();
@@ -300,13 +316,42 @@ public class WebAppUtils {
   public static String getAHSWebAppURLWithoutScheme(Configuration conf) {
     if (YarnConfiguration.useHttps(conf)) {
       return conf.get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS,
-        YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS);
+          YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_HTTPS_ADDRESS);
     } else {
       return conf.get(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
-        YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS);
+          YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WEBAPP_ADDRESS);
     }
   }
-  
+
+  public static String getTimelineReaderWebAppURLWithoutScheme(
+      Configuration conf) {
+    if (YarnConfiguration.useHttps(conf)) {
+      return conf
+          .get(YarnConfiguration.TIMELINE_SERVICE_READER_WEBAPP_HTTPS_ADDRESS,
+              YarnConfiguration.
+                  DEFAULT_TIMELINE_SERVICE_READER_WEBAPP_HTTPS_ADDRESS);
+    } else {
+      return conf.get(YarnConfiguration.TIMELINE_SERVICE_READER_WEBAPP_ADDRESS,
+          YarnConfiguration.
+              DEFAULT_TIMELINE_SERVICE_READER_WEBAPP_ADDRESS);
+    }
+  }
+
+  public static String getTimelineCollectorWebAppURLWithoutScheme(
+      Configuration conf) {
+    if (YarnConfiguration.useHttps(conf)) {
+      return conf.get(
+          YarnConfiguration.TIMELINE_SERVICE_COLLECTOR_WEBAPP_HTTPS_ADDRESS,
+          YarnConfiguration.
+              DEFAULT_TIMELINE_SERVICE_COLLECTOR_WEBAPP_HTTPS_ADDRESS);
+    } else {
+      return conf
+          .get(YarnConfiguration.TIMELINE_SERVICE_COLLECTOR_WEBAPP_ADDRESS,
+              YarnConfiguration.
+                  DEFAULT_TIMELINE_SERVICE_COLLECTOR_WEBAPP_ADDRESS);
+    }
+  }
+
   /**
    * if url has scheme then it will be returned as it is else it will return
    * url with scheme.
@@ -322,7 +367,7 @@ public class WebAppUtils {
       return schemePrefix + url;
     }
   }
-  
+
   public static String getRunningLogURL(
       String nodeHttpAddress, String containerId, String user) {
     if (nodeHttpAddress == null || nodeHttpAddress.isEmpty() ||
@@ -436,7 +481,25 @@ public class WebAppUtils {
     return aid;
   }
 
-  private static String getURLEncodedQueryString(HttpServletRequest request) {
+  public static String getSupportedLogContentType(String format) {
+    if (format.equalsIgnoreCase("text")) {
+      return "text/plain";
+    } else if (format.equalsIgnoreCase("octet-stream")) {
+      return "application/octet-stream";
+    }
+    return null;
+  }
+
+  public static String getDefaultLogContentType() {
+    return "text/plain";
+  }
+
+  public static List<String> listSupportedLogContentType() {
+    return Arrays.asList("text", "octet-stream");
+  }
+
+  private static String getURLEncodedQueryString(HttpServletRequest request,
+      String parameterToRemove) {
     String queryString = request.getQueryString();
     if (queryString != null && !queryString.isEmpty()) {
       String reqEncoding = request.getCharacterEncoding();
@@ -444,10 +507,52 @@ public class WebAppUtils {
         reqEncoding = "ISO-8859-1";
       }
       Charset encoding = Charset.forName(reqEncoding);
-      List<NameValuePair> params = URLEncodedUtils.parse(queryString, encoding);
+      List<NameValuePair> params = URLEncodedUtils.parse(queryString,
+          encoding);
+      if (parameterToRemove != null && !parameterToRemove.isEmpty()) {
+        Iterator<NameValuePair> paramIterator = params.iterator();
+        while(paramIterator.hasNext()) {
+          NameValuePair current = paramIterator.next();
+          if (current.getName().equals(parameterToRemove)) {
+            paramIterator.remove();
+          }
+        }
+      }
       return URLEncodedUtils.format(params, encoding);
     }
     return null;
+  }
+
+  /**
+   * Get a query string.
+   * @param request HttpServletRequest with the request details
+   * @return the query parameter string
+  */
+  public static List<NameValuePair> getURLEncodedQueryParam(
+      HttpServletRequest request) {
+    String queryString = request.getQueryString();
+    if (queryString != null && !queryString.isEmpty()) {
+      String reqEncoding = request.getCharacterEncoding();
+      if (reqEncoding == null || reqEncoding.isEmpty()) {
+        reqEncoding = "ISO-8859-1";
+      }
+      Charset encoding = Charset.forName(reqEncoding);
+      List<NameValuePair> params = URLEncodedUtils.parse(queryString,
+          encoding);
+      return params;
+    }
+    return null;
+  }
+
+  /**
+    * Get a query string which removes the passed parameter.
+    * @param httpRequest HttpServletRequest with the request details
+    * @param parameterName the query parameters must be removed
+    * @return the query parameter string
+    */
+  public static String removeQueryParams(HttpServletRequest httpRequest,
+      String parameterName) {
+    return getURLEncodedQueryString(httpRequest, parameterName);
   }
 
   /**
@@ -457,7 +562,7 @@ public class WebAppUtils {
    */
   public static String getHtmlEscapedURIWithQueryString(
       HttpServletRequest request) {
-    String urlEncodedQueryString = getURLEncodedQueryString(request);
+    String urlEncodedQueryString = getURLEncodedQueryString(request, null);
     if (urlEncodedQueryString != null) {
       return HtmlQuoting.quoteHtmlChars(
           request.getRequestURI() + "?" + urlEncodedQueryString);
@@ -474,7 +579,7 @@ public class WebAppUtils {
   public static String appendQueryParams(HttpServletRequest request,
       String targetUri) {
     String ret = targetUri;
-    String urlEncodedQueryString = getURLEncodedQueryString(request);
+    String urlEncodedQueryString = getURLEncodedQueryString(request, null);
     if (urlEncodedQueryString != null) {
       ret += "?" + urlEncodedQueryString;
     }

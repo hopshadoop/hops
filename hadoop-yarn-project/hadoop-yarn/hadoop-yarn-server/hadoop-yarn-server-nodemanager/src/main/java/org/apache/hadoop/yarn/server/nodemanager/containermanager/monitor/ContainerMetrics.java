@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor;
 
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Snapshot;
+import com.codahale.metrics.UniformReservoir;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -29,13 +32,17 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableStat;
+import org.apache.hadoop.metrics2.util.Quantile;
+import org.apache.hadoop.metrics2.util.QuantileEstimator;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
@@ -46,12 +53,14 @@ public class ContainerMetrics implements MetricsSource {
   public static final String PMEM_LIMIT_METRIC_NAME = "pMemLimitMBs";
   public static final String VMEM_LIMIT_METRIC_NAME = "vMemLimitMBs";
   public static final String VCORE_LIMIT_METRIC_NAME = "vCoreLimit";
-  public static final String GPU_LIMIT_METRIC_NAME = "gpuLimit";
   public static final String PMEM_USAGE_METRIC_NAME = "pMemUsageMBs";
+  public static final String PMEM_USAGE_QUANTILES_NAME = "pMemUsageMBHistogram";
   public static final String LAUNCH_DURATION_METRIC_NAME = "launchDurationMs";
   public static final String LOCALIZATION_DURATION_METRIC_NAME =
       "localizationDurationMs";
   private static final String PHY_CPU_USAGE_METRIC_NAME = "pCpuUsagePercent";
+  private static final String PHY_CPU_USAGE_QUANTILES_NAME =
+      "pCpuUsagePercentHistogram";
 
   // Use a multiplier of 1000 to avoid losing too much precision when
   // converting to integers
@@ -60,12 +69,18 @@ public class ContainerMetrics implements MetricsSource {
   @Metric
   public MutableStat pMemMBsStat;
 
+  @Metric
+  public  MutableQuantiles pMemMBQuantiles;
+
   // This tracks overall CPU percentage of the machine in terms of percentage
   // of 1 core similar to top
   // Thus if you use 2 cores completely out of 4 available cores this value
   // will be 200
   @Metric
   public MutableStat cpuCoreUsagePercent;
+
+  @Metric
+  public  MutableQuantiles cpuCoreUsagePercentQuantiles;
 
   @Metric
   public MutableStat milliVcoresUsed;
@@ -78,15 +93,21 @@ public class ContainerMetrics implements MetricsSource {
 
   @Metric
   public MutableGaugeInt cpuVcoreLimit;
-  
-  @Metric
-  public MutableGaugeInt gpuLimit;
 
   @Metric
   public MutableGaugeLong launchDurationMs;
 
   @Metric
   public MutableGaugeLong localizationDurationMs;
+
+  @Metric
+  public MutableGaugeLong startTime;
+
+  @Metric
+  public MutableGaugeLong finishTime;
+
+  @Metric
+  public MutableGaugeInt exitCode;
 
   static final MetricsInfo RECORD_INFO =
       info("ContainerResource", "Resource limit and usage by container");
@@ -100,17 +121,16 @@ public class ContainerMetrics implements MetricsSource {
   final MetricsSystem metricsSystem;
 
   // Metrics publishing status
-  private long flushPeriodMs;
+  private final long flushPeriodMs;
+  private final long unregisterDelayMs;
   private boolean flushOnPeriod = false; // true if period elapsed
   private boolean finished = false; // true if container finished
-  private boolean unregister = false; // unregister
-  private long unregisterDelayMs;
   private Timer timer; // lazily initialized
 
   /**
    * Simple metrics cache to help prevent re-registrations.
    */
-  protected final static Map<ContainerId, ContainerMetrics>
+  private final static Map<ContainerId, ContainerMetrics>
       usageMetrics = new HashMap<>();
   // Create a timer to unregister container metrics,
   // whose associated thread run as a daemon.
@@ -131,9 +151,23 @@ public class ContainerMetrics implements MetricsSource {
 
     this.pMemMBsStat = registry.newStat(
         PMEM_USAGE_METRIC_NAME, "Physical memory stats", "Usage", "MBs", true);
+    this.pMemMBQuantiles = registry
+        .newQuantiles(PMEM_USAGE_QUANTILES_NAME, "Physical memory quantiles",
+            "Usage", "MBs", 1);
+    ContainerMetricsQuantiles memEstimator =
+        new ContainerMetricsQuantiles(MutableQuantiles.quantiles);
+    pMemMBQuantiles.setEstimator(memEstimator);
+
     this.cpuCoreUsagePercent = registry.newStat(
         PHY_CPU_USAGE_METRIC_NAME, "Physical Cpu core percent usage stats",
         "Usage", "Percents", true);
+    this.cpuCoreUsagePercentQuantiles = registry
+        .newQuantiles(PHY_CPU_USAGE_QUANTILES_NAME,
+            "Physical Cpu core percent usage quantiles", "Usage", "Percents",
+            1);
+    ContainerMetricsQuantiles cpuEstimator =
+        new ContainerMetricsQuantiles(MutableQuantiles.quantiles);
+    cpuCoreUsagePercentQuantiles.setEstimator(cpuEstimator);
     this.milliVcoresUsed = registry.newStat(
         VCORE_USAGE_METRIC_NAME, "1000 times Vcore usage", "Usage",
         "MilliVcores", true);
@@ -143,8 +177,6 @@ public class ContainerMetrics implements MetricsSource {
         VMEM_LIMIT_METRIC_NAME, "Virtual memory limit in MBs", 0);
     this.cpuVcoreLimit = registry.newGauge(
         VCORE_LIMIT_METRIC_NAME, "CPU limit in number of vcores", 0);
-    this.gpuLimit = registry.newGauge(
-        GPU_LIMIT_METRIC_NAME, "GPU limit in number of GPUs", 0);
     this.launchDurationMs = registry.newGauge(
         LAUNCH_DURATION_METRIC_NAME, "Launch duration in MS", 0L);
     this.localizationDurationMs = registry.newGauge(
@@ -200,17 +232,11 @@ public class ContainerMetrics implements MetricsSource {
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
     //Container goes through registered -> finished -> unregistered.
-    if (unregister) {
-      return;
-    }
-
     if (finished || flushOnPeriod) {
       registry.snapshot(collector.addRecord(registry.info()), all);
     }
 
-    if (finished) {
-      this.unregister = true;
-    } else if (flushOnPeriod) {
+    if (!finished && flushOnPeriod) {
       flushOnPeriod = false;
       scheduleTimerTaskIfRequired();
     }
@@ -224,12 +250,15 @@ public class ContainerMetrics implements MetricsSource {
         timer = null;
       }
       scheduleTimerTaskForUnregistration();
+      this.pMemMBQuantiles.stop();
+      this.cpuCoreUsagePercentQuantiles.stop();
     }
   }
 
   public void recordMemoryUsage(int memoryMBs) {
     if (memoryMBs >= 0) {
       this.pMemMBsStat.add(memoryMBs);
+      this.pMemMBQuantiles.add(memoryMBs);
     }
   }
 
@@ -237,6 +266,7 @@ public class ContainerMetrics implements MetricsSource {
       int totalPhysicalCpuPercent, int milliVcoresUsed) {
     if (totalPhysicalCpuPercent >=0) {
       this.cpuCoreUsagePercent.add(totalPhysicalCpuPercent);
+      this.cpuCoreUsagePercentQuantiles.add(totalPhysicalCpuPercent);
     }
     if (milliVcoresUsed >= 0) {
       this.milliVcoresUsed.add(milliVcoresUsed);
@@ -244,15 +274,13 @@ public class ContainerMetrics implements MetricsSource {
   }
 
   public void recordProcessId(String processId) {
-    registry.tag(PROCESSID_INFO, processId);
+    registry.tag(PROCESSID_INFO, processId, true);
   }
 
-  public void recordResourceLimit(int vmemLimit, int pmemLimit, int
-      cpuVcores, int gpus) {
+  public void recordResourceLimit(int vmemLimit, int pmemLimit, int cpuVcores) {
     this.vMemLimitMbs.set(vmemLimit);
     this.pMemLimitMbs.set(pmemLimit);
     this.cpuVcoreLimit.set(cpuVcores);
-    this.gpuLimit.set(gpus);
   }
 
   public void recordStateChangeDurations(long launchDuration,
@@ -261,12 +289,22 @@ public class ContainerMetrics implements MetricsSource {
     this.localizationDurationMs.set(localizationDuration);
   }
 
+  public void recordStartTime(long startTime) {
+    this.startTime.set(startTime);
+  }
+
+  public void recordFinishTimeAndExitCode(long finishTime, int exitCode) {
+    this.finishTime.set(finishTime);
+    this.exitCode.set(exitCode);
+  }
+
   private synchronized void scheduleTimerTaskIfRequired() {
     if (flushPeriodMs > 0) {
       // Lazily initialize timer
       if (timer == null) {
         this.timer = new Timer("Metrics flush checker", true);
       }
+
       TimerTask timerTask = new TimerTask() {
         @Override
         public void run() {
@@ -277,6 +315,7 @@ public class ContainerMetrics implements MetricsSource {
           }
         }
       };
+
       timer.schedule(timerTask, flushPeriodMs);
     }
   }
@@ -289,5 +328,42 @@ public class ContainerMetrics implements MetricsSource {
       }
     };
     unregisterContainerMetricsTimer.schedule(timerTask, unregisterDelayMs);
+  }
+
+  public static class ContainerMetricsQuantiles implements QuantileEstimator {
+
+    private final Histogram histogram = new Histogram(new UniformReservoir());
+
+    private Quantile[] quantiles;
+
+    ContainerMetricsQuantiles(Quantile[] q) {
+      quantiles = q;
+    }
+
+    @Override
+    public synchronized void insert(long value) {
+      histogram.update(value);
+    }
+
+    @Override
+    synchronized public long getCount() {
+      return histogram.getCount();
+    }
+
+    @Override
+    synchronized public void clear() {
+      // don't do anything because we want metrics over the lifetime of the
+      // container
+    }
+
+    @Override
+    public synchronized Map<Quantile, Long> snapshot() {
+      Snapshot snapshot = histogram.getSnapshot();
+      Map<Quantile, Long> values = new TreeMap<>();
+      for (Quantile quantile : quantiles) {
+        values.put(quantile, (long) snapshot.getValue(quantile.quantile));
+      }
+      return values;
+    }
   }
 }

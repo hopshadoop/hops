@@ -81,7 +81,7 @@ public class TestLocalizedResource {
       final Credentials creds0 = new Credentials();
       final LocalResourceVisibility vis0 = LocalResourceVisibility.PRIVATE;
       final LocalizerContext ctxt0 =
-        new LocalizerContext("yak", container0, creds0, "yakFolder");
+        new LocalizerContext("yak", container0, creds0);
       LocalResourceRequest rsrcA = new LocalResourceRequest(apiRsrc);
       LocalizedResource local = new LocalizedResource(rsrcA, dispatcher);
       local.handle(new ResourceRequestEvent(rsrcA, vis0, ctxt0));
@@ -98,7 +98,7 @@ public class TestLocalizedResource {
       final Credentials creds1 = new Credentials();
       final ContainerId container1 = getMockContainer(1L);
       final LocalizerContext ctxt1 =
-        new LocalizerContext("yak", container1, creds1, "yakFolder");
+        new LocalizerContext("yak", container1, creds1);
       final LocalResourceVisibility vis1 = LocalResourceVisibility.PUBLIC;
       local.handle(new ResourceRequestEvent(rsrcA, vis1, ctxt1));
       dispatcher.await();
@@ -124,13 +124,13 @@ public class TestLocalizedResource {
       final LocalResourceVisibility vis2 = LocalResourceVisibility.PRIVATE;
       final Credentials creds2 = new Credentials();
       final LocalizerContext ctxt2 =
-        new LocalizerContext("yak", container2, creds2, "yakFolder");
+        new LocalizerContext("yak", container2, creds2);
 
       final ContainerId container3 = getMockContainer(3L);
       final LocalResourceVisibility vis3 = LocalResourceVisibility.PRIVATE;
       final Credentials creds3 = new Credentials();
       final LocalizerContext ctxt3 =
-        new LocalizerContext("yak", container3, creds3, "yakFolder");
+        new LocalizerContext("yak", container3, creds3);
 
       local.handle(new ResourceRequestEvent(rsrcA, vis2, ctxt2));
       local.handle(new ResourceRequestEvent(rsrcA, vis3, ctxt3));
@@ -162,7 +162,7 @@ public class TestLocalizedResource {
       final ContainerId container4 = getMockContainer(4L);
       final Credentials creds4 = new Credentials();
       final LocalizerContext ctxt4 =
-        new LocalizerContext("yak", container4, creds4, "yakFolder");
+        new LocalizerContext("yak", container4, creds4);
       final LocalResourceVisibility vis4 = LocalResourceVisibility.PRIVATE;
       local.handle(new ResourceRequestEvent(rsrcA, vis4, ctxt4));
       dispatcher.await();

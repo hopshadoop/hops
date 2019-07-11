@@ -24,7 +24,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import com.google.common.collect.Sets;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -35,12 +37,25 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.NodeAttribute;
+import org.apache.hadoop.yarn.api.records.NodeAttributeType;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
+import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
 import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.NMContainerStatusPBImpl;
+
+import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb
+    .NodeHeartbeatRequestPBImpl;
 import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.NodeHeartbeatResponsePBImpl;
 import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.RegisterNodeManagerRequestPBImpl;
+
+import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.Assert;
 import org.junit.Test;
@@ -48,11 +63,28 @@ import org.junit.Test;
 public class TestProtocolRecords {
 
   @Test
+  public void testResource() {
+    final long mem = 123;
+    final int vcores = 456;
+    final Resource r = Resource.newInstance(mem, vcores);
+    // should be a lightweight SimpleResource which is a private inner class
+    // so just verify it's not the heavyweight pb impl.
+    Assert.assertFalse(r instanceof ResourcePBImpl);
+    Assert.assertEquals(mem, r.getMemorySize());
+    Assert.assertEquals(vcores, r.getVirtualCores());
+
+    ResourceProto proto = ProtoUtils.convertToProtoFormat(r);
+    Assert.assertEquals(mem, proto.getMemory());
+    Assert.assertEquals(vcores, proto.getVirtualCores());
+    Assert.assertEquals(r, ProtoUtils.convertFromProtoFormat(proto));
+  }
+
+  @Test
   public void testNMContainerStatus() {
     ApplicationId appId = ApplicationId.newInstance(123456789, 1);
     ApplicationAttemptId attemptId = ApplicationAttemptId.newInstance(appId, 1);
     ContainerId containerId = ContainerId.newContainerId(attemptId, 1);
-    Resource resource = Resource.newInstance(1000, 200, 300);
+    Resource resource = Resource.newInstance(1000, 200);
 
     NMContainerStatus report =
         NMContainerStatus.newInstance(containerId, 0,
@@ -80,7 +112,7 @@ public class TestProtocolRecords {
 
     NMContainerStatus containerReport =
         NMContainerStatus.newInstance(containerId, 0,
-          ContainerState.RUNNING, Resource.newInstance(1024, 1, 2), "diagnostics",
+          ContainerState.RUNNING, Resource.newInstance(1024, 1), "diagnostics",
           0, Priority.newInstance(10), 1234);
     List<NMContainerStatus> reports = Arrays.asList(containerReport);
     Map<ApplicationId, UpdatedCryptoForApp> runningApplications = new HashMap<>(1);
@@ -89,7 +121,7 @@ public class TestProtocolRecords {
     RegisterNodeManagerRequest request =
         RegisterNodeManagerRequest.newInstance(
           NodeId.newInstance("1.1.1.1", 1000), 8080,
-            Resource.newInstance(1024, 1, 2), "NM-version-id", reports,
+            Resource.newInstance(1024, 1), "NM-version-id", reports,
             runningApplications);
     RegisterNodeManagerRequest requestProto =
         new RegisterNodeManagerRequestPBImpl(
@@ -100,7 +132,7 @@ public class TestProtocolRecords {
     Assert.assertEquals("NM-version-id", requestProto.getNMVersion());
     Assert.assertEquals(NodeId.newInstance("1.1.1.1", 1000),
       requestProto.getNodeId());
-    Assert.assertEquals(Resource.newInstance(1024, 1, 2),
+    Assert.assertEquals(Resource.newInstance(1024, 1),
       requestProto.getResource());
     Assert.assertEquals(1, requestProto.getRunningApplications().size());
     Assert.assertNotNull(requestProto.getRunningApplications().get(appId));
@@ -136,5 +168,53 @@ public class TestProtocolRecords {
         new NodeHeartbeatResponsePBImpl(
           ((NodeHeartbeatResponsePBImpl) record).getProto());
     Assert.assertEquals(appCredentials, proto.getSystemCredentialsForApps());
+  }
+
+  @Test
+  public void testNodeHeartBeatRequest() throws IOException {
+    NodeHeartbeatRequest record =
+        Records.newRecord(NodeHeartbeatRequest.class);
+    NodeStatus nodeStatus =
+        Records.newRecord(NodeStatus.class);
+    OpportunisticContainersStatus opportunisticContainersStatus =
+        Records.newRecord(OpportunisticContainersStatus.class);
+    opportunisticContainersStatus.setEstimatedQueueWaitTime(123);
+    opportunisticContainersStatus.setWaitQueueLength(321);
+    nodeStatus.setOpportunisticContainersStatus(opportunisticContainersStatus);
+    record.setNodeStatus(nodeStatus);
+
+    Set<NodeAttribute> attributeSet =
+        Sets.newHashSet(NodeAttribute.newInstance("attributeA",
+                NodeAttributeType.STRING, "valueA"),
+            NodeAttribute.newInstance("attributeB",
+                NodeAttributeType.STRING, "valueB"));
+    record.setNodeAttributes(attributeSet);
+
+    NodeHeartbeatRequestPBImpl pb = new
+        NodeHeartbeatRequestPBImpl(
+        ((NodeHeartbeatRequestPBImpl) record).getProto());
+
+    Assert.assertEquals(123,
+        pb.getNodeStatus()
+            .getOpportunisticContainersStatus().getEstimatedQueueWaitTime());
+    Assert.assertEquals(321,
+        pb.getNodeStatus().getOpportunisticContainersStatus()
+            .getWaitQueueLength());
+    Assert.assertEquals(2, pb.getNodeAttributes().size());
+  }
+
+  @Test
+  public void testContainerStatus() {
+    ContainerStatus status = Records.newRecord(ContainerStatus.class);
+    List<String> ips = Arrays.asList("127.0.0.1", "139.5.25.2");
+    status.setIPs(ips);
+    status.setHost("locahost123");
+    ContainerStatusPBImpl pb =
+        new ContainerStatusPBImpl(((ContainerStatusPBImpl) status).getProto());
+    Assert.assertEquals(ips, pb.getIPs());
+    Assert.assertEquals("locahost123", pb.getHost());
+
+    status.setIPs(null);
+    Assert.assertNull(status.getIPs());
   }
 }

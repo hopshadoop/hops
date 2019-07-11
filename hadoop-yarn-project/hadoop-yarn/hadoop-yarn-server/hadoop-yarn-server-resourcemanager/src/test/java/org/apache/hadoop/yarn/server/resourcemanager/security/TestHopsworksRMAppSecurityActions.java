@@ -301,18 +301,18 @@ public class TestHopsworksRMAppSecurityActions {
     Date nbf = DateUtils.localDateTime2Date(now);
     LocalDateTime expiration = now.plus(10, ChronoUnit.MINUTES);
     Date expirationDate = DateUtils.localDateTime2Date(expiration);
-    JWTClaimsSet masterClaims = new JWTClaimsSet();
-    masterClaims.setSubject("master_token");
-    masterClaims.setExpirationTime(expirationDate);
-    masterClaims.setNotBeforeTime(nbf);
+    JWTClaimsSet masterClaims = new JWTClaimsSet.Builder()
+        .subject("master_token")
+        .expirationTime(expirationDate)
+        .notBeforeTime(nbf).build();
     String newMasterToken = jwtIssuer.generate(masterClaims);
     Assert.assertNotNull(newMasterToken);
-    
+
     String[] newRenewalTokens = new String[5];
-    JWTClaimsSet renewClaims = new JWTClaimsSet();
-    renewClaims.setSubject("renew_token");
-    renewClaims.setExpirationTime(expirationDate);
-    renewClaims.setNotBeforeTime(nbf);
+    JWTClaimsSet renewClaims = new JWTClaimsSet.Builder()
+        .subject("renew_token")
+        .expirationTime(expirationDate)
+        .notBeforeTime(nbf).build();
     for (int i = 0; i < newRenewalTokens.length; i++) {
       String renewToken = jwtIssuer.generate(renewClaims);
       Assert.assertNotNull(renewToken);
@@ -344,9 +344,9 @@ public class TestHopsworksRMAppSecurityActions {
   public void testServiceJWTRenewalRetry() throws Exception {
     LocalDateTime expiration = DateUtils.getNow().plus(10, ChronoUnit.MINUTES);
     Date expirationDate = DateUtils.localDateTime2Date(expiration);
-    JWTClaimsSet claims = new JWTClaimsSet();
-    claims.setSubject("test");
-    claims.setExpirationTime(expirationDate);
+    JWTClaimsSet claims = new JWTClaimsSet.Builder()
+    .subject("test")
+    .expirationTime(expirationDate).build();
     String newMasterToken = jwtIssuer.generate(claims);
     String[] renewTokens = new String[5];
     for (int i = 0; i < renewTokens.length; i++) {

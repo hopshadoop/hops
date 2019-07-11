@@ -21,6 +21,7 @@ package org.apache.hadoop.util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
@@ -45,6 +46,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.serializer.Deserializer;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
+import org.slf4j.Logger;
 
 /**
  * General reflection utils
@@ -135,7 +137,7 @@ public class ReflectionUtils {
     setConf(result, conf);
     return result;
   }
-  
+
   static private ThreadMXBean threadBean = 
     ManagementFactory.getThreadMXBean();
     
@@ -210,7 +212,36 @@ public class ReflectionUtils {
     boolean dumpStack = false;
     if (log.isInfoEnabled()) {
       synchronized (ReflectionUtils.class) {
-        long now = Time.now();
+        long now = Time.monotonicNow();
+        if (now - previousLogTime >= minInterval * 1000) {
+          previousLogTime = now;
+          dumpStack = true;
+        }
+      }
+      if (dumpStack) {
+        try {
+          ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+          printThreadInfo(new PrintStream(buffer, false, "UTF-8"), title);
+          log.info(buffer.toString(Charset.defaultCharset().name()));
+        } catch (UnsupportedEncodingException ignored) {
+        }
+      }
+    }
+  }
+
+  /**
+   * Log the current thread stacks at INFO level.
+   * @param log the logger that logs the stack trace
+   * @param title a descriptive title for the call stacks
+   * @param minInterval the minimum time from the last
+   */
+  public static void logThreadInfo(Logger log,
+                                   String title,
+                                   long minInterval) {
+    boolean dumpStack = false;
+    if (log.isInfoEnabled()) {
+      synchronized (ReflectionUtils.class) {
+        long now = Time.monotonicNow();
         if (now - previousLogTime >= minInterval * 1000) {
           previousLogTime = now;
           dumpStack = true;

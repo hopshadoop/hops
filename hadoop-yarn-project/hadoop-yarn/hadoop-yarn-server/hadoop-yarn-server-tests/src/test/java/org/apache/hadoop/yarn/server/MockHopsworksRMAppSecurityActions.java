@@ -34,7 +34,7 @@ public class MockHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityAct
   private final byte[] secret;
   private final MockJWTIssuer jwtIssuer;
   
-  public MockHopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException {
+  public MockHopsworksRMAppSecurityActions() throws MalformedURLException, GeneralSecurityException, JOSEException {
     super();
     Random rand = new Random();
     secret = new byte[32];
@@ -45,8 +45,8 @@ public class MockHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityAct
   @Override
   protected void loadMasterJWT() throws GeneralSecurityException {
     LocalDateTime masterExpiration = LocalDateTime.now().plus(10L, ChronoUnit.MINUTES);
-    JWTClaimsSet claims = new JWTClaimsSet();
-    claims.setExpirationTime(Date.from(masterExpiration.atZone(ZoneId.systemDefault()).toInstant()));
+    JWTClaimsSet claims = new JWTClaimsSet.Builder().expirationTime(Date.from(masterExpiration.atZone(ZoneId.
+        systemDefault()).toInstant())).build();
     try {
       String masterToken = jwtIssuer.generate(claims);
       setMasterToken(masterToken);

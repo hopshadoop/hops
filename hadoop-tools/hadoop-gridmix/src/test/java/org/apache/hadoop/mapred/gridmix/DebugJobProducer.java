@@ -40,12 +40,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DebugJobProducer implements JobStoryProducer {
-  public static final Log LOG = LogFactory.getLog(DebugJobProducer.class);
+  public static final Logger LOG = LoggerFactory.getLogger(DebugJobProducer.class);
   final ArrayList<JobStory> submitted;
   private final Configuration conf;
   private final AtomicInteger numJobs;
@@ -262,7 +262,6 @@ public class DebugJobProducer implements JobStoryProducer {
       throw new UnsupportedOperationException();
     }
 
-    @SuppressWarnings({ "deprecation", "incomplete-switch" })
     @Override
     public TaskAttemptInfo getTaskAttemptInfo(
       TaskType taskType, int taskNumber, int taskAttemptNumber) {

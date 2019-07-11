@@ -20,8 +20,6 @@ package org.apache.hadoop.ipc;
 
 import com.google.common.base.Supplier;
 import com.google.protobuf.ServiceException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -50,11 +48,14 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.MetricsAsserts;
 import org.apache.hadoop.test.MockitoUtil;
-import org.apache.log4j.Level;
+import org.apache.hadoop.test.Whitebox;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.mockito.internal.util.reflection.Whitebox;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import javax.net.SocketFactory;
 import java.io.Closeable;
@@ -90,8 +91,6 @@ import static org.apache.hadoop.test.MetricsAsserts.assertCounterGt;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -104,7 +103,7 @@ import static org.mockito.Mockito.verify;
 @SuppressWarnings("deprecation")
 public class TestRPC extends TestRpcBase {
 
-  public static final Log LOG = LogFactory.getLog(TestRPC.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestRPC.class);
 
   @Before
   public void setup() {
@@ -446,6 +445,15 @@ public class TestRPC extends TestRpcBase {
       assertCounter("RpcProcessingTimeNumOps", 3L, rb);
       assertCounterGt("SentBytes", 0L, rb);
       assertCounterGt("ReceivedBytes", 0L, rb);
+
+      // Check tags of the metrics
+      assertEquals("" + server.getPort(),
+          server.getRpcMetrics().getTag("port").value());
+
+      assertEquals("TestProtobufRpcProto",
+          server.getRpcMetrics().getTag("serverName").value());
+
+
 
       // Number of calls to echo method should be 2
       rb = getMetrics(server.rpcDetailedMetrics.name());
@@ -917,18 +925,6 @@ public class TestRPC extends TestRpcBase {
     } finally {
       server.stop();
     }
-    // let threads get past the barrier
-    Thread.sleep(1000);
-    // stop a single thread
-    while (leaderRunning.get()) {
-      leaderThread.interrupt();
-    }
-    
-    latch.await();
-    
-    // should not cause any other thread to get an error
-    assertTrue("rpc got exception " + error.get(), error.get() == null);
-    server.stop();
   }
 
   @Test
@@ -1021,7 +1017,7 @@ public class TestRPC extends TestRpcBase {
     }
   }
 
-  private <T> ExternalCall<T> newExtCall(final UserGroupInformation ugi,
+  private <T> ExternalCall<T> newExtCall(UserGroupInformation ugi,
       PrivilegedExceptionAction<T> callable) {
     return new ExternalCall<T>(callable) {
       @Override
@@ -1135,10 +1131,7 @@ public class TestRPC extends TestRpcBase {
                 return null;
               }
             }));
-      }
-      while (server.getCallQueueLen() != 1
-          && countThreads(CallQueueManager.class.getName()) != 1) {
-        Thread.sleep(100);
+        verify(spy, timeout(500).times(i + 1)).add(Mockito.<Call>anyObject());
       }
       try {
         proxy.sleep(null, newSleepRequest(100));
@@ -1154,6 +1147,9 @@ public class TestRPC extends TestRpcBase {
     } finally {
       executorService.shutdown();
       stop(server, proxy);
+    }
+    if (lastException != null) {
+      LOG.error("Last received non-RetriableException:", lastException);
     }
     assertTrue("RetriableException not received", succeeded);
   }
@@ -1206,7 +1202,7 @@ public class TestRPC extends TestRpcBase {
                 return null;
               }
             }));
-        verify(spy, timeout(500).times(i + 1)).offer(Mockito.<Call>anyObject());
+        verify(spy, timeout(500).times(i + 1)).add(Mockito.<Call>anyObject());
       }
       // Start another sleep RPC call and verify the call is backed off due to
       // avg response time(3s) exceeds threshold (2s).
@@ -1374,6 +1370,50 @@ public class TestRPC extends TestRpcBase {
     }
   }
 
+  @Test
+  public void testServerNameFromClass() {
+    Assert.assertEquals("TestRPC",
+        RPC.Server.serverNameFromClass(this.getClass()));
+    Assert.assertEquals("TestClass",
+        RPC.Server.serverNameFromClass(TestRPC.TestClass.class));
+
+    Object testing = new TestClass().classFactory();
+    Assert.assertEquals("Embedded",
+        RPC.Server.serverNameFromClass(testing.getClass()));
+
+    testing = new TestClass().classFactoryAbstract();
+    Assert.assertEquals("TestClass",
+        RPC.Server.serverNameFromClass(testing.getClass()));
+
+    testing = new TestClass().classFactoryObject();
+    Assert.assertEquals("TestClass",
+        RPC.Server.serverNameFromClass(testing.getClass()));
+
+  }
+
+  static class TestClass {
+    class Embedded {
+    }
+
+    abstract class AbstractEmbedded {
+
+    }
+
+    private Object classFactory() {
+      return new Embedded();
+    }
+
+    private Object classFactoryAbstract() {
+      return new AbstractEmbedded() {
+      };
+    }
+
+    private Object classFactoryObject() {
+      return new Object() {
+      };
+    }
+
+  }
   public static class FakeRequestClass extends RpcWritable {
     static volatile IOException exception;
     @Override

@@ -275,11 +275,12 @@ public class NamenodeWebHdfsMethods {
       final HttpOpParam.Op op, final long openOffset, final long blocksize, final String excludeDatanodes,
       final Param<?, ?>... parameters) throws URISyntaxException, IOException {
     final DatanodeInfo dn;
-    try {
-      dn = chooseDatanode(namenode, path, op, openOffset, blocksize,
+    dn = chooseDatanode(namenode, path, op, openOffset, blocksize,
           excludeDatanodes);
-    } catch (NetworkTopology.InvalidTopologyException ite) {
-      throw new IOException("Failed to find datanode, suggest to check cluster health.", ite);
+    
+    if (dn == null) {
+      throw new IOException("Failed to find datanode, suggest to check cluster"
+          + " health. excludeDatanodes=" + excludeDatanodes);
     }
 
     final String delegationQuery;

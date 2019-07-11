@@ -21,13 +21,12 @@ package org.apache.hadoop.mapreduce.util;
 import java.io.IOException;
 import java.util.Arrays;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.Shell.ExitCodeException;
 import org.apache.hadoop.util.Shell.ShellCommandExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** 
  * Process tree related operations
@@ -36,7 +35,7 @@ import org.apache.hadoop.util.Shell.ShellCommandExecutor;
 @InterfaceStability.Unstable
 public class ProcessTree {
 
-  private static final Log LOG = LogFactory.getLog(ProcessTree.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ProcessTree.class);
 
   public static final long DEFAULT_SLEEPTIME_BEFORE_SIGKILL = 5000L;
 
@@ -48,8 +47,8 @@ public class ProcessTree {
   private static final String SIGTERM_STR = "SIGTERM";
   private static final String SIGKILL_STR = "SIGKILL";
 
-
   public static final boolean isSetsidAvailable = isSetsidSupported();
+
   private static boolean isSetsidSupported() {
     ShellCommandExecutor shexec = null;
     boolean setsidSupported = true;
@@ -113,7 +112,6 @@ public class ProcessTree {
     terminateProcessGroup(pgrpId);
     sigKill(pgrpId, true, sleeptimeBeforeSigkill, inBackground);
   }
-
 
   /**
    * Send a specified signal to the specified pid
@@ -214,7 +212,6 @@ public class ProcessTree {
       }
     }  
   }
-  
 
   /** Kills the process(OR process group) by sending the signal SIGKILL
    * @param pid Process id(OR process group id) of to-be-deleted-process
@@ -301,7 +298,7 @@ public class ProcessTree {
     }
     return (shexec.getExitCode() == 0 ? true : false);
   }
-  
+
   /**
    * Is the process group with  still alive?
    * 
@@ -326,7 +323,6 @@ public class ProcessTree {
     }
     return (shexec.getExitCode() == 0 ? true : false);
   }
-  
 
   /**
    * Helper thread class that kills process-tree with SIGKILL in background

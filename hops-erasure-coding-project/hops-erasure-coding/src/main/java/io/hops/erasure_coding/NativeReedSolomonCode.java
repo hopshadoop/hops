@@ -18,6 +18,7 @@
 
 package io.hops.erasure_coding;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -51,7 +52,7 @@ public class NativeReedSolomonCode extends ErasureCode {
     }
     
     @Override
-    public void encodeBulk(byte[][] inputs, byte[][] outputs) {
+    public void encodeBulk(byte[][] inputs, byte[][] outputs) throws IOException {
         
         ByteBuffer[] binputs = new ByteBuffer[inputs.length];
         ByteBuffer[] boutputs = new ByteBuffer[outputs.length];
@@ -90,7 +91,7 @@ public class NativeReedSolomonCode extends ErasureCode {
     
     @Override
     public void decodeBulk(byte[][] readBufs, byte[][] writeBufs,
-    int[] erasedLocations, int[] locationsToRead, int[] locationsNotToRead) {
+    int[] erasedLocations, int[] locationsToRead, int[] locationsNotToRead) throws IOException {
         
         ByteBuffer[] breadBufs = new ByteBuffer[readBufs.length];
         ByteBuffer[] bwriteBufs = new ByteBuffer[locationsNotToRead.length];

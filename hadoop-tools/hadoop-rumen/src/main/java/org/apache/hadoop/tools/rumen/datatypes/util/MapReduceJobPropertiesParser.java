@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -42,12 +42,11 @@ import org.apache.log4j.Logger;
  * result of deprecation some keys change or are preferred over other keys, 
  * across versions. {@link MapReduceJobPropertiesParser} is a utility class that
  * parses MapReduce job configuration properties and converts the value into a 
- * well defined {@link DataType}. Users can use the 
- * {@link MapReduceJobPropertiesParser#parseJobProperty(String, String)} API to 
- * process job configuration parameters. This API will parse a job property 
- * represented as a key-value pair and return the value wrapped inside a 
- * {@link DataType}. Callers can then use the returned {@link DataType} for 
- * further processing.
+ * well defined {@link DataType}. Users can use the
+ * {@link #parseJobProperty(String, String)} API to process job 
+ * configuration parameters. This API will parse a job property represented as a
+ * key-value pair and return the value wrapped inside a {@link DataType}. 
+ * Callers can then use the returned {@link DataType} for further processing.
  * 
  * {@link MapReduceJobPropertiesParser} thrives on the key name to decide which
  * {@link DataType} to wrap the value with. Values for keys representing 
@@ -62,15 +61,15 @@ import org.apache.log4j.Logger;
  * {@link DefaultDataType}. Currently only '-Xmx' and '-Xms' settings are 
  * considered while the rest are ignored.
  * 
- * Note that the {@link MapReduceJobPropertiesParser#parseJobProperty(String, 
- * String)} API maps the keys to a configuration parameter listed in 
+ * Note that the {@link #parseJobProperty(String, String)} API 
+ * maps the keys to a configuration parameter listed in 
  * {@link MRJobConfig}. This not only filters non-framework specific keys thus 
- * ignoring user-specific and hard-to-parse keys but also provides a consistent 
+ * ignoring user-specific and hard-to-parse keys but also provides a consistent
  * view for all possible inputs. So if users invoke the 
- * {@link MapReduceJobPropertiesParser#parseJobProperty(String, String)} API
- * with either &lt;"mapreduce.job.user.name", "bob"&gt; or
- * &lt;"user.name", "bob"&gt;, then the result would be a {@link UserName}
- * {@link DataType} wrapping the user-name "bob".
+ * {@link #parseJobProperty(String, String)} API with either
+ * &lt;"mapreduce.job.user.name", "bob"&gt; or &lt;"user.name", "bob"&gt;,
+ * then the result would be a {@link UserName} {@link DataType} wrapping
+ * the user-name "bob".
  */
 @SuppressWarnings("deprecation")
 public class MapReduceJobPropertiesParser implements JobPropertyParser {
@@ -131,7 +130,7 @@ public class MapReduceJobPropertiesParser implements JobPropertyParser {
   /**
    * Extracts the -Xmx heap option from the specified string.
    */
-  public static void extractMaxHeapOpts(String javaOptions, 
+  public static void extractMaxHeapOpts(final String javaOptions,
                                         List<String> heapOpts, 
                                         List<String> others) {
     for (String opt : javaOptions.split(" ")) {
@@ -161,6 +160,7 @@ public class MapReduceJobPropertiesParser implements JobPropertyParser {
   
   // Maps the value of the specified key.
   private DataType<?> fromString(String key, String value) {
+    DefaultDataType defaultValue = new DefaultDataType(value);
     if (value != null) {
       // check known configs
       //  job-name
@@ -191,14 +191,13 @@ public class MapReduceJobPropertiesParser implements JobPropertyParser {
       // check if the config parameter represents a number
       try {
         format.parse(value);
-        return new DefaultDataType(value);
+        return defaultValue;
       } catch (ParseException pe) {}
 
       // check if the config parameters represents a boolean 
       // avoiding exceptions
       if ("true".equals(value) || "false".equals(value)) {
-        Boolean.parseBoolean(value);
-        return new DefaultDataType(value);
+        return defaultValue;
       }
 
       // check if the config parameter represents a class
@@ -209,7 +208,7 @@ public class MapReduceJobPropertiesParser implements JobPropertyParser {
       // handle distributed cache sizes and timestamps
       if (latestKey.endsWith("sizes") 
           || latestKey.endsWith(".timestamps")) {
-        new DefaultDataType(value);
+        return defaultValue;
       }
       
       // check if the config parameter represents a file-system path

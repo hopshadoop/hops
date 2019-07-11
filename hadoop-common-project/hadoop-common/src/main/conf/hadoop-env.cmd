@@ -58,11 +58,7 @@ set HADOOP_DATANODE_OPTS=-Dhadoop.security.logger=ERROR,RFAS %HADOOP_DATANODE_OP
 set HADOOP_SECONDARYNAMENODE_OPTS=-Dhadoop.security.logger=%HADOOP_SECURITY_LOGGER% -Dhdfs.audit.logger=%HDFS_AUDIT_LOGGER% %HADOOP_SECONDARYNAMENODE_OPTS%
 
 @rem The following applies to multiple commands (fs, dfs, fsck, distcp etc)
-set HADOOP_CLIENT_OPTS=%HADOOP_CLIENT_OPTS%
-@rem set heap args when HADOOP_HEAPSIZE is empty
-if not defined HADOOP_HEAPSIZE (
-  set HADOOP_CLIENT_OPTS=-Xmx512m %HADOOP_CLIENT_OPTS%
-)
+set HADOOP_CLIENT_OPTS=-Xmx512m %HADOOP_CLIENT_OPTS%
 @rem set HADOOP_JAVA_PLATFORM_OPTS="-XX:-UsePerfData %HADOOP_JAVA_PLATFORM_OPTS%"
 
 @rem On secure datanodes, user to run the datanode as after dropping privileges
@@ -73,6 +69,15 @@ set HADOOP_SECURE_DN_USER=%HADOOP_SECURE_DN_USER%
 
 @rem Where log files are stored in the secure data environment.
 set HADOOP_SECURE_DN_LOG_DIR=%HADOOP_LOG_DIR%\%HADOOP_HDFS_USER%
+
+@rem
+@rem Router-based HDFS Federation specific parameters
+@rem Specify the JVM options to be used when starting the RBF Routers.
+@rem These options will be appended to the options specified as HADOOP_OPTS
+@rem and therefore may override any similar flags set in HADOOP_OPTS
+@rem
+@rem set HADOOP_DFSROUTER_OPTS=""
+@rem
 
 @rem The directory where pid files are stored. /tmp by default.
 @rem NOTE: this should be set to a directory that can only be written to by 

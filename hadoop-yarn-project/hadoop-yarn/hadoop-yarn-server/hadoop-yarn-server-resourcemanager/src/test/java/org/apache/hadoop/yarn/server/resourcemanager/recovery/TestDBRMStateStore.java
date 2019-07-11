@@ -25,6 +25,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.records.Version;
 import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -118,6 +119,11 @@ public class TestDBRMStateStore extends RMStateStoreTestBase {
     @Override
     public boolean appExists(RMApp app) throws Exception {
       return stateStore.loadRMAppState(app.getApplicationId()) != null;
+    }
+    
+    @Override
+    public boolean attemptExists(RMAppAttempt attempt) throws Exception {
+      return stateStore.loadRMAppAttemptState(attempt.getAppAttemptId())!=null;
     }
   }
 

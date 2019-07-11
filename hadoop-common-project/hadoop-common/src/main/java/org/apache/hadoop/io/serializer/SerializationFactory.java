@@ -21,8 +21,6 @@ package org.apache.hadoop.io.serializer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -31,6 +29,8 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.serializer.avro.AvroReflectSerialization;
 import org.apache.hadoop.io.serializer.avro.AvroSpecificSerialization;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -40,12 +40,12 @@ import org.apache.hadoop.util.ReflectionUtils;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Evolving
 public class SerializationFactory extends Configured {
-  
-  private static final Log LOG =
-    LogFactory.getLog(SerializationFactory.class.getName());
+
+  static final Logger LOG =
+      LoggerFactory.getLogger(SerializationFactory.class.getName());
 
   private List<Serialization<?>> serializations = new ArrayList<Serialization<?>>();
-  
+
   /**
    * <p>
    * Serializations are found by reading the <code>io.serializations</code>
@@ -56,14 +56,14 @@ public class SerializationFactory extends Configured {
   public SerializationFactory(Configuration conf) {
     super(conf);
     for (String serializerName : conf.getTrimmedStrings(
-      CommonConfigurationKeys.IO_SERIALIZATIONS_KEY,
-      new String[]{WritableSerialization.class.getName(),
-        AvroSpecificSerialization.class.getName(),
-        AvroReflectSerialization.class.getName()})) {
+            CommonConfigurationKeys.IO_SERIALIZATIONS_KEY,
+            new String[]{WritableSerialization.class.getName(),
+                    AvroSpecificSerialization.class.getName(),
+                    AvroReflectSerialization.class.getName()})) {
       add(conf, serializerName);
     }
   }
-  
+
   @SuppressWarnings("unchecked")
   private void add(Configuration conf, String serializationName) {
     try {
@@ -101,5 +101,5 @@ public class SerializationFactory extends Configured {
     }
     return null;
   }
-  
+
 }

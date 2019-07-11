@@ -2073,7 +2073,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
     //get block checksum for each block
     long remaining = length;
-    for(int i = 0; i < locatedblocks.size(); i++) {
+    for(int i = 0; i < locatedblocks.size() && remaining > 0; i++) {
       if (refetchBlocks) {  // refetch to get fresh tokens
         blockLocations = callGetBlockLocations(namenode, src, 0, length);
         if (null == blockLocations) {
@@ -2085,6 +2085,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       LocatedBlock lb = locatedblocks.get(i);
       final ExtendedBlock block = lb.getBlock();
       final DatanodeInfo[] datanodes = lb.getLocations();
+      if (remaining < block.getNumBytes()) {
+        block.setNumBytes(remaining);
+      }
+      remaining -= block.getNumBytes();
 
       //try each datanode location of the block
       final int timeout = 3000 * datanodes.length + dfsClientConf.socketTimeout;

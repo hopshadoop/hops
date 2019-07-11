@@ -26,14 +26,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -42,6 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.GroupMappingServiceProvider;
 import org.apache.hadoop.security.Groups;
@@ -49,12 +49,22 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
+import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodeLabelsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodeLabelsResponse;
 import org.apache.hadoop.yarn.api.records.DecommissionType;
+import org.apache.hadoop.yarn.api.records.NodeAttribute;
+import org.apache.hadoop.yarn.api.records.NodeAttributeType;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.server.api.protocolrecords.AddToClusterNodeLabelsRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.AttributeMappingOperationType;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeToAttributes;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodesToAttributesMappingRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshAdminAclsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshClusterMaxPriorityRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshNodesRequest;
@@ -65,19 +75,33 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshSuperUserGroupsC
 import org.apache.hadoop.yarn.server.api.protocolrecords.RefreshUserToGroupsMappingsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RemoveFromClusterNodeLabelsRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.ReplaceLabelsOnNodeRequest;
+import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.AddToClusterNodeLabelsRequestPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.resource.DynamicResourceConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration;
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.RM_PROXY_USER_PREFIX;
+import static org.apache.hadoop.yarn.server.resourcemanager.resource.DynamicResourceConfiguration.NODES;
+import static org.apache.hadoop.yarn.server.resourcemanager.resource.DynamicResourceConfiguration.PREFIX;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImplNotDist;
+import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.ipc.YarnRPC;
+import org.apache.hadoop.yarn.nodelabels.NodeAttributesManager;
+import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.AddToClusterNodeLabelsRequestProto;
+
+import static org.junit.Assert.assertTrue;
+import org.junit.Ignore;
 
 public class TestRMAdminService {
 
@@ -96,6 +120,9 @@ public class TestRMAdminService {
 
   @Before
   public void setup() throws IOException {
+    QueueMetrics.clearQueueMetrics();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+
     configuration = new YarnConfiguration();
     configuration.set(YarnConfiguration.RM_SCHEDULER,
         CapacityScheduler.class.getCanonicalName());
@@ -111,10 +138,6 @@ public class TestRMAdminService {
     fs.delete(tmpDir, true);
     fs.mkdirs(workingPath);
     fs.mkdirs(tmpDir);
-
-    RMStorageFactory.setConfiguration(configuration);
-    YarnAPIStorageFactory.setConfiguration(configuration);
-    DBUtility.InitializeDB();
 
     // reset the groups to what it default test settings
     MockUnixGroupsMapping.resetGroups();
@@ -172,7 +195,8 @@ public class TestRMAdminService {
 
     CapacitySchedulerConfiguration csConf =
         new CapacitySchedulerConfiguration();
-    csConf.set("yarn.scheduler.capacity.maximum-applications", "5000");
+    csConf.set(CapacitySchedulerConfiguration.MAXIMUM_SYSTEM_APPLICATIONS,
+        "5000");
     uploadConfiguration(csConf, "capacity-scheduler.xml");
 
     rm.adminService.refreshQueues(RefreshQueuesRequest.newInstance());
@@ -180,6 +204,29 @@ public class TestRMAdminService {
     int maxAppsAfter = cs.getConfiguration().getMaximumSystemApplications();
     Assert.assertEquals(maxAppsAfter, 5000);
     Assert.assertTrue(maxAppsAfter != maxAppsBefore);
+  }
+
+  @Test
+  public void testAdminRefreshQueuesWithMutableSchedulerConfiguration() {
+    configuration.set(YarnConfiguration.SCHEDULER_CONFIGURATION_STORE_CLASS,
+        YarnConfiguration.MEMORY_CONFIGURATION_STORE);
+
+    try {
+      rm = new MockRM(configuration);
+      rm.init(configuration);
+      rm.start();
+    } catch (Exception ex) {
+      fail("Should not get any exceptions");
+    }
+
+    try {
+      rm.adminService.refreshQueues(RefreshQueuesRequest.newInstance());
+      fail("Expected exception while calling refreshQueues when scheduler" +
+          " configuration is mutable.");
+    } catch (Exception ex) {
+      assertTrue(ex.getMessage().endsWith("Scheduler configuration is " +
+          "mutable. refreshQueues is not allowed in this scenario."));
+    }
   }
 
   @Test
@@ -229,13 +276,13 @@ public class TestRMAdminService {
     NodeId nid = NodeId.fromString("h1:1234");
     RMNode ni = rm.getRMContext().getRMNodes().get(nid);
     Resource resource = ni.getTotalCapability();
-    Assert.assertEquals("<memory:5120, vCores:5, gpus:0>", resource.toString());
+    Assert.assertEquals("<memory:5120, vCores:5>", resource.toString());
 
     DynamicResourceConfiguration drConf =
         new DynamicResourceConfiguration();
-    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
-    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "4");
-    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    drConf.set(PREFIX + NODES, "h1:1234");
+    drConf.set(PREFIX + "h1:1234.vcores", "4");
+    drConf.set(PREFIX + "h1:1234.memory", "4096");
     uploadConfiguration(drConf, "dynamic-resources.xml");
 
     rm.adminService.refreshNodesResources(
@@ -244,7 +291,7 @@ public class TestRMAdminService {
 
     RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
     Resource resourceAfter = niAfter.getTotalCapability();
-    Assert.assertEquals("<memory:4096, vCores:4, gpus:0>", resourceAfter.toString());
+    Assert.assertEquals("<memory:4096, vCores:4>", resourceAfter.toString());
   }
 
   @Test
@@ -269,13 +316,13 @@ public class TestRMAdminService {
     NodeId nid = NodeId.fromString("h1:1234");
     RMNode ni = rm.getRMContext().getRMNodes().get(nid);
     Resource resource = ni.getTotalCapability();
-    Assert.assertEquals("<memory:2048, vCores:2, gpus:0>", resource.toString());
+    Assert.assertEquals("<memory:2048, vCores:2>", resource.toString());
 
     DynamicResourceConfiguration drConf =
         new DynamicResourceConfiguration();
-    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
-    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "4");
-    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    drConf.set(PREFIX + NODES, "h1:1234");
+    drConf.set(PREFIX + "h1:1234.vcores", "4");
+    drConf.set(PREFIX + "h1:1234.memory", "4096");
     uploadConfiguration(drConf, "dynamic-resources.xml");
 
     rm.adminService.refreshNodesResources(
@@ -291,7 +338,7 @@ public class TestRMAdminService {
 
     RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
     Resource resourceAfter = niAfter.getTotalCapability();
-    Assert.assertEquals("<memory:4096, vCores:4, gpus:0>", resourceAfter.toString());
+    Assert.assertEquals("<memory:4096, vCores:4>", resourceAfter.toString());
 
     Assert.assertEquals(4096, nm.getMemory());
     Assert.assertEquals(4, nm.getvCores());
@@ -319,13 +366,13 @@ public class TestRMAdminService {
     NodeId nid = NodeId.fromString("h1:1234");
     RMNode ni = rm.getRMContext().getRMNodes().get(nid);
     Resource resource = ni.getTotalCapability();
-    Assert.assertEquals("<memory:2048, vCores:2, gpus:0>", resource.toString());
+    Assert.assertEquals("<memory:2048, vCores:2>", resource.toString());
 
     DynamicResourceConfiguration drConf =
         new DynamicResourceConfiguration();
-    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
-    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "4");
-    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    drConf.set(PREFIX + NODES, "h1:1234");
+    drConf.set(PREFIX + "h1:1234.vcores", "4");
+    drConf.set(PREFIX + "h1:1234.memory", "4096");
     uploadConfiguration(drConf, "dynamic-resources.xml");
 
     rm.adminService.refreshNodesResources(
@@ -340,7 +387,7 @@ public class TestRMAdminService {
 
     RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
     Resource resourceAfter = niAfter.getTotalCapability();
-    Assert.assertEquals("<memory:4096, vCores:4, gpus:0>", resourceAfter.toString());
+    Assert.assertEquals("<memory:4096, vCores:4>", resourceAfter.toString());
 
     Assert.assertEquals(4096, nm.getMemory());
     Assert.assertEquals(4, nm.getvCores());
@@ -348,7 +395,7 @@ public class TestRMAdminService {
 
   @Test
   public void testResourcePersistentForNMRegistrationWithNewResource()
-      throws IOException, YarnException, InterruptedException {
+      throws IOException, YarnException {
     configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
         "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
 
@@ -367,13 +414,13 @@ public class TestRMAdminService {
     NodeId nid = NodeId.fromString("h1:1234");
     RMNode ni = rm.getRMContext().getRMNodes().get(nid);
     Resource resource = ni.getTotalCapability();
-    Assert.assertEquals("<memory:5120, vCores:5, gpus:0>", resource.toString());
+    Assert.assertEquals("<memory:5120, vCores:5>", resource.toString());
 
     DynamicResourceConfiguration drConf =
         new DynamicResourceConfiguration();
-    drConf.set("yarn.resource.dynamic.nodes", "h1:1234");
-    drConf.set("yarn.resource.dynamic.h1:1234.vcores", "6");
-    drConf.set("yarn.resource.dynamic.h1:1234.memory", "4096");
+    drConf.set(PREFIX + NODES, "h1:1234");
+    drConf.set(PREFIX + "h1:1234.vcores", "4");
+    drConf.set(PREFIX + "h1:1234.memory", "4096");
     uploadConfiguration(drConf, "dynamic-resources.xml");
 
     rm.adminService.refreshNodesResources(
@@ -389,7 +436,7 @@ public class TestRMAdminService {
 
     RMNode niAfter = rm.getRMContext().getRMNodes().get(nid);
     Resource resourceAfter = niAfter.getTotalCapability();
-    Assert.assertEquals("<memory:4096, vCores:6, gpus:0>", resourceAfter.toString());
+    Assert.assertEquals("<memory:4096, vCores:4>", resourceAfter.toString());
 
     // Replace original dr file with an empty dr file, and validate node
     // registration with new resources will take effective now.
@@ -407,12 +454,12 @@ public class TestRMAdminService {
     } catch (Exception ex) {
       fail("Should not get any exceptions");
     }
-    Thread.sleep(500);
+
     niAfter = rm.getRMContext().getRMNodes().get(nid);
     resourceAfter = niAfter.getTotalCapability();
     // new resource in registration should take effective as we empty
     // dynamic resource file already.
-    Assert.assertEquals("<memory:8192, vCores:8, gpus:0>", resourceAfter.toString());
+    Assert.assertEquals("<memory:8192, vCores:8>", resourceAfter.toString());
   }
 
   @Test
@@ -618,8 +665,8 @@ public class TestRMAdminService {
         .get("hadoop.proxyuser.test.hosts").contains("test_hosts"));
 
     Configuration yarnConf = new Configuration(false);
-    yarnConf.set("yarn.resourcemanager.proxyuser.test.groups", "test_groups_1");
-    yarnConf.set("yarn.resourcemanager.proxyuser.test.hosts", "test_hosts_1");
+    yarnConf.set(RM_PROXY_USER_PREFIX + "test.groups", "test_groups_1");
+    yarnConf.set(RM_PROXY_USER_PREFIX + "test.hosts", "test_hosts_1");
     uploadConfiguration(yarnConf, "yarn-site.xml");
 
     // RM specific configs will overwrite the common ones
@@ -684,6 +731,7 @@ public class TestRMAdminService {
     }
 
     // Make sure RM will use the updated GroupMappingServiceProvider
+    Groups.getUserToGroupsMappingServiceWithLoadedConfiguration(conf).refresh();
     List<String> groupBefore =
         new ArrayList<String>(Groups.getUserToGroupsMappingService(
             configuration).getGroups(user));
@@ -773,29 +821,11 @@ public class TestRMAdminService {
       YarnException {
     StateChangeRequestInfo requestInfo = new StateChangeRequestInfo(
         HAServiceProtocol.RequestSource.REQUEST_BY_USER);
-    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
-        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
-    configuration.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
-    configuration.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
-    int base = 100;
-    for (String confKey : YarnConfiguration
-        .getServiceAddressConfKeys(configuration)) {
-      configuration.set(HAUtil.addSuffix(confKey, "rm1"), "0.0.0.0:"
-          + (base + 20));
-      configuration.set(HAUtil.addSuffix(confKey, "rm2"), "0.0.0.0:"
-          + (base + 40));
-      base = base * 2;
-    }
+    updateConfigurationForRMHA();
     Configuration conf1 = new Configuration(configuration);
     conf1.set(YarnConfiguration.RM_HA_ID, "rm1");
-    conf1.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            "localhost:8034");
-
     Configuration conf2 = new Configuration(configuration);
     conf2.set(YarnConfiguration.RM_HA_ID, "rm2");
-    conf2.set(YarnConfiguration.RM_GROUP_MEMBERSHIP_ADDRESS,
-            "localhost:8035");
 
     // upload default configurations
     uploadDefaultConfiguration();
@@ -821,7 +851,8 @@ public class TestRMAdminService {
 
       CapacitySchedulerConfiguration csConf =
           new CapacitySchedulerConfiguration();
-      csConf.set("yarn.scheduler.capacity.maximum-applications", "5000");
+      csConf.set(CapacitySchedulerConfiguration.MAXIMUM_SYSTEM_APPLICATIONS,
+          "5000");
       uploadConfiguration(csConf, "capacity-scheduler.xml");
 
       rm1.adminService.refreshQueues(RefreshQueuesRequest.newInstance());
@@ -859,6 +890,75 @@ public class TestRMAdminService {
         rm2.stop();
       }
     }
+  }
+
+  /**
+   * Test that a configuration with no leader election configured fails.
+   */
+  @Ignore //In hops the leader election is always configured as it is in the database.
+  @Test
+  public void testHAConfWithoutLeaderElection() {
+    Configuration conf = new Configuration(configuration);
+
+    conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
+    conf.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
+
+    int base = 100;
+
+    for (String confKey :
+        YarnConfiguration.getServiceAddressConfKeys(configuration)) {
+      conf.set(HAUtil.addSuffix(confKey, "rm1"), "0.0.0.0:"
+          + (base + 20));
+      conf.set(HAUtil.addSuffix(confKey, "rm2"), "0.0.0.0:"
+          + (base + 40));
+      base = base * 2;
+    }
+
+    conf.set(YarnConfiguration.RM_HA_ID, "rm1");
+
+    checkBadConfiguration(conf);
+  }
+
+  /**
+   * Test that a configuration with a single RM fails.
+   */
+  @Test
+  public void testHAConfWithSingleRMID() {
+    Configuration conf = new Configuration(configuration);
+
+    conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
+    conf.set(YarnConfiguration.RM_HA_IDS, "rm1");
+
+    int base = 100;
+
+    for (String confKey :
+        YarnConfiguration.getServiceAddressConfKeys(configuration)) {
+      conf.set(HAUtil.addSuffix(confKey, "rm1"), "0.0.0.0:"
+          + (base + 20));
+      base = base * 2;
+    }
+
+    conf.set(YarnConfiguration.RM_HA_ID, "rm1");
+
+    checkBadConfiguration(conf);
+  }
+
+  /**
+   * Test that a configuration with no service information fails.
+   */
+  @Test
+  public void testHAConfWithoutServiceInfo() {
+    Configuration conf = new Configuration(configuration);
+
+    conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
+    conf.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, true);
+    conf.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
+
+    conf.set(YarnConfiguration.RM_HA_ID, "rm1");
+
+    checkBadConfiguration(conf);
   }
 
   @Test
@@ -909,7 +1009,8 @@ public class TestRMAdminService {
 
     CapacitySchedulerConfiguration csConf =
         new CapacitySchedulerConfiguration();
-    csConf.set("yarn.scheduler.capacity.maximum-applications", "5000");
+    csConf.set(CapacitySchedulerConfiguration.MAXIMUM_SYSTEM_APPLICATIONS,
+        "5000");
     uploadConfiguration(csConf, "capacity-scheduler.xml");
 
     String aclsString = "alice,bob users,wheel";
@@ -1005,6 +1106,7 @@ public class TestRMAdminService {
           .get("hadoop.proxyuser.test.hosts").contains("test_hosts"));
 
       // verify UserToGroupsMappings
+      Groups.getUserToGroupsMappingServiceWithLoadedConfiguration(conf).refresh();
       List<String> groupAfter =
           Groups.getUserToGroupsMappingService(configuration).getGroups(
               UserGroupInformation.getCurrentUser().getUserName());
@@ -1107,21 +1209,7 @@ public class TestRMAdminService {
 
     ((RMContextImpl) rm.getRMContext())
         .setHAServiceState(HAServiceState.ACTIVE);
-    Map<NodeId, RMNode> rmNodes = rm.getRMContext().getRMNodes();
-    rmNodes.put(NodeId.newInstance("host1", 1111),
-        new RMNodeImplNotDist(null, rm.getRMContext(), "host1", 0, 0, null, null,
-                null));
-    rmNodes.put(NodeId.newInstance("host2", 2222),
-            new RMNodeImplNotDist(null, rm.getRMContext(), "host2", 0, 0, null, null,
-                null));
-    rmNodes.put(NodeId.newInstance("host3", 3333),
-            new RMNodeImplNotDist(null, rm.getRMContext(), "host3", 0, 0, null, null,
-                null));
-    Map<NodeId, RMNode> rmInactiveNodes = rm.getRMContext()
-        .getInactiveRMNodes();
-    rmInactiveNodes.put(NodeId.newInstance("host4", 4444),
-        new RMNodeImplNotDist(null, rm.getRMContext(), "host4", 0, 0, null, null,
-                null));
+    setActiveAndInactiveNodes(rm);
     RMNodeLabelsManager labelMgr = rm.rmContext.getNodeLabelManager();
 
     // by default, distributed configuration for node label is disabled, this
@@ -1346,4 +1434,261 @@ public class TestRMAdminService {
     }
   }
 
+  @Test
+  public void testSecureRMBecomeActive() throws IOException,
+      YarnException {
+    StateChangeRequestInfo requestInfo = new StateChangeRequestInfo(
+        HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+    updateConfigurationForRMHA();
+    configuration.setBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, true);
+    configuration.set(YarnConfiguration.RM_HA_ID, "rm1");
+    // upload default configurations
+    uploadDefaultConfiguration();
+
+    ResourceManager resourceManager = new ResourceManager();
+    try {
+      resourceManager.init(configuration);
+      resourceManager.start();
+      Assert.assertTrue(resourceManager.getRMContext().getHAServiceState()
+          == HAServiceState.STANDBY);
+      resourceManager.adminService.transitionToActive(requestInfo);
+    } finally {
+        resourceManager.close();
+    }
+  }
+
+  private void updateConfigurationForRMHA() {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+    configuration.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
+    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
+
+    int base = 1500;
+    for (String confKey : YarnConfiguration
+        .getServiceAddressConfKeys(configuration)) {
+      configuration.set(HAUtil.addSuffix(confKey, "rm1"),
+          "0.0.0.0:" + (base + 20));
+      configuration.set(HAUtil.addSuffix(confKey, "rm2"),
+          "0.0.0.1:" + (base + 40));
+      base = base * 2;
+    }
+  }
+
+  /**
+   * This method initializes an RM with the given configuration and expects it
+   * to fail with a configuration error.
+   *
+   * @param conf the {@link Configuration} to use
+   */
+  private void checkBadConfiguration(Configuration conf) {
+    MockRM rm1 = null;
+
+    conf.set(YarnConfiguration.RM_HA_ID, "rm1");
+
+    try {
+      rm1 = new MockRM(conf);
+      rm1.init(conf);
+      fail("The RM allowed an invalid configuration");
+    } catch (YarnRuntimeException e) {
+      assertTrue("The RM initialization threw an unexpected exception",
+          e.getMessage().startsWith(HAUtil.BAD_CONFIG_MESSAGE_PREFIX));
+    }
+  }
+
+  @Test(timeout = 30000)
+  public void testAdminAddToClusterNodeLabelsWithDeprecatedAPIs()
+      throws Exception, YarnException {
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        "org.apache.hadoop.yarn.FileSystemBasedConfigurationProvider");
+
+    uploadDefaultConfiguration();
+
+    rm = new MockRM(configuration) {
+      protected ClientRMService createClientRMService() {
+        return new ClientRMService(this.rmContext, scheduler, this.rmAppManager,
+            this.applicationACLsManager, this.queueACLsManager,
+            this.getRMContext().getRMDelegationTokenSecretManager());
+      };
+    };
+    rm.init(configuration);
+    rm.start();
+
+    try {
+      List<String> list = new ArrayList<String>();
+      list.add("a");
+      list.add("b");
+      AddToClusterNodeLabelsRequestProto proto = AddToClusterNodeLabelsRequestProto
+          .newBuilder().addAllDeprecatedNodeLabels(list).build();
+      AddToClusterNodeLabelsRequestPBImpl protoImpl = new AddToClusterNodeLabelsRequestPBImpl(
+          proto);
+      rm.adminService
+          .addToClusterNodeLabels((AddToClusterNodeLabelsRequest) protoImpl);
+    } catch (Exception ex) {
+      fail("Could not update node labels." + ex);
+    }
+
+    // Create a client.
+    Configuration conf = new Configuration();
+    YarnRPC rpc = YarnRPC.create(conf);
+    InetSocketAddress rmAddress = rm.getClientRMService().getBindAddress();
+    ApplicationClientProtocol client = (ApplicationClientProtocol) rpc
+        .getProxy(ApplicationClientProtocol.class, rmAddress, conf);
+
+    // Get node labels collection
+    GetClusterNodeLabelsResponse response = client
+        .getClusterNodeLabels(GetClusterNodeLabelsRequest.newInstance());
+    NodeLabel labelX = NodeLabel.newInstance("a");
+    NodeLabel labelY = NodeLabel.newInstance("b");
+    Assert.assertTrue(
+        response.getNodeLabelList().containsAll(Arrays.asList(labelX, labelY)));
+  }
+
+  @Test(timeout = 30000)
+  public void testMapAttributesToNodes() throws Exception, YarnException {
+    // 1. Need to test for the Invalid Node
+    // 1.1. Need to test for active nodes
+    // 1.2. Need to test for Inactive nodes
+    // 1.3. Test with Single Node invalid
+    // 1.4. Need to test with port (should fail)
+    // 1.5. Test with unknown node when failOnUnknownNodes is false
+
+    // also test : 3. Ensure Appropriate manager Method call is done
+    Configuration newConf = NodeAttributeTestUtils.getRandomDirConf(null);
+    rm = new MockRM(newConf);
+
+    NodeAttributesManager spiedAttributesManager =
+        Mockito.spy(rm.getRMContext().getNodeAttributesManager());
+    rm.getRMContext().setNodeAttributesManager(spiedAttributesManager);
+
+    ((RMContextImpl) rm.getRMContext())
+        .setHAServiceState(HAServiceState.ACTIVE);
+    setActiveAndInactiveNodes(rm);
+    // by default, distributed configuration for node label is disabled, this
+    // should pass
+    NodesToAttributesMappingRequest request =
+        NodesToAttributesMappingRequest
+            .newInstance(AttributeMappingOperationType.ADD,
+                ImmutableList.of(NodeToAttributes.newInstance("host1",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_CENTRALIZED, "x",
+                        NodeAttributeType.STRING, "dfasdf")))),
+                true);
+    try {
+      rm.adminService.mapAttributesToNodes(request);
+    } catch (Exception ex) {
+      fail("should not fail on known node in active state" + ex.getMessage());
+    }
+    Mockito.verify(spiedAttributesManager, Mockito.times(1))
+        .addNodeAttributes(Mockito.anyMap());
+
+    request =
+        NodesToAttributesMappingRequest
+            .newInstance(AttributeMappingOperationType.REMOVE,
+                ImmutableList.of(NodeToAttributes.newInstance("host4",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_CENTRALIZED, "x",
+                        NodeAttributeType.STRING, "dfasdf")))),
+                true);
+    try {
+      rm.adminService.mapAttributesToNodes(request);
+    } catch (Exception ex) {
+      fail("should not fail on known node in inactive state" + ex.getMessage());
+    }
+    Mockito.verify(spiedAttributesManager, Mockito.times(1))
+        .removeNodeAttributes(Mockito.anyMap());
+
+    request =
+        NodesToAttributesMappingRequest
+            .newInstance(AttributeMappingOperationType.ADD,
+                ImmutableList.of(NodeToAttributes.newInstance("host5",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_CENTRALIZED, "x",
+                        NodeAttributeType.STRING, "dfasdf")))),
+                true);
+    try {
+      rm.adminService.mapAttributesToNodes(request);
+      fail("host5 is not a valid node, It should have failed");
+    } catch (YarnException ex) {
+      Assert.assertEquals("Exception Message is not as desired",
+          " Following nodes does not exist : [host5]",
+          ex.getCause().getMessage());
+    }
+
+    request =
+        NodesToAttributesMappingRequest
+            .newInstance(AttributeMappingOperationType.ADD, ImmutableList.of(
+                NodeToAttributes.newInstance("host4:8889",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_CENTRALIZED, "x",
+                        NodeAttributeType.STRING, "dfasdf"))),
+                NodeToAttributes.newInstance("host2:8889",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_CENTRALIZED, "x",
+                        NodeAttributeType.STRING, "dfasdf")))),
+                true);
+    try {
+      // port if added in CLI it fails in the client itself. Here we just check
+      // against hostname hence the message as : nodes does not exist.
+      rm.adminService.mapAttributesToNodes(request);
+      fail("host with the port should fail as only hostnames are validated");
+    } catch (YarnException ex) {
+      Assert.assertEquals("Exception Message is not as desired",
+          " Following nodes does not exist : [host4:8889, host2:8889]",
+          ex.getCause().getMessage());
+    }
+
+    request =
+        NodesToAttributesMappingRequest
+            .newInstance(AttributeMappingOperationType.REPLACE,
+                ImmutableList.of(NodeToAttributes.newInstance("host5",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_CENTRALIZED, "x",
+                        NodeAttributeType.STRING, "dfasdf")))),
+                false);
+    try {
+      rm.adminService.mapAttributesToNodes(request);
+    } catch (Exception ex) {
+      fail("This operation should not fail as failOnUnknownNodes is false : "
+          + ex.getMessage());
+    }
+    Mockito.verify(spiedAttributesManager, Mockito.times(1))
+        .replaceNodeAttributes(Mockito.eq(NodeAttribute.PREFIX_CENTRALIZED),
+            Mockito.anyMap());
+
+    // 2. fail on invalid prefix
+    request =
+        NodesToAttributesMappingRequest
+            .newInstance(AttributeMappingOperationType.ADD,
+                ImmutableList.of(NodeToAttributes.newInstance("host5",
+                    ImmutableList.of(NodeAttribute.newInstance(
+                        NodeAttribute.PREFIX_DISTRIBUTED, "x",
+                        NodeAttributeType.STRING, "dfasdf")))),
+                false);
+    try {
+      rm.adminService.mapAttributesToNodes(request);
+      fail("This operation should fail as prefix should be \"nm.yarn.io\".");
+    } catch (YarnException ex) {
+      Assert.assertEquals("Exception Message is not as desired",
+          "Invalid Attribute Mapping for the node host5. Prefix should be "
+              + "rm.yarn.io", ex.getCause().getMessage());
+    }
+
+    rm.close();
+  }
+
+  private void setActiveAndInactiveNodes(ResourceManager resourceManager) {
+    Map<NodeId, RMNode> rmNodes = resourceManager.getRMContext().getRMNodes();
+    rmNodes.put(NodeId.newInstance("host1", 1111), new RMNodeImpl(null,
+        resourceManager.getRMContext(), "host1", 0, 0, null, null, null));
+    rmNodes.put(NodeId.newInstance("host2", 2222), new RMNodeImpl(null,
+        resourceManager.getRMContext(), "host2", 0, 0, null, null, null));
+    rmNodes.put(NodeId.newInstance("host3", 3333), new RMNodeImpl(null,
+        resourceManager.getRMContext(), "host3", 0, 0, null, null, null));
+    Map<NodeId, RMNode> rmInactiveNodes =
+        resourceManager.getRMContext().getInactiveRMNodes();
+    rmInactiveNodes.put(NodeId.newInstance("host4", 4444), new RMNodeImpl(null,
+        resourceManager.getRMContext(), "host4", 0, 0, null, null, null));
+  }
 }

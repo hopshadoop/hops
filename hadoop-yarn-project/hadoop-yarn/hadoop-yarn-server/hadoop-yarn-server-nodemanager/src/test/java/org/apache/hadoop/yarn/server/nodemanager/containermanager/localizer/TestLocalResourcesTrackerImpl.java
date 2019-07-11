@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
@@ -54,6 +55,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerResourceFailedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerResourceLocalizedEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.FileDeletionMatcher;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizerEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.LocalizerResourceRequestEvent;
@@ -77,7 +79,6 @@ public class TestLocalResourcesTrackerImpl {
   @SuppressWarnings("unchecked")
   public void test() {
     String user = "testuser";
-    String userFolder = "testuserFolder";
     DrainDispatcher dispatcher = null;
     try {
       Configuration conf = new Configuration();
@@ -92,9 +93,9 @@ public class TestLocalResourcesTrackerImpl {
       DeletionService mockDelService = mock(DeletionService.class);
 
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
       ContainerId cId2 = BuilderUtils.newContainerId(1, 1, 1, 2);
-      LocalizerContext lc2 = new LocalizerContext(user, cId2, null, userFolder);
+      LocalizerContext lc2 = new LocalizerContext(user, cId2, null);
 
       LocalResourceRequest req1 =
           createLocalResourceRequest(user, 1, 1, LocalResourceVisibility.PUBLIC);
@@ -174,7 +175,6 @@ public class TestLocalResourcesTrackerImpl {
   @SuppressWarnings("unchecked")
   public void testConsistency() {
     String user = "testuser";
-    String userFolder = "testuserFolder";
     DrainDispatcher dispatcher = null;
     try {
       Configuration conf = new Configuration();
@@ -185,7 +185,7 @@ public class TestLocalResourcesTrackerImpl {
       dispatcher.register(ContainerEventType.class, containerEventHandler);
 
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
       LocalResourceRequest req1 = createLocalResourceRequest(user, 1, 1,
           LocalResourceVisibility.PUBLIC);
       LocalizedResource lr1 = createLocalizedResource(req1, dispatcher);
@@ -242,11 +242,10 @@ public class TestLocalResourcesTrackerImpl {
     }
   }
 
-  @Test(timeout = 1000)
+  @Test(timeout = 10000)
   @SuppressWarnings("unchecked")
   public void testLocalResourceCache() {
     String user = "testuser";
-    String userFolder = "testuserFolder";
     DrainDispatcher dispatcher = null;
     try {
       Configuration conf = new Configuration();
@@ -274,7 +273,7 @@ public class TestLocalResourcesTrackerImpl {
       // same local resource.
       // Container 1 requesting local resource.
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
       ResourceEvent reqEvent1 =
           new ResourceRequestEvent(lr, LocalResourceVisibility.PRIVATE, lc1);
 
@@ -296,7 +295,7 @@ public class TestLocalResourcesTrackerImpl {
 
       // Container 2 requesting the resource
       ContainerId cId2 = BuilderUtils.newContainerId(1, 1, 1, 2);
-      LocalizerContext lc2 = new LocalizerContext(user, cId2, null, userFolder);
+      LocalizerContext lc2 = new LocalizerContext(user, cId2, null);
       ResourceEvent reqEvent2 =
           new ResourceRequestEvent(lr, LocalResourceVisibility.PRIVATE, lc2);
       tracker.handle(reqEvent2);
@@ -335,7 +334,7 @@ public class TestLocalResourcesTrackerImpl {
       // Container-3 now requests for the same resource. This request call
       // is coming prior to Container-2's release call.
       ContainerId cId3 = BuilderUtils.newContainerId(1, 1, 1, 3);
-      LocalizerContext lc3 = new LocalizerContext(user, cId3, null, userFolder);
+      LocalizerContext lc3 = new LocalizerContext(user, cId3, null);
       ResourceEvent reqEvent3 =
           new ResourceRequestEvent(lr, LocalResourceVisibility.PRIVATE, lc3);
       tracker.handle(reqEvent3);
@@ -388,11 +387,10 @@ public class TestLocalResourcesTrackerImpl {
     }
   }
 
-  @Test(timeout = 100000)
+  @Test(timeout = 10000)
   @SuppressWarnings("unchecked")
   public void testHierarchicalLocalCacheDirectories() {
     String user = "testuser";
-    String userFolder = "testuserFolder";
     DrainDispatcher dispatcher = null;
     try {
       Configuration conf = new Configuration();
@@ -422,7 +420,7 @@ public class TestLocalResourcesTrackerImpl {
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
       LocalResourceRequest lr1 = createLocalResourceRequest(user, 1, 1,
           LocalResourceVisibility.PUBLIC);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
 
       // Container 1 requests lr1 to be localized
       ResourceEvent reqEvent1 = new ResourceRequestEvent(lr1,
@@ -516,7 +514,6 @@ public class TestLocalResourcesTrackerImpl {
   @SuppressWarnings("unchecked")
   public void testStateStoreSuccessfulLocalization() throws Exception {
     final String user = "someuser";
-    final String userFolder = "someuserFolder";
     final ApplicationId appId = ApplicationId.newInstance(1, 1);
     // This is a random path. NO File creation will take place at this place.
     final Path localDir = new Path("/tmp");
@@ -539,7 +536,7 @@ public class TestLocalResourcesTrackerImpl {
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
       LocalResourceRequest lr1 = createLocalResourceRequest(user, 1, 1,
           LocalResourceVisibility.APPLICATION);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
 
       // Container 1 requests lr1 to be localized
       ResourceEvent reqEvent1 = new ResourceRequestEvent(lr1,
@@ -599,7 +596,6 @@ public class TestLocalResourcesTrackerImpl {
   @SuppressWarnings("unchecked")
   public void testStateStoreFailedLocalization() throws Exception {
     final String user = "someuser";
-    final String userFolder = "someuserFolder";
     final ApplicationId appId = ApplicationId.newInstance(1, 1);
     // This is a random path. NO File creation will take place at this place.
     final Path localDir = new Path("/tmp");
@@ -621,7 +617,7 @@ public class TestLocalResourcesTrackerImpl {
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
       LocalResourceRequest lr1 = createLocalResourceRequest(user, 1, 1,
           LocalResourceVisibility.APPLICATION);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
 
       // Container 1 requests lr1 to be localized
       ResourceEvent reqEvent1 = new ResourceRequestEvent(lr1,
@@ -662,7 +658,6 @@ public class TestLocalResourcesTrackerImpl {
   @SuppressWarnings("unchecked")
   public void testRecoveredResource() throws Exception {
     final String user = "someuser";
-    final String userFolder = "someuserFolder";
     final ApplicationId appId = ApplicationId.newInstance(1, 1);
     // This is a random path. NO File creation will take place at this place.
     final Path localDir = new Path("/tmp/localdir");
@@ -696,7 +691,7 @@ public class TestLocalResourcesTrackerImpl {
       // verify new paths reflect recovery of previous resources
       LocalResourceRequest lr2 = createLocalResourceRequest(user, 2, 2,
           LocalResourceVisibility.APPLICATION);
-      LocalizerContext lc2 = new LocalizerContext(user, cId1, null, userFolder);
+      LocalizerContext lc2 = new LocalizerContext(user, cId1, null);
       ResourceEvent reqEvent2 = new ResourceRequestEvent(lr2,
           LocalResourceVisibility.APPLICATION, lc2);
       tracker.handle(reqEvent2);
@@ -830,7 +825,8 @@ public class TestLocalResourcesTrackerImpl {
       Path rPath = tracker.getPathForLocalization(req1, base_path,
           delService);
       Assert.assertFalse(lfs.util().exists(rPath));
-      verify(delService, times(1)).delete(eq(user), eq(conflictPath));
+      verify(delService, times(1)).delete(argThat(new FileDeletionMatcher(
+          delService, user, conflictPath, null)));
     } finally {
       lfs.delete(base_path, true);
       if (dispatcher != null) {
@@ -855,7 +851,7 @@ public class TestLocalResourcesTrackerImpl {
       dispatcher.register(ContainerEventType.class, containerEventHandler);
 
       ContainerId cId1 = BuilderUtils.newContainerId(1, 1, 1, 1);
-      LocalizerContext lc1 = new LocalizerContext(user, cId1, null, user);
+      LocalizerContext lc1 = new LocalizerContext(user, cId1, null);
       LocalResourceRequest req1 =
           createLocalResourceRequest(user, 1, 1, LocalResourceVisibility.PUBLIC);
       LocalResourceRequest req2 =
@@ -910,7 +906,6 @@ public class TestLocalResourcesTrackerImpl {
   @SuppressWarnings("unchecked")
   public void testReleaseWhileDownloading() throws Exception {
     String user = "testuser";
-    String userFolder = "testuserFolder";
     DrainDispatcher dispatcher = null;
     try {
       Configuration conf = new Configuration();
@@ -923,7 +918,7 @@ public class TestLocalResourcesTrackerImpl {
       dispatcher.register(ContainerEventType.class, containerEventHandler);
 
       ContainerId cId = BuilderUtils.newContainerId(1, 1, 1, 1);
-      LocalizerContext lc = new LocalizerContext(user, cId, null, userFolder);
+      LocalizerContext lc = new LocalizerContext(user, cId, null);
 
       LocalResourceRequest req =
           createLocalResourceRequest(user, 1, 1, LocalResourceVisibility.PUBLIC);

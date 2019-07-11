@@ -44,6 +44,12 @@ public class ReservationDefinitionInfo {
   @XmlElement(name = "reservation-name")
   private String reservationName;
 
+  @XmlElement(name = "priority")
+  private int priority;
+
+  @XmlElement(name = "recurrence-expression")
+  private String recurrenceExpression;
+
   public ReservationDefinitionInfo() {
 
   }
@@ -54,6 +60,7 @@ public class ReservationDefinitionInfo {
     reservationName = definition.getReservationName();
     reservationRequests = new ReservationRequestsInfo(definition
             .getReservationRequests());
+    recurrenceExpression = definition.getRecurrenceExpression();
   }
 
   public long getArrival() {
@@ -87,6 +94,22 @@ public class ReservationDefinitionInfo {
 
   public void setReservationName(String reservationName) {
     this.reservationName = reservationName;
+  }
+
+  public int getPriority() {
+    return priority;
+  }
+
+  public void setPriority(int priority) {
+    this.priority = priority;
+  }
+
+  public String getRecurrenceExpression() {
+    return recurrenceExpression;
+  }
+
+  public void setRecurrenceExpression(String recurrenceExpression) {
+    this.recurrenceExpression = recurrenceExpression;
   }
 
 }

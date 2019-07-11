@@ -33,7 +33,7 @@ import org.apache.hadoop.conf.TestConfigurationFieldsBase;
  */
 public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
 
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings({"deprecation", "methodlength"})
   @Override
   public void initializeMemberVariables() {
     xmlFilename = new String("yarn-default.xml");
@@ -48,26 +48,6 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
     errorIfMissingXmlProps = true;
 
     // Specific properties to skip
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_FS_NODE_LABELS_STORE_IMPL_CLASS);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_RM_CONFIGURATION_PROVIDER_CLASS);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_LEAST_LOADED_CLIENT_FAILOVER_PROXY_PROVIDER);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_IPC_RECORD_FACTORY_CLASS);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_IPC_CLIENT_FACTORY_CLASS);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_IPC_SERVER_FACTORY_CLASS);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_IPC_RPC_IMPL);
-    configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_RM_SCHEDULER);
-    configurationPropsToSkipCompare
-            .add(YarnConfiguration.DEFAULT_NM_GPU_MANAGEMENT_IMPL);
     configurationPropsToSkipCompare
         .add(YarnConfiguration
             .YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONCLIENT_PROTOCOL);
@@ -86,15 +66,66 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
     configurationPropsToSkipCompare
         .add(YarnConfiguration
             .YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCETRACKER_PROTOCOL);
+    configurationPropsToSkipCompare.add(YarnConfiguration
+        .YARN_SECURITY_SERVICE_AUTHORIZATION_COLLECTOR_NODEMANAGER_PROTOCOL);
+    configurationPropsToSkipCompare.add(YarnConfiguration
+        .YARN_SECURITY_SERVICE_AUTHORIZATION_DISTRIBUTEDSCHEDULING_PROTOCOL);
+    configurationPropsToSkipCompare.add(YarnConfiguration
+        .YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONMASTER_NODEMANAGER_PROTOCOL);
     configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_SCM_STORE_CLASS);
+        .add(YarnConfiguration.RM_RESERVATION_SYSTEM_MAX_PERIODICITY);
+
+    // Federation default configs to be ignored
     configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_SCM_APP_CHECKER_CLASS);
+        .add(YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_CLIENT_CLASS);
     configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_SHARED_CACHE_CHECKSUM_ALGO_IMPL);
+        .add(YarnConfiguration.FEDERATION_FAILOVER_ENABLED);
     configurationPropsToSkipCompare
-        .add(YarnConfiguration.DEFAULT_AMRM_PROXY_INTERCEPTOR_CLASS_PIPELINE);
-    configurationPropsToSkipCompare.add(YarnConfiguration.CURATOR_LEADER_ELECTOR);
+        .add(YarnConfiguration.FEDERATION_STATESTORE_HEARTBEAT_INTERVAL_SECS);
+    configurationPrefixToSkipCompare
+        .add(YarnConfiguration.FEDERATION_FLUSH_CACHE_FOR_RM_ADDR);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.RM_EPOCH);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.ROUTER_CLIENTRM_ADDRESS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.ROUTER_RMADMIN_ADDRESS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.ROUTER_WEBAPP_DEFAULT_INTERCEPTOR_CLASS);
+
+    // Federation policies configs to be ignored
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_POLICY_MANAGER);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_POLICY_MANAGER_PARAMS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.DEFAULT_FEDERATION_POLICY_MANAGER);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.DEFAULT_FEDERATION_POLICY_MANAGER_PARAMS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_AMRMPROXY_HB_MAX_WAIT_MS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_AMRMPROXY_SUBCLUSTER_TIMEOUT);
+
+    // Federation StateStore ZK implementation configs to be ignored
+    configurationPropsToSkipCompare.add(
+        YarnConfiguration.FEDERATION_STATESTORE_ZK_PARENT_PATH);
+
+    // Federation StateStore SQL implementation configs to be ignored
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_STATESTORE_SQL_JDBC_CLASS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_SQL_JDBC_CLASS);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_STATESTORE_SQL_USERNAME);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_STATESTORE_SQL_PASSWORD);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_STATESTORE_SQL_URL);
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.FEDERATION_STATESTORE_SQL_MAXCONNECTIONS);
 
     // Ignore blacklisting nodes for AM failures feature since it is still a
     // "work in progress"
@@ -105,9 +136,16 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
 
     // Ignore all YARN Application Timeline Service (version 1) properties
     configurationPrefixToSkipCompare.add("yarn.timeline-service.");
+    // skip deprecated RM_SYSTEM_METRICS_PUBLISHER_ENABLED
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.RM_SYSTEM_METRICS_PUBLISHER_ENABLED);
 
     // Used as Java command line properties, not XML
     configurationPrefixToSkipCompare.add("yarn.app.container");
+
+    // Ignore default file name for resource profiles
+    configurationPropsToSkipCompare
+        .add(YarnConfiguration.DEFAULT_RM_RESOURCE_PROFILES_SOURCE_FILE);
 
     // Ignore NodeManager "work in progress" variables
     configurationPrefixToSkipCompare
@@ -120,6 +158,21 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
         .add(YarnConfiguration.NM_NETWORK_RESOURCE_OUTBOUND_BANDWIDTH_YARN_MBIT);
     configurationPrefixToSkipCompare
         .add(YarnConfiguration.NM_DISK_RESOURCE_ENABLED);
+    configurationPrefixToSkipCompare
+        .add(YarnConfiguration.NM_CPU_RESOURCE_ENABLED);
+    configurationPrefixToSkipCompare.add(
+        YarnConfiguration.NM_NETWORK_TAG_MAPPING_MANAGER);
+    configurationPrefixToSkipCompare.add(
+        YarnConfiguration.NM_NETWORK_TAG_MAPPING_FILE_PATH);
+    configurationPrefixToSkipCompare.add(
+        YarnConfiguration.NM_NETWORK_TAG_PREFIX);
+
+    // Ignore all Router Federation variables
+
+    configurationPrefixToSkipCompare
+        .add(YarnConfiguration.ROUTER_CLIENTRM_SUBMIT_RETRY);
+    configurationPrefixToSkipCompare
+        .add(YarnConfiguration.ROUTER_WEBAPP_PARTIAL_RESULTS_ENABLED);
 
     // Set by container-executor.cfg
     configurationPrefixToSkipCompare.add(YarnConfiguration.NM_USER_HOME_DIR);
@@ -127,14 +180,12 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
     // Ignore deprecated properties
     configurationPrefixToSkipCompare
         .add(YarnConfiguration.YARN_CLIENT_APP_SUBMISSION_POLL_INTERVAL_MS);
+    configurationPrefixToSkipCompare
+        .add(YarnConfiguration.DISPLAY_APPS_FOR_LOGGED_IN_USER);
 
     // Allocate for usage
     xmlPropsToSkipCompare = new HashSet<String>();
     xmlPrefixToSkipCompare = new HashSet<String>();
-
-    // Should probably be moved from yarn-default.xml to mapred-default.xml
-    xmlPropsToSkipCompare.add("mapreduce.job.hdfs-servers");
-    xmlPropsToSkipCompare.add("mapreduce.job.jar");
 
     // Possibly obsolete, but unable to verify 100%
     xmlPropsToSkipCompare.add("yarn.nodemanager.aux-services.mapreduce_shuffle.class");
@@ -148,8 +199,22 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
 
     // Currently defined in RegistryConstants/core-site.xml
     xmlPrefixToSkipCompare.add("hadoop.registry");
+
+    xmlPrefixToSkipCompare.add(
+        "yarn.log-aggregation.file-controller.TFile.class");
     
     // Used as template for variable number of master JWT renew tokens. %d is a sequence number
-    xmlPropsToSkipCompare.add("yarn.resourcemanager.rmappsecurity.jwt.renew-token-%d");
+    xmlPropsToSkipCompare.add ("yarn.resourcemanager.rmappsecurity.jwt.renew-token-%d");
+
+    // Add the filters used for checking for collision of default values.
+    initDefaultValueCollisionCheck();
+  }
+
+  /**
+   * Add filters used to perform the check of default values collision by
+   * {@link TestConfigurationFieldsBase#filtersForDefaultValueCollisionCheck}.
+   */
+  private void initDefaultValueCollisionCheck() {
+    filtersForDefaultValueCollisionCheck.add("_PORT");
   }
 }

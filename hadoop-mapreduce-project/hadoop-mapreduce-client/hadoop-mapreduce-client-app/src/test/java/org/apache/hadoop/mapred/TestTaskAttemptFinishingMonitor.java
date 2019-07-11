@@ -30,6 +30,7 @@ import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptFinishingMonitor;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
+import org.apache.hadoop.mapreduce.v2.app.rm.preemption.CheckpointAMPreemptionPolicy;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMHeartbeatHandler;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
 import org.apache.hadoop.yarn.event.Event;
@@ -46,7 +47,7 @@ public class TestTaskAttemptFinishingMonitor {
   @Test
   public void testFinshingAttemptTimeout()
       throws IOException, InterruptedException {
-    SystemClock clock = new SystemClock();
+    SystemClock clock = SystemClock.getInstance();
     Configuration conf = new Configuration();
     conf.setInt(MRJobConfig.TASK_EXIT_TIMEOUT, 100);
     conf.setInt(MRJobConfig.TASK_EXIT_TIMEOUT_CHECK_INTERVAL_MS, 10);
@@ -67,8 +68,10 @@ public class TestTaskAttemptFinishingMonitor {
         taskAttemptFinishingMonitor);
     when(appCtx.getClock()).thenReturn(clock);
 
+    CheckpointAMPreemptionPolicy policy = new CheckpointAMPreemptionPolicy();
+    policy.init(appCtx);
     TaskAttemptListenerImpl listener =
-        new TaskAttemptListenerImpl(appCtx, secret, rmHeartbeatHandler, null);
+        new TaskAttemptListenerImpl(appCtx, secret, rmHeartbeatHandler, policy);
 
     listener.init(conf);
     listener.start();
@@ -88,7 +91,7 @@ public class TestTaskAttemptFinishingMonitor {
 
   }
 
-  public static class MockEventHandler implements EventHandler {
+  public static class MockEventHandler implements EventHandler<Event> {
     public boolean timedOut = false;
 
     @Override

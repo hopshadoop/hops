@@ -19,50 +19,74 @@
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.ApplicationsRequestScope;
+import org.apache.hadoop.yarn.api.protocolrecords.ResourceTypes;
 import org.apache.hadoop.yarn.api.records.AMCommand;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
+import org.apache.hadoop.yarn.api.records.ApplicationTimeoutType;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerRetryPolicy;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.hadoop.yarn.api.records.ContainerSubState;
 import org.apache.hadoop.yarn.api.records.ContainerUpdateType;
+import org.apache.hadoop.yarn.api.records.ExecutionTypeRequest;
+import org.apache.hadoop.yarn.api.records.ExecutionType;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.LogAggregationStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
+import org.apache.hadoop.yarn.api.records.NodeUpdateType;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueState;
+import org.apache.hadoop.yarn.api.records.RejectionReason;
 import org.apache.hadoop.yarn.api.records.ReservationRequestInterpreter;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceInformation;
 import org.apache.hadoop.yarn.api.records.UpdateContainerError;
 import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+import org.apache.hadoop.yarn.api.resource.PlacementConstraint.TargetExpression;
+import org.apache.hadoop.yarn.api.resource.PlacementConstraint.TimedPlacementConstraint;
 import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.proto.YarnProtos.AMCommandProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAccessTypeProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationResourceUsageReportProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationTimeoutTypeProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStateProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ContainerSubStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.FinalApplicationStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceTypeProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceVisibilityProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.LogAggregationStatusProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.NodeStateProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.PlacementConstraintTargetProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueACLProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ReservationRequestInterpreterProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.TimedPlacementConstraintProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationAttemptStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationStateProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ContainerRetryPolicyProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerTypeProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ExecutionTypeProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ExecutionTypeRequestProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.ResourceTypesProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.NodeUpdateTypeProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.ContainerUpdateTypeProto;
 import org.apache.hadoop.yarn.server.api.ContainerType;
@@ -77,7 +101,7 @@ public class ProtoUtils {
   /*
    * ContainerState
    */
-  private static String CONTAINER_STATE_PREFIX = "C_";
+  private final static String CONTAINER_STATE_PREFIX = "C_";
   public static ContainerStateProto convertToProtoFormat(ContainerState e) {
     return ContainerStateProto.valueOf(CONTAINER_STATE_PREFIX + e.name());
   }
@@ -86,9 +110,23 @@ public class ProtoUtils {
   }
 
   /*
+   * Container SubState
+   */
+  private final static String CONTAINER_SUB_STATE_PREFIX = "CSS_";
+  public static ContainerSubStateProto convertToProtoFormat(
+      ContainerSubState e) {
+    return ContainerSubStateProto.valueOf(
+        CONTAINER_SUB_STATE_PREFIX + e.name());
+  }
+  public static ContainerSubState convertFromProtoFormat(
+      ContainerSubStateProto e) {
+    return ContainerSubState.valueOf(
+        e.name().substring(CONTAINER_SUB_STATE_PREFIX.length()));
+  }
+  /*
    * NodeState
    */
-  private static String NODE_STATE_PREFIX = "NS_";
+  private final static String NODE_STATE_PREFIX = "NS_";
   public static NodeStateProto convertToProtoFormat(NodeState e) {
     return NodeStateProto.valueOf(NODE_STATE_PREFIX + e.name());
   }
@@ -196,6 +234,21 @@ public class ProtoUtils {
   }
 
   /*
+   * RejectionReason
+   */
+  private static final String REJECTION_REASON_PREFIX = "RRP_";
+  public static YarnProtos.RejectionReasonProto convertToProtoFormat(
+      RejectionReason e) {
+    return YarnProtos.RejectionReasonProto
+        .valueOf(REJECTION_REASON_PREFIX + e.name());
+  }
+  public static RejectionReason convertFromProtoFormat(
+      YarnProtos.RejectionReasonProto e) {
+    return RejectionReason.valueOf(e.name()
+        .replace(REJECTION_REASON_PREFIX, ""));
+  }
+
+  /*
    * ByteBuffer
    */
   public static ByteBuffer convertFromProtoFormat(ByteString byteString) {
@@ -253,6 +306,23 @@ public class ProtoUtils {
     return ApplicationAccessType.valueOf(e.name().replace(
         APP_ACCESS_TYPE_PREFIX, ""));
   }
+
+  /*
+   * ApplicationTimeoutType
+   */
+  private static String APP_TIMEOUT_TYPE_PREFIX = "APP_TIMEOUT_";
+
+  public static ApplicationTimeoutTypeProto convertToProtoFormat(
+      ApplicationTimeoutType e) {
+    return ApplicationTimeoutTypeProto
+        .valueOf(APP_TIMEOUT_TYPE_PREFIX + e.name());
+  }
+
+  public static ApplicationTimeoutType convertFromProtoFormat(
+      ApplicationTimeoutTypeProto e) {
+    return ApplicationTimeoutType
+        .valueOf(e.name().replace(APP_TIMEOUT_TYPE_PREFIX, ""));
+  }
   
   /*
    * Reservation Request interpreter type
@@ -296,6 +366,26 @@ public class ProtoUtils {
   }
 
   /*
+  * NodeUpdateType
+  */
+  public static NodeUpdateTypeProto convertToProtoFormat(NodeUpdateType e) {
+    return NodeUpdateTypeProto.valueOf(e.name());
+  }
+  public static NodeUpdateType convertFromProtoFormat(NodeUpdateTypeProto e) {
+    return NodeUpdateType.valueOf(e.name());
+  }
+
+  /*
+   * ExecutionType
+   */
+  public static ExecutionTypeProto convertToProtoFormat(ExecutionType e) {
+    return ExecutionTypeProto.valueOf(e.name());
+  }
+  public static ExecutionType convertFromProtoFormat(ExecutionTypeProto e) {
+    return ExecutionType.valueOf(e.name());
+  }
+
+  /*
    * ContainerUpdateType
    */
   public static ContainerUpdateTypeProto convertToProtoFormat(
@@ -311,11 +401,37 @@ public class ProtoUtils {
    * Resource
    */
   public static synchronized ResourceProto convertToProtoFormat(Resource r) {
-    return ((ResourcePBImpl) r).getProto();
+    return ResourcePBImpl.getProto(r);
   }
 
   public static Resource convertFromProtoFormat(ResourceProto resource) {
     return new ResourcePBImpl(resource);
+  }
+
+  /*
+   * ContainerRetryPolicy
+   */
+  public static ContainerRetryPolicyProto convertToProtoFormat(
+      ContainerRetryPolicy e) {
+    return ContainerRetryPolicyProto.valueOf(e.name());
+  }
+
+  public static ContainerRetryPolicy convertFromProtoFormat(
+      ContainerRetryPolicyProto e) {
+    return ContainerRetryPolicy.valueOf(e.name());
+  }
+
+  /*
+   * ExecutionTypeRequest
+   */
+  public static ExecutionTypeRequestProto convertToProtoFormat(
+      ExecutionTypeRequest e) {
+    return ((ExecutionTypeRequestPBImpl)e).getProto();
+  }
+
+  public static ExecutionTypeRequest convertFromProtoFormat(
+      ExecutionTypeRequestProto e) {
+    return new ExecutionTypeRequestPBImpl(e);
   }
 
   /*
@@ -371,6 +487,68 @@ public class ProtoUtils {
   public static YarnServiceProtos.UpdateContainerErrorProto
       convertToProtoFormat(UpdateContainerError t) {
     return ((UpdateContainerErrorPBImpl) t).getProto();
+  }
+
+  /*
+   * ResourceTypes
+   */
+  public static ResourceTypesProto converToProtoFormat(ResourceTypes e) {
+    return ResourceTypesProto.valueOf(e.name());
+  }
+
+  public static ResourceTypes convertFromProtoFormat(ResourceTypesProto e) {
+    return ResourceTypes.valueOf(e.name());
+  }
+
+  public static Map<String, Long> convertStringLongMapProtoListToMap(
+      List<YarnProtos.StringLongMapProto> pList) {
+    Resource tmp = Resource.newInstance(0, 0);
+    Map<String, Long> ret = new HashMap<>();
+    for (ResourceInformation entry : tmp.getResources()) {
+      ret.put(entry.getName(), 0L);
+    }
+    if (pList != null) {
+      for (YarnProtos.StringLongMapProto p : pList) {
+        ret.put(p.getKey(), p.getValue());
+      }
+    }
+    return ret;
+  }
+
+  public static List<YarnProtos.StringLongMapProto> convertMapToStringLongMapProtoList(
+      Map<String, Long> map) {
+    List<YarnProtos.StringLongMapProto> ret = new ArrayList<>();
+    for (Map.Entry<String, Long> entry : map.entrySet()) {
+      YarnProtos.StringLongMapProto.Builder tmp =
+          YarnProtos.StringLongMapProto.newBuilder();
+      tmp.setKey(entry.getKey());
+      tmp.setValue(entry.getValue());
+      ret.add(tmp.build());
+    }
+    return ret;
+  }
+
+  public static PlacementConstraintTargetProto.TargetType convertToProtoFormat(
+          TargetExpression.TargetType t) {
+    return PlacementConstraintTargetProto.TargetType.valueOf(t.name());
+  }
+
+  public static TargetExpression.TargetType convertFromProtoFormat(
+          PlacementConstraintTargetProto.TargetType t) {
+    return TargetExpression.TargetType.valueOf(t.name());
+  }
+
+  /*
+   * TimedPlacementConstraint.DelayUnit
+   */
+  public static TimedPlacementConstraintProto.DelayUnit convertToProtoFormat(
+          TimedPlacementConstraint.DelayUnit u) {
+    return TimedPlacementConstraintProto.DelayUnit.valueOf(u.name());
+  }
+
+  public static TimedPlacementConstraint.DelayUnit convertFromProtoFormat(
+          TimedPlacementConstraintProto.DelayUnit u) {
+    return TimedPlacementConstraint.DelayUnit.valueOf(u.name());
   }
 }
 

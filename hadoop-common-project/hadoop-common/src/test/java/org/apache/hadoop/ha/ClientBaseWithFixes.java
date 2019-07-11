@@ -59,7 +59,7 @@ import com.google.common.annotations.VisibleForTesting;
  * which causes spurious failures in the JMXEnv verification when
  * we run these tests with the upstream ClientBase.
  */
-public abstract class ClientBaseWithFixes extends ZKTestCase {
+public abstract class ClientBaseWithFixes {
     protected static final Logger LOG = LoggerFactory.getLogger(ClientBaseWithFixes.class);
 
     public static int CONNECTION_TIMEOUT = 30000;

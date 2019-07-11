@@ -18,15 +18,24 @@
 package org.apache.hadoop.tools.rumen.state;
 
 import java.io.DataInput;
-import java.io.DataInputStream;
 import java.io.DataOutput;
-import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.HashMap;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.Version;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -35,16 +44,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.tools.rumen.Anonymizer;
 import org.apache.hadoop.tools.rumen.datatypes.DataType;
-import org.codehaus.jackson.JsonEncoding;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.Version;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.SerializationConfig;
-import org.codehaus.jackson.map.module.SimpleModule;
 
 /**
  * A pool of states. States used by {@link DataType}'s can be managed the 
@@ -186,46 +185,38 @@ public class StatePool {
     if (reload) {
       // Reload persisted entries
       Path stateFilename = new Path(persistDirPath, COMMIT_STATE_FILENAME);
-      FileSystem fs = stateFilename.getFileSystem(conf);
-      if (fs.exists(stateFilename)) {
-        reloadState(stateFilename, conf);
-      } else {
-        throw new RuntimeException("No latest state persist directory found!" 
+      if (!reloadState(stateFilename, conf)) {
+        throw new RuntimeException("No latest state persist directory found!"
                                    + " Disable persistence and run.");
       }
     }
   }
   
-  private void reloadState(Path stateFile, Configuration conf) 
-  throws Exception {
-    FileSystem fs = stateFile.getFileSystem(conf);
-    if (fs.exists(stateFile)) {
+  private boolean reloadState(Path stateFile, Configuration configuration)
+      throws Exception {
+    FileSystem fs = stateFile.getFileSystem(configuration);
+    try (FSDataInputStream in = fs.open(stateFile)) {
       System.out.println("Reading state from " + stateFile.toString());
-      FSDataInputStream in = fs.open(stateFile);
-      
       read(in);
-      in.close();
-    } else {
+      return true;
+    } catch (FileNotFoundException e) {
       System.out.println("No state information found for " + stateFile);
+      return false;
     }
   }
   
   private void read(DataInput in) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
-    mapper.configure(
-        DeserializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
-    
     // define a module
     SimpleModule module = new SimpleModule("State Serializer",  
-        new Version(0, 1, 1, "FINAL"));
+        new Version(0, 1, 1, "FINAL", "", ""));
     // add the state deserializer
     module.addDeserializer(StatePair.class, new StateDeserializer());
 
     // register the module with the object-mapper
     mapper.registerModule(module);
 
-    JsonParser parser = 
-      mapper.getJsonFactory().createJsonParser((DataInputStream)in);
+    JsonParser parser = mapper.getFactory().createParser((InputStream)in);
     StatePool statePool = mapper.readValue(parser, StatePool.class);
     this.setStates(statePool.getStates());
     parser.close();
@@ -283,20 +274,18 @@ public class StatePool {
     // This is just a JSON experiment
     System.out.println("Dumping the StatePool's in JSON format.");
     ObjectMapper outMapper = new ObjectMapper();
-    outMapper.configure(
-        SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
     // define a module
     SimpleModule module = new SimpleModule("State Serializer",  
-        new Version(0, 1, 1, "FINAL"));
+        new Version(0, 1, 1, "FINAL", "", ""));
     // add the state serializer
     //module.addSerializer(State.class, new StateSerializer());
 
     // register the module with the object-mapper
     outMapper.registerModule(module);
 
-    JsonFactory outFactory = outMapper.getJsonFactory();
-    JsonGenerator jGen = 
-      outFactory.createJsonGenerator((DataOutputStream)out, JsonEncoding.UTF8);
+    JsonFactory outFactory = outMapper.getFactory();
+    JsonGenerator jGen =
+        outFactory.createGenerator((OutputStream)out, JsonEncoding.UTF8);
     jGen.useDefaultPrettyPrinter();
 
     jGen.writeObject(this);

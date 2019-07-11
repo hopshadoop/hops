@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Longs;
 import com.google.protobuf.ByteString;
@@ -73,6 +72,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 
 /**
@@ -336,7 +336,7 @@ public class ClientDatanodeProtocolTranslatorPB
           if (change.hasErrorMessage()) {
             errorMessage = change.getErrorMessage();
           }
-          statusMap.put(pc, Optional.fromNullable(errorMessage));
+          statusMap.put(pc, Optional.ofNullable(errorMessage));
         }
       }
     } catch (ServiceException e) {

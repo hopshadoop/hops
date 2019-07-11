@@ -19,7 +19,6 @@ package org.apache.hadoop.fs.shell;
 
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -49,15 +48,10 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
-import org.codehaus.jackson.JsonEncoding;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.util.MinimalPrettyPrinter;
 
 /**
  * Display contents or checksums of files 
@@ -211,7 +205,7 @@ class Display extends FsCommand {
 
   protected class TextRecordInputStream extends InputStream {
     SequenceFile.Reader r;
-    WritableComparable<?> key;
+    Writable key;
     Writable val;
 
     DataInputBuffer inbuf;
@@ -223,7 +217,7 @@ class Display extends FsCommand {
       r = new SequenceFile.Reader(lconf, 
           SequenceFile.Reader.file(fpath));
       key = ReflectionUtils.newInstance(
-          r.getKeyClass().asSubclass(WritableComparable.class), lconf);
+          r.getKeyClass().asSubclass(Writable.class), lconf);
       val = ReflectionUtils.newInstance(
           r.getValueClass().asSubclass(Writable.class), lconf);
       inbuf = new DataInputBuffer();
@@ -279,12 +273,7 @@ class Display extends FsCommand {
       Schema schema = fileReader.getSchema();
       writer = new GenericDatumWriter<Object>(schema);
       output = new ByteArrayOutputStream();
-      JsonGenerator generator =
-        new JsonFactory().createJsonGenerator(output, JsonEncoding.UTF8);
-      MinimalPrettyPrinter prettyPrinter = new MinimalPrettyPrinter();
-      prettyPrinter.setRootValueSeparator(System.getProperty("line.separator"));
-      generator.setPrettyPrinter(prettyPrinter);
-      encoder = EncoderFactory.get().jsonEncoder(schema, generator);
+      encoder = EncoderFactory.get().jsonEncoder(schema, output);
     }
 
     /**

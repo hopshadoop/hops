@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -54,6 +55,9 @@ public class ApplicationAttemptStateDataPBImpl extends
   private ApplicationAttemptId attemptId = null;
   private Container masterContainer = null;
   private ByteBuffer appAttemptTokens = null;
+
+  private Map<String, Long> resourceSecondsMap;
+  private Map<String, Long> preemptedResourceSecondsMap;
 
   public ApplicationAttemptStateDataPBImpl() {
     builder = ApplicationAttemptStateDataProto.newBuilder();
@@ -207,7 +211,7 @@ public class ApplicationAttemptStateDataPBImpl extends
     builder.setFinalTrackingUrl(url);
   }
 
-   @Override
+  @Override
   public String getTrackingUrl() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasTrackingUrl()) {
@@ -268,13 +272,7 @@ public class ApplicationAttemptStateDataPBImpl extends
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
     return p.getVcoreSeconds();
   }
-  
-  @Override
-  public long getGPUSeconds() {
-    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getGpuSeconds();
-  }
-  
+
   @Override
   public void setMemorySeconds(long memorySeconds) {
     maybeInitBuilder();
@@ -285,12 +283,6 @@ public class ApplicationAttemptStateDataPBImpl extends
   public void setVcoreSeconds(long vcoreSeconds) {
     maybeInitBuilder();
     builder.setVcoreSeconds(vcoreSeconds);
-  }
-  
-  @Override
-  public void setGPUSeconds(long gpuSeconds) {
-    maybeInitBuilder();
-    builder.setGpuSeconds(gpuSeconds);
   }
 
   @Override
@@ -317,18 +309,6 @@ public class ApplicationAttemptStateDataPBImpl extends
     builder.setPreemptedVcoreSeconds(vcoreSeconds);
   }
 
-  @Override
-  public long getPreemptedGPUSeconds() {
-    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getPreemptedGpuSeconds();
-  }
-  
-  @Override
-  public void setPreemptedGPUSeconds(long gpuSeconds) {
-    maybeInitBuilder();
-    builder.setPreemptedGpuSeconds(gpuSeconds);
-  }
-  
   @Override
   public FinalApplicationStatus getFinalApplicationStatus() {
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
@@ -445,6 +425,52 @@ public class ApplicationAttemptStateDataPBImpl extends
       return null;
     } finally {
       IOUtils.closeStream(dibb);
+    }
+  }
+
+  @Override
+  public Map<String, Long> getResourceSecondsMap() {
+    if (this.resourceSecondsMap != null) {
+      return this.resourceSecondsMap;
+    }
+    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    this.resourceSecondsMap = ProtoUtils.convertStringLongMapProtoListToMap(
+        p.getApplicationResourceUsageMapList());
+    return this.resourceSecondsMap;
+  }
+
+  @Override
+  public void setResourceSecondsMap(Map<String, Long> resourceSecondsMap) {
+    maybeInitBuilder();
+    builder.clearApplicationResourceUsageMap();
+    this.resourceSecondsMap = resourceSecondsMap;
+    if (resourceSecondsMap != null) {
+      builder.addAllApplicationResourceUsageMap(
+          ProtoUtils.convertMapToStringLongMapProtoList(resourceSecondsMap));
+    }
+  }
+
+  @Override
+  public Map<String, Long> getPreemptedResourceSecondsMap() {
+    if (this.preemptedResourceSecondsMap != null) {
+      return this.preemptedResourceSecondsMap;
+    }
+    ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
+    this.preemptedResourceSecondsMap = ProtoUtils
+        .convertStringLongMapProtoListToMap(
+            p.getApplicationResourceUsageMapList());
+    return this.preemptedResourceSecondsMap;
+  }
+
+  @Override
+  public void setPreemptedResourceSecondsMap(
+      Map<String, Long> preemptedResourceSecondsMap) {
+    maybeInitBuilder();
+    builder.clearPreemptedResourceUsageMap();
+    this.preemptedResourceSecondsMap = preemptedResourceSecondsMap;
+    if (preemptedResourceSecondsMap != null) {
+      builder.addAllPreemptedResourceUsageMap(ProtoUtils
+          .convertMapToStringLongMapProtoList(preemptedResourceSecondsMap));
     }
   }
 }

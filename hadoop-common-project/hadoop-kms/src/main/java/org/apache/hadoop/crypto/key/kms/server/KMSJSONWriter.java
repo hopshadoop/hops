@@ -18,7 +18,8 @@
 package org.apache.hadoop.crypto.key.kms.server;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.hadoop.http.JettyUtils;
+import org.apache.hadoop.util.JsonSerialization;
 
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
@@ -41,7 +42,7 @@ import java.util.Map;
  * to their JSON representation.
  */
 @Provider
-@Produces(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
 @InterfaceAudience.Private
 public class KMSJSONWriter implements MessageBodyWriter<Object> {
 
@@ -65,8 +66,7 @@ public class KMSJSONWriter implements MessageBodyWriter<Object> {
       OutputStream outputStream) throws IOException, WebApplicationException {
     Writer writer = new OutputStreamWriter(outputStream, Charset
         .forName("UTF-8"));
-    ObjectMapper jsonMapper = new ObjectMapper();
-    jsonMapper.writerWithDefaultPrettyPrinter().writeValue(writer, obj);
+    JsonSerialization.writer().writeValue(writer, obj);
   }
 
 }

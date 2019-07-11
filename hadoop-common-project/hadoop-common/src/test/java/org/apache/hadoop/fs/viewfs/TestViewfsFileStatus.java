@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.FsConstants;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -70,8 +71,14 @@ public class TestViewfsFileStatus {
     ConfigUtil.addLink(conf, "/foo/bar/baz", TEST_DIR.toURI());
     FileSystem vfs = FileSystem.get(FsConstants.VIEWFS_URI, conf);
     assertEquals(ViewFileSystem.class, vfs.getClass());
-    FileStatus stat = vfs.getFileStatus(new Path("/foo/bar/baz", testfilename));
+    Path path = new Path("/foo/bar/baz", testfilename);
+    FileStatus stat = vfs.getFileStatus(path);
     assertEquals(content.length, stat.getLen());
+    ContractTestUtils.assertNotErasureCoded(vfs, path);
+    assertTrue(path + " should have erasure coding unset in " +
+            "FileStatus#toString(): " + stat,
+        stat.toString().contains("isErasureCoded=false"));
+
     // check serialization/deserialization
     DataOutputBuffer dob = new DataOutputBuffer();
     stat.write(dob);
@@ -80,25 +87,27 @@ public class TestViewfsFileStatus {
     FileStatus deSer = new FileStatus();
     deSer.readFields(dib);
     assertEquals(content.length, deSer.getLen());
+    assertFalse(deSer.isErasureCoded());
   }
 
   // Tests that ViewFileSystem.getFileChecksum calls res.targetFileSystem
   // .getFileChecksum with res.remainingPath and not with f
   @Test
   public void testGetFileChecksum() throws IOException {
+    final Path path = new Path("/tmp/someFile");
     FileSystem mockFS = Mockito.mock(FileSystem.class);
     InodeTree.ResolveResult<FileSystem> res =
       new InodeTree.ResolveResult<FileSystem>(null, mockFS , null,
         new Path("someFile"));
     @SuppressWarnings("unchecked")
     InodeTree<FileSystem> fsState = Mockito.mock(InodeTree.class);
-    Mockito.when(fsState.resolve("/tmp/someFile", true)).thenReturn(res);
+    Mockito.when(fsState.resolve(path.toString(), true)).thenReturn(res);
     ViewFileSystem vfs = Mockito.mock(ViewFileSystem.class);
     vfs.fsState = fsState;
 
-    Mockito.when(vfs.getFileChecksum(new Path("/tmp/someFile")))
-      .thenCallRealMethod();
-    vfs.getFileChecksum(new Path("/tmp/someFile"));
+    Mockito.when(vfs.getFileChecksum(path)).thenCallRealMethod();
+    Mockito.when(vfs.getUriPath(path)).thenCallRealMethod();
+    vfs.getFileChecksum(path);
 
     Mockito.verify(mockFS).getFileChecksum(new Path("someFile"));
   }

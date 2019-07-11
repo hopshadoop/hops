@@ -28,14 +28,18 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 public interface Application extends EventHandler<ApplicationEvent> {
 
   String getUser();
-  
-  String getUserFolder();
-  
+
   Map<ContainerId, Container> getContainers();
 
   ApplicationId getAppId();
 
   ApplicationState getApplicationState();
+
+  String getFlowName();
+
+  String getFlowVersion();
+
+  long getFlowRunId();
   
   int getX509Version();
   

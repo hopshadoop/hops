@@ -29,6 +29,7 @@ import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
+import org.apache.hadoop.yarn.api.records.ApplicationTimeoutType;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.ApplicationStateDataProto;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.util.Records;
@@ -46,7 +47,8 @@ public abstract class ApplicationStateData {
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, String user,
       ApplicationSubmissionContext submissionContext, RMAppState state,
-      String diagnostics, long finishTime, CallerContext callerContext) {
+      String diagnostics, long launchTime, long finishTime,
+      CallerContext callerContext) {
     ApplicationStateData appState = Records.newRecord(ApplicationStateData.class);
     appState.setSubmitTime(submitTime);
     appState.setStartTime(startTime);
@@ -54,17 +56,33 @@ public abstract class ApplicationStateData {
     appState.setApplicationSubmissionContext(submissionContext);
     appState.setState(state);
     appState.setDiagnostics(diagnostics);
+    appState.setLaunchTime(launchTime);
     appState.setFinishTime(finishTime);
     appState.setCallerContext(callerContext);
     return appState;
   }
 
-  public static ApplicationStateData newInstance(long submitTime, long startTime,
-      ApplicationSubmissionContext context, String user, CallerContext callerContext,
+  public static ApplicationStateData newInstance(long submitTime,
+      long startTime, String user,
+      ApplicationSubmissionContext submissionContext, RMAppState state,
+      String diagnostics, long launchTime, long finishTime,
+      CallerContext callerContext,
+      Map<ApplicationTimeoutType, Long> applicationTimeouts,
       byte[] keyStore, char[] keyStorePassword, byte[] trustStore, char[] trustStorePassword,
       Integer cryptoMaterialVersion, long certificateExpiration, boolean isDuringMaterialRotation,
       long materialRotationStartTime) {
-    ApplicationStateData appState = newInstance(submitTime, startTime, context, user, callerContext);
+    ApplicationStateData appState =
+        Records.newRecord(ApplicationStateData.class);
+    appState.setSubmitTime(submitTime);
+    appState.setStartTime(startTime);
+    appState.setUser(user);
+    appState.setApplicationSubmissionContext(submissionContext);
+    appState.setState(state);
+    appState.setDiagnostics(diagnostics);
+    appState.setLaunchTime(launchTime);
+    appState.setFinishTime(finishTime);
+    appState.setCallerContext(callerContext);
+    appState.setApplicationTimeouts(applicationTimeouts);
     appState.setKeyStore(keyStore);
     appState.setKeyStorePassword(keyStorePassword);
     appState.setTrustStore(trustStore);
@@ -75,11 +93,11 @@ public abstract class ApplicationStateData {
     appState.setMaterialRotationStartTime(materialRotationStartTime);
     return appState;
   }
-  
+
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, ApplicationSubmissionContext context, String user,
       CallerContext callerContext) {
-    return newInstance(submitTime, startTime, user, context, null, "", 0,
+    return newInstance(submitTime, startTime, user, context, null, "", 0, 0,
         callerContext);
   }
   
@@ -95,6 +113,16 @@ public abstract class ApplicationStateData {
   public ApplicationAttemptStateData getAttempt(
       ApplicationAttemptId  attemptId) {
     return attempts.get(attemptId);
+  }
+
+  public int getFirstAttemptId() {
+    int min = Integer.MAX_VALUE;
+    for(ApplicationAttemptId attemptId : attempts.keySet()) {
+      if (attemptId.getAttemptId() < min) {
+        min = attemptId.getAttemptId();
+      }
+    }
+    return min == Integer.MAX_VALUE ? 1 : min;
   }
 
   public abstract ApplicationStateDataProto getProto();
@@ -122,6 +150,20 @@ public abstract class ApplicationStateData {
   @Private
   @Unstable
   public abstract void setStartTime(long startTime);
+
+
+
+  /**
+   * Get the <em>launch time</em> of the application.
+   * @return <em>launch time</em> of the application
+   */
+  @Public
+  @Stable
+  public abstract long getLaunchTime();
+
+  @Private
+  @Unstable
+  public abstract void setLaunchTime(long launchTime);
 
   /**
    * The application submitter
@@ -175,6 +217,13 @@ public abstract class ApplicationStateData {
   public abstract CallerContext getCallerContext();
   
   public abstract void setCallerContext(CallerContext callerContext);
+
+  @Public
+  public abstract Map<ApplicationTimeoutType, Long> getApplicationTimeouts();
+
+  @Public
+  public abstract void setApplicationTimeouts(
+      Map<ApplicationTimeoutType, Long> applicationTimeouts);
   
   public abstract byte[] getKeyStore();
   

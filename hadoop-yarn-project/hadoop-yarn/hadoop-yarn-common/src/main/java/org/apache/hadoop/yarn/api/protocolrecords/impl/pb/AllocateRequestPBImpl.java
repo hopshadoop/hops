@@ -27,19 +27,19 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerResourceIncreaseRequest;
 import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.SchedulingRequest;
 import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.api.records.impl.pb.ContainerIdPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerResourceIncreaseRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceBlacklistRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceRequestPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.SchedulingRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.UpdateContainerRequestPBImpl;
-import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceBlacklistRequestProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceRequestProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.SchedulingRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.UpdateContainerRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.AllocateRequestProtoOrBuilder;
@@ -56,11 +56,9 @@ public class AllocateRequestPBImpl extends AllocateRequest {
   private List<ResourceRequest> ask = null;
   private List<ContainerId> release = null;
   private List<UpdateContainerRequest> updateRequests = null;
+  private List<SchedulingRequest> schedulingRequests = null;
   private ResourceBlacklistRequest blacklistRequest = null;
-
-  // This is deprecated, leave it here only to make unit test not break
-  @Deprecated
-  private List<ContainerResourceIncreaseRequest> deprecatedIncreaseReqs = null;
+  private String trackingUrl = null;
   
   public AllocateRequestPBImpl() {
     builder = AllocateRequestProto.newBuilder();
@@ -108,11 +106,14 @@ public class AllocateRequestPBImpl extends AllocateRequest {
     if (this.updateRequests != null) {
       addUpdateRequestsToProto();
     }
+    if (this.schedulingRequests != null) {
+      addSchedulingRequestsToProto();
+    }
     if (this.blacklistRequest != null) {
       builder.setBlacklistRequest(convertToProtoFormat(this.blacklistRequest));
     }
-    if (this.deprecatedIncreaseReqs != null) {
-      addIncreaseRequestsToProto();
+    if (this.trackingUrl != null) {
+      builder.setTrackingUrl(this.trackingUrl);
     }
   }
 
@@ -185,6 +186,24 @@ public class AllocateRequestPBImpl extends AllocateRequest {
     initUpdateRequests();
     this.updateRequests.clear();
     this.updateRequests.addAll(updateRequests);
+  }
+
+  @Override
+  public List<SchedulingRequest> getSchedulingRequests() {
+    initSchedulingRequests();
+    return this.schedulingRequests;
+  }
+
+  @Override
+  public void setSchedulingRequests(
+      List<SchedulingRequest> schedulingRequests) {
+    if (schedulingRequests == null) {
+      builder.clearSchedulingRequests();
+      return;
+    }
+    initSchedulingRequests();
+    this.schedulingRequests.clear();
+    this.schedulingRequests.addAll(schedulingRequests);
   }
 
   @Override
@@ -271,6 +290,20 @@ public class AllocateRequestPBImpl extends AllocateRequest {
     }
   }
 
+  private void initSchedulingRequests() {
+    if (this.schedulingRequests != null) {
+      return;
+    }
+    AllocateRequestProtoOrBuilder p = viaProto ? proto : builder;
+    List<SchedulingRequestProto> list =
+        p.getSchedulingRequestsList();
+    this.schedulingRequests = new ArrayList<>();
+
+    for (SchedulingRequestProto c : list) {
+      this.schedulingRequests.add(convertFromProtoFormat(c));
+    }
+  }
+
   private void addUpdateRequestsToProto() {
     maybeInitBuilder();
     builder.clearUpdateRequests();
@@ -307,34 +340,20 @@ public class AllocateRequestPBImpl extends AllocateRequest {
     builder.addAllUpdateRequests(iterable);
   }
 
-  private void initIncreaseRequests() {
-    if (this.deprecatedIncreaseReqs != null) {
-      return;
-    }
-    AllocateRequestProtoOrBuilder p = viaProto ? proto : builder;
-    List<YarnProtos.ContainerResourceIncreaseRequestProto> list =
-        p.getIncreaseRequestList();
-    this.deprecatedIncreaseReqs = new ArrayList<>();
-
-    for (YarnProtos.ContainerResourceIncreaseRequestProto c : list) {
-      this.deprecatedIncreaseReqs.add(convertFromProtoFormat(c));
-    }
-  }
-
-  private void addIncreaseRequestsToProto() {
+  private void addSchedulingRequestsToProto() {
     maybeInitBuilder();
-    builder.clearIncreaseRequest();
-    if (deprecatedIncreaseReqs == null) {
+    builder.clearSchedulingRequests();
+    if (schedulingRequests == null) {
       return;
     }
-    Iterable<YarnProtos.ContainerResourceIncreaseRequestProto> iterable =
-        new Iterable<YarnProtos.ContainerResourceIncreaseRequestProto>() {
+    Iterable<SchedulingRequestProto> iterable =
+        new Iterable<SchedulingRequestProto>() {
           @Override
-          public Iterator<YarnProtos.ContainerResourceIncreaseRequestProto> iterator() {
-            return new Iterator<YarnProtos.ContainerResourceIncreaseRequestProto>() {
+          public Iterator<SchedulingRequestProto> iterator() {
+            return new Iterator<SchedulingRequestProto>() {
 
-              private Iterator<ContainerResourceIncreaseRequest> iter =
-                  deprecatedIncreaseReqs.iterator();
+              private Iterator<SchedulingRequest> iter =
+                  schedulingRequests.iterator();
 
               @Override
               public boolean hasNext() {
@@ -342,7 +361,7 @@ public class AllocateRequestPBImpl extends AllocateRequest {
               }
 
               @Override
-              public YarnProtos.ContainerResourceIncreaseRequestProto next() {
+              public SchedulingRequestProto next() {
                 return convertToProtoFormat(iter.next());
               }
 
@@ -354,9 +373,8 @@ public class AllocateRequestPBImpl extends AllocateRequest {
 
           }
         };
-    builder.addAllIncreaseRequest(iterable);
+    builder.addAllSchedulingRequests(iterable);
   }
-
   @Override
   public List<ContainerId> getReleaseList() {
     initReleases();
@@ -384,7 +402,28 @@ public class AllocateRequestPBImpl extends AllocateRequest {
       this.release.add(convertFromProtoFormat(c));
     }
   }
-  
+
+  @Override
+  public String getTrackingUrl() {
+    AllocateRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.trackingUrl != null) {
+      return this.trackingUrl;
+    }
+    if (p.hasTrackingUrl()) {
+      this.trackingUrl = p.getTrackingUrl();
+    }
+    return this.trackingUrl;
+  }
+
+  @Override
+  public void setTrackingUrl(String trackingUrl) {
+    maybeInitBuilder();
+    if (trackingUrl == null) {
+      builder.clearTrackingUrl();
+    }
+    this.trackingUrl = trackingUrl;
+  }
+
   private void addReleasesToProto() {
     maybeInitBuilder();
     builder.clearRelease();
@@ -437,6 +476,16 @@ public class AllocateRequestPBImpl extends AllocateRequest {
     return ((UpdateContainerRequestPBImpl) t).getProto();
   }
 
+  private SchedulingRequestPBImpl convertFromProtoFormat(
+      SchedulingRequestProto p) {
+    return new SchedulingRequestPBImpl(p);
+  }
+
+  private SchedulingRequestProto convertToProtoFormat(
+      SchedulingRequest t) {
+    return ((SchedulingRequestPBImpl) t).getProto();
+  }
+
   private ContainerIdPBImpl convertFromProtoFormat(ContainerIdProto p) {
     return new ContainerIdPBImpl(p);
   }
@@ -451,36 +500,5 @@ public class AllocateRequestPBImpl extends AllocateRequest {
 
   private ResourceBlacklistRequestProto convertToProtoFormat(ResourceBlacklistRequest t) {
     return ((ResourceBlacklistRequestPBImpl)t).getProto();
-  }
-
-  @Deprecated
-  @Override
-  public List<ContainerResourceIncreaseRequest> getIncreaseRequests() {
-    initIncreaseRequests();
-    return this.deprecatedIncreaseReqs;
-  }
-
-  @Deprecated
-  @Override
-  public void setIncreaseRequests(
-      List<ContainerResourceIncreaseRequest> increaseRequests) {
-    if (increaseRequests == null) {
-      return;
-    }
-    initIncreaseRequests();
-    this.deprecatedIncreaseReqs.clear();
-    this.deprecatedIncreaseReqs.addAll(increaseRequests);
-  }
-
-  private ContainerResourceIncreaseRequestPBImpl convertFromProtoFormat(
-      YarnProtos.ContainerResourceIncreaseRequestProto p) {
-    return new ContainerResourceIncreaseRequestPBImpl(p);
-
-  }
-
-  private YarnProtos.ContainerResourceIncreaseRequestProto convertToProtoFormat(
-      ContainerResourceIncreaseRequest t) {
-    return ((ContainerResourceIncreaseRequestPBImpl) t).getProto();
-
   }
 }  

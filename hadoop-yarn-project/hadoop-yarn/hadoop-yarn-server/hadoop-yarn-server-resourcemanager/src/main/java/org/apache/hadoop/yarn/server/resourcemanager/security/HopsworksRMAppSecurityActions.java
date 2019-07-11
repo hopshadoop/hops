@@ -24,7 +24,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
-import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -87,6 +86,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.http.HttpStatus;
 
 public class HopsworksRMAppSecurityActions implements RMAppSecurityActions, Configurable {
   public static final String REVOKE_CERT_ID_PARAM = "certId";

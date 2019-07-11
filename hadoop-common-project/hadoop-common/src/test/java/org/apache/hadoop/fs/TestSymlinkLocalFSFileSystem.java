@@ -22,14 +22,13 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
-import org.apache.hadoop.util.Shell;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
 
 public class TestSymlinkLocalFSFileSystem extends TestSymlinkLocalFS {
 
@@ -42,29 +41,29 @@ public class TestSymlinkLocalFSFileSystem extends TestSymlinkLocalFS {
   @Ignore("RawLocalFileSystem#mkdir does not treat existence of directory" +
       " as an error")
   @Override
-  @Test(timeout=1000)
+  @Test(timeout=10000)
   public void testMkdirExistingLink() throws IOException {}
 
   @Ignore("FileSystem#create defaults to creating parents," +
       " throwing an IOException instead of FileNotFoundException")
   @Override
-  @Test(timeout=1000)
+  @Test(timeout=10000)
   public void testCreateFileViaDanglingLinkParent() throws IOException {}
 
   @Ignore("RawLocalFileSystem does not throw an exception if the path" +
       " already exists")
   @Override
-  @Test(timeout=1000)
+  @Test(timeout=10000)
   public void testCreateFileDirExistingLink() throws IOException {}
   
   @Ignore("ChecksumFileSystem does not support append")
   @Override
-  @Test(timeout=1000)
+  @Test(timeout=10000)
   public void testAccessFileViaInterSymlinkAbsTarget() throws IOException {}
 
   @Override
   public void testRenameFileWithDestParentSymlink() throws IOException {
-    assumeTrue(!Shell.WINDOWS);
+    assumeNotWindows();
     super.testRenameFileWithDestParentSymlink();
   }
 

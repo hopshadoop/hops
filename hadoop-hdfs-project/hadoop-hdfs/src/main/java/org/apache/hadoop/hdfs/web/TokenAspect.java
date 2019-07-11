@@ -54,9 +54,7 @@ final class TokenAspect<T extends FileSystem & Renewable> {
 
     @Override
     public boolean handleKind(Text kind) {
-      return kind.equals(HftpFileSystem.TOKEN_KIND)
-          || kind.equals(HsftpFileSystem.TOKEN_KIND)
-          || kind.equals(WebHdfsFileSystem.TOKEN_KIND)
+      return kind.equals(WebHdfsFileSystem.TOKEN_KIND)
           || kind.equals(SWebHdfsFileSystem.TOKEN_KIND);
     }
 
@@ -75,11 +73,7 @@ final class TokenAspect<T extends FileSystem & Renewable> {
       final InetSocketAddress address = SecurityUtil.getTokenServiceAddr(token);
       Text kind = token.getKind();
       final URI uri;
-      if (kind.equals(HftpFileSystem.TOKEN_KIND)) {
-        uri = DFSUtil.createUri(HftpFileSystem.SCHEME, address);
-      } else if (kind.equals(HsftpFileSystem.TOKEN_KIND)) {
-        uri = DFSUtil.createUri(HsftpFileSystem.SCHEME, address);
-      } else if (kind.equals(WebHdfsFileSystem.TOKEN_KIND)) {
+      if (kind.equals(WebHdfsFileSystem.TOKEN_KIND)) {
         uri = DFSUtil.createUri(WebHdfsFileSystem.SCHEME, address);
       } else if (kind.equals(SWebHdfsFileSystem.TOKEN_KIND)) {
         uri = DFSUtil.createUri(SWebHdfsFileSystem.SCHEME, address);

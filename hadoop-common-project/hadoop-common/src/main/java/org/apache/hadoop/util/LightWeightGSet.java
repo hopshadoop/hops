@@ -392,14 +392,14 @@ public class LightWeightGSet<K, E extends K> implements GSet<K, E> {
     final int exponent = e2 < 0? 0: e2 > 30? 30: e2;
     final int c = 1 << exponent;
 
-    LOG.trace("Computing capacity for map " + mapName);
-    LOG.trace("VM type       = " + vmBit + "-bit");
-    LOG.trace(percentage + "% max memory "
+    LOG.info("Computing capacity for map " + mapName);
+    LOG.info("VM type       = " + vmBit + "-bit");
+    LOG.info(percentage + "% max memory "
         + StringUtils.TraditionalBinaryPrefix.long2String(maxMemory, "B", 1)
         + " = "
         + StringUtils.TraditionalBinaryPrefix.long2String((long) percentMemory,
             "B", 1));
-    LOG.trace("capacity      = 2^" + exponent + " = " + c + " entries");
+    LOG.info("capacity      = 2^" + exponent + " = " + c + " entries");
     return c;
   }
   

@@ -122,4 +122,14 @@ public abstract class NodeStatus {
   @Unstable
   public abstract void setIncreasedContainers(
       List<Container> increasedContainers);
+
+  @Private
+  @Unstable
+  public abstract OpportunisticContainersStatus
+      getOpportunisticContainersStatus();
+
+  @Private
+  @Unstable
+  public abstract void setOpportunisticContainersStatus(
+      OpportunisticContainersStatus opportunisticContainersStatus);
 }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.sharedcachemanager.store;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,13 +29,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
@@ -43,6 +41,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.StringInterner;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -51,6 +50,8 @@ import org.apache.hadoop.yarn.server.sharedcachemanager.AppChecker;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A thread safe version of an in-memory SCM store. The thread safety is
@@ -73,7 +74,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 @Private
 @Evolving
 public class InMemorySCMStore extends SCMStore {
-  private static final Log LOG = LogFactory.getLog(InMemorySCMStore.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(InMemorySCMStore.class);
 
   private final Map<String, SharedCacheResource> cachedResources =
       new ConcurrentHashMap<String, SharedCacheResource>();
@@ -116,7 +118,7 @@ public class InMemorySCMStore extends SCMStore {
     ThreadFactory tf =
         new ThreadFactoryBuilder().setNameFormat("InMemorySCMStore")
             .build();
-    scheduler = Executors.newSingleThreadScheduledExecutor(tf);
+    scheduler = HadoopExecutors.newSingleThreadScheduledExecutor(tf);
 
     super.serviceInit(conf);
   }
@@ -189,11 +191,14 @@ public class InMemorySCMStore extends SCMStore {
         conf.get(YarnConfiguration.SHARED_CACHE_ROOT,
             YarnConfiguration.DEFAULT_SHARED_CACHE_ROOT);
     Path root = new Path(location);
-    if (!fs.exists(root)) {
+    try {
+      fs.getFileStatus(root);
+    } catch (FileNotFoundException e) {
       String message =
           "The shared cache root directory " + location + " was not found";
       LOG.error(message);
-      throw new IOException(message);
+      throw (IOException)new FileNotFoundException(message)
+          .initCause(e);
     }
 
     int nestedLevel = SharedCacheUtil.getCacheDepth(conf);

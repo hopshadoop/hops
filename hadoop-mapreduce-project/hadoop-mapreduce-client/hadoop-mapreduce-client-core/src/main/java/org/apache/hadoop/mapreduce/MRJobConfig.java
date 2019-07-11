@@ -28,6 +28,9 @@ import org.apache.hadoop.yarn.util.Apps;
 @InterfaceStability.Evolving
 public interface MRJobConfig {
 
+  // Used by MapTask
+  public static final String MAP_SORT_CLASS = "map.sort.class";
+
   // Put all of the attribute names in here so that Job and JobContext are
   // consistent.
   public static final String INPUT_FORMAT_CLASS_ATTR = "mapreduce.job.inputformat.class";
@@ -48,6 +51,20 @@ public interface MRJobConfig {
   public static final String SETUP_CLEANUP_NEEDED = "mapreduce.job.committer.setup.cleanup.needed";
 
   public static final String TASK_CLEANUP_NEEDED = "mapreduce.job.committer.task.cleanup.needed";
+
+  public static final String JOB_SINGLE_DISK_LIMIT_BYTES =
+          "mapreduce.job.local-fs.single-disk-limit.bytes";
+  // negative values disable the limit
+  public static final long DEFAULT_JOB_SINGLE_DISK_LIMIT_BYTES = -1;
+
+  public static final String JOB_SINGLE_DISK_LIMIT_KILL_LIMIT_EXCEED =
+      "mapreduce.job.local-fs.single-disk-limit.check.kill-limit-exceed";
+  // setting to false only logs the kill
+  public static final boolean DEFAULT_JOB_SINGLE_DISK_LIMIT_KILL_LIMIT_EXCEED = true;
+
+  public static final String JOB_SINGLE_DISK_LIMIT_CHECK_INTERVAL_MS =
+      "mapreduce.job.local-fs.single-disk-limit.check.interval-ms";
+  public static final long DEFAULT_JOB_SINGLE_DISK_LIMIT_CHECK_INTERVAL_MS = 5000;
 
   public static final String TASK_LOCAL_WRITE_LIMIT_BYTES =
           "mapreduce.task.local-fs.write-limit.bytes";
@@ -87,6 +104,12 @@ public interface MRJobConfig {
    * Node Label expression applicable for reduce containers.
    */
   public static final String REDUCE_NODE_LABEL_EXP = "mapreduce.reduce.node-label-expression";
+
+  /**
+   * Specify strict locality on a comma-separated list of racks and/or nodes.
+   * Syntax: /rack or /rack/node or node (assumes /default-rack)
+   */
+  public static final String AM_STRICT_LOCALITY = "mapreduce.job.am.strict-locality";
 
   public static final String RESERVATION_ID = "mapreduce.job.reservation.id";
 
@@ -185,6 +208,77 @@ public interface MRJobConfig {
   public static final String CACHE_ARCHIVES_VISIBILITIES = "mapreduce.job.cache.archives.visibilities";
 
   /**
+   * This parameter controls the visibility of the localized job jar on the node
+   * manager. If set to true, the visibility will be set to
+   * LocalResourceVisibility.PUBLIC. If set to false, the visibility will be set
+   * to LocalResourceVisibility.APPLICATION. This is a generated parameter and
+   * should not be set manually via config files.
+   */
+  String JOBJAR_VISIBILITY = "mapreduce.job.jobjar.visibility";
+  boolean JOBJAR_VISIBILITY_DEFAULT = false;
+
+  /**
+   * This is a generated parameter and should not be set manually via config
+   * files.
+   */
+  String JOBJAR_SHARED_CACHE_UPLOAD_POLICY =
+      "mapreduce.job.jobjar.sharedcache.uploadpolicy";
+  boolean JOBJAR_SHARED_CACHE_UPLOAD_POLICY_DEFAULT = false;
+
+  /**
+   * This is a generated parameter and should not be set manually via config
+   * files.
+   */
+  String CACHE_FILES_SHARED_CACHE_UPLOAD_POLICIES =
+      "mapreduce.job.cache.files.sharedcache.uploadpolicies";
+
+  /**
+   * This is a generated parameter and should not be set manually via config
+   * files.
+   */
+  String CACHE_ARCHIVES_SHARED_CACHE_UPLOAD_POLICIES =
+      "mapreduce.job.cache.archives.sharedcache.uploadpolicies";
+
+  /**
+   * A comma delimited list of file resources that are needed for this MapReduce
+   * job. These resources, if the files resource type is enabled, should either
+   * use the shared cache or be added to the shared cache. This parameter can be
+   * modified programmatically using the MapReduce Job api.
+   */
+  String FILES_FOR_SHARED_CACHE = "mapreduce.job.cache.sharedcache.files";
+
+  /**
+   * A comma delimited list of libjar resources that are needed for this
+   * MapReduce job. These resources, if the libjars resource type is enabled,
+   * should either use the shared cache or be added to the shared cache. These
+   * resources will also be added to the classpath of all tasks for this
+   * MapReduce job. This parameter can be modified programmatically using the
+   * MapReduce Job api.
+   */
+  String FILES_FOR_CLASSPATH_AND_SHARED_CACHE =
+      "mapreduce.job.cache.sharedcache.files.addtoclasspath";
+
+  /**
+   * A comma delimited list of archive resources that are needed for this
+   * MapReduce job. These resources, if the archives resource type is enabled,
+   * should either use the shared cache or be added to the shared cache. This
+   * parameter can be modified programmatically using the MapReduce Job api.
+   */
+  String ARCHIVES_FOR_SHARED_CACHE =
+      "mapreduce.job.cache.sharedcache.archives";
+
+  /**
+   * A comma delimited list of resource categories that are enabled for the
+   * shared cache. If a category is enabled, resources in that category will be
+   * uploaded to the shared cache. The valid categories are: jobjar, libjars,
+   * files, archives. If "disabled" is specified then all categories are
+   * disabled. If "enabled" is specified then all categories are enabled.
+   */
+  String SHARED_CACHE_MODE = "mapreduce.job.sharedcache.mode";
+
+  String SHARED_CACHE_MODE_DEFAULT = "disabled";
+
+  /**
    * @deprecated Symlinks are always on and cannot be disabled.
    */
   @Deprecated
@@ -212,7 +306,11 @@ public interface MRJobConfig {
 
   public static final String IO_SORT_FACTOR = "mapreduce.task.io.sort.factor";
 
+  public static final int DEFAULT_IO_SORT_FACTOR = 10;
+
   public static final String IO_SORT_MB = "mapreduce.task.io.sort.mb";
+
+  public static final int DEFAULT_IO_SORT_MB = 100;
 
   public static final String INDEX_CACHE_MEMORY_LIMIT = "mapreduce.task.index.cache.limit.bytes";
 
@@ -279,11 +377,46 @@ public interface MRJobConfig {
 
   public static final String MAP_INPUT_START = "mapreduce.map.input.start";
 
+  /**
+   * Configuration key for specifying memory requirement for the mapper.
+   * Kept for backward-compatibility, mapreduce.map.resource.memory
+   * is the new preferred way to specify this.
+   */
   public static final String MAP_MEMORY_MB = "mapreduce.map.memory.mb";
   public static final int DEFAULT_MAP_MEMORY_MB = 1024;
 
+  /**
+   * Configuration key for specifying CPU requirement for the mapper.
+   * Kept for backward-compatibility, mapreduce.map.resource.vcores
+   * is the new preferred way to specify this.
+   */
   public static final String MAP_CPU_VCORES = "mapreduce.map.cpu.vcores";
   public static final int DEFAULT_MAP_CPU_VCORES = 1;
+
+  /**
+   * Custom resource names required by the mapper should be
+   * appended to this prefix, the value's format is {amount}[ ][{unit}].
+   * If no unit is defined, the default unit will be used.
+   * Standard resource names: memory (default unit: Mi), vcores
+   */
+  public static final String MAP_RESOURCE_TYPE_PREFIX =
+      "mapreduce.map.resource.";
+
+  /**
+   * Resource type name for CPU vcores.
+   */
+  public static final String RESOURCE_TYPE_NAME_VCORE = "vcores";
+
+  /**
+   * Resource type name for memory.
+   */
+  public static final String RESOURCE_TYPE_NAME_MEMORY = "memory";
+
+  /**
+   * Alternative resource type name for memory.
+   */
+  public static final String RESOURCE_TYPE_ALTERNATIVE_NAME_MEMORY =
+      "memory-mb";
 
   public static final String MAP_ENV = "mapreduce.map.env";
 
@@ -311,7 +444,13 @@ public interface MRJobConfig {
 
   public static final String MAP_OUTPUT_VALUE_CLASS = "mapreduce.map.output.value.class";
 
-  public static final String MAP_OUTPUT_KEY_FIELD_SEPERATOR = "mapreduce.map.output.key.field.separator";
+  public static final String MAP_OUTPUT_KEY_FIELD_SEPARATOR = "mapreduce.map.output.key.field.separator";
+
+  /**
+   * @deprecated Use {@link #MAP_OUTPUT_KEY_FIELD_SEPARATOR}
+   */
+  @Deprecated
+  public static final String MAP_OUTPUT_KEY_FIELD_SEPERATOR = MAP_OUTPUT_KEY_FIELD_SEPARATOR;
 
   public static final String MAP_LOG_LEVEL = "mapreduce.map.log.level";
 
@@ -327,11 +466,30 @@ public interface MRJobConfig {
 
   public static final String REDUCE_MARKRESET_BUFFER_SIZE = "mapreduce.reduce.markreset.buffer.size";
 
+  /**
+   * Configuration key for specifying memory requirement for the reducer.
+   * Kept for backward-compatibility, mapreduce.reduce.resource.memory
+   * is the new preferred way to specify this.
+   */
   public static final String REDUCE_MEMORY_MB = "mapreduce.reduce.memory.mb";
   public static final int DEFAULT_REDUCE_MEMORY_MB = 1024;
 
+  /**
+   * Configuration key for specifying CPU requirement for the reducer.
+   * Kept for backward-compatibility, mapreduce.reduce.resource.vcores
+   * is the new preferred way to specify this.
+   */
   public static final String REDUCE_CPU_VCORES = "mapreduce.reduce.cpu.vcores";
   public static final int DEFAULT_REDUCE_CPU_VCORES = 1;
+
+  /**
+   * Resource names required by the reducer should be
+   * appended to this prefix, the value's format is {amount}[ ][{unit}].
+   * If no unit is defined, the default unit will be used.
+   * Standard resource names: memory (default unit: Mi), vcores
+   */
+  public static final String REDUCE_RESOURCE_TYPE_PREFIX =
+      "mapreduce.reduce.resource.";
 
   public static final String REDUCE_MEMORY_TOTAL_BYTES = "mapreduce.reduce.memory.totalbytes";
 
@@ -412,7 +570,7 @@ public interface MRJobConfig {
   public static final String JOB_ACL_MODIFY_JOB = "mapreduce.job.acl-modify-job";
 
   public static final String DEFAULT_JOB_ACL_MODIFY_JOB = " ";
-  
+
   public static final String JOB_RUNNING_MAP_LIMIT =
       "mapreduce.job.running.map.limit";
   public static final int DEFAULT_JOB_RUNNING_MAP_LIMIT = 0;
@@ -420,6 +578,13 @@ public interface MRJobConfig {
   public static final String JOB_RUNNING_REDUCE_LIMIT =
       "mapreduce.job.running.reduce.limit";
   public static final int DEFAULT_JOB_RUNNING_REDUCE_LIMIT = 0;
+
+  /* Config for Limit on the number of map tasks allowed per job
+   * There is no limit if this value is negative.
+   */
+  public static final String JOB_MAX_MAP =
+      "mapreduce.job.max.map";
+  public static final int DEFAULT_JOB_MAX_MAP = -1;
 
   /* config for tracking the local file where all the credentials for the job
    * credentials.
@@ -495,7 +660,7 @@ public interface MRJobConfig {
    */
   public static final String MR_CLIENT_JOB_MAX_RETRIES =
       MR_PREFIX + "client.job.max-retries";
-  public static final int DEFAULT_MR_CLIENT_JOB_MAX_RETRIES = 0;
+  public static final int DEFAULT_MR_CLIENT_JOB_MAX_RETRIES = 3;
 
   /**
    * How long to wait between jobclient retries on failure
@@ -511,7 +676,10 @@ public interface MRJobConfig {
   public static final String DEFAULT_MR_AM_STAGING_DIR = 
     "/tmp/hadoop-yarn/staging";
 
-  /** The amount of memory the MR app master needs.*/
+  /** The amount of memory the MR app master needs.
+   * Kept for backward-compatibility, yarn.app.mapreduce.am.resource.memory is
+   * the new preferred way to specify this
+   */
   public static final String MR_AM_VMEM_MB =
     MR_AM_PREFIX+"resource.mb";
   public static final int DEFAULT_MR_AM_VMEM_MB = 1536;
@@ -520,6 +688,15 @@ public interface MRJobConfig {
   public static final String MR_AM_CPU_VCORES =
     MR_AM_PREFIX+"resource.cpu-vcores";
   public static final int DEFAULT_MR_AM_CPU_VCORES = 1;
+
+  /**
+   * Resource names required by the MR AM should be
+   * appended to this prefix, the value's format is {amount}[ ][{unit}].
+   * If no unit is defined, the default unit will be used
+   * Standard resource names: memory (default unit: Mi), vcores
+   */
+  public static final String MR_AM_RESOURCE_PREFIX =
+      MR_AM_PREFIX + "resource.";
 
   /** Command line arguments passed to the MR app master.*/
   public static final String MR_AM_COMMAND_OPTS =
@@ -578,7 +755,13 @@ public interface MRJobConfig {
    */
   public static final String MR_AM_JOB_CLIENT_PORT_RANGE = 
     MR_AM_PREFIX + "job.client.port-range";
-  
+
+  /**
+   * Range of ports that the MapReduce AM can use when binding for its webapp.
+   * Leave blank if you want all possible ports.
+   */
+  String MR_AM_WEBAPP_PORT_RANGE = MR_AM_PREFIX + "webapp.port-range";
+
   /** Enable blacklisting of nodes in the job.*/
   public static final String MR_AM_JOB_NODE_BLACKLISTING_ENABLE = 
     MR_AM_PREFIX  + "job.node-blacklisting.enable";
@@ -601,7 +784,13 @@ public interface MRJobConfig {
   public static final String MR_AM_JOB_REDUCE_PREEMPTION_LIMIT = 
     MR_AM_PREFIX  + "job.reduce.preemption.limit";
   public static final float DEFAULT_MR_AM_JOB_REDUCE_PREEMPTION_LIMIT = 0.5f;
-  
+
+  /**
+   * Policy class encoding responses to preemption requests.
+   */
+  public static final String MR_AM_PREEMPTION_POLICY =
+    MR_AM_PREFIX + "preemption.policy";
+
   /** AM ACL disabled. **/
   public static final String JOB_AM_ACCESS_DISABLED = 
     "mapreduce.job.am-access-disabled";
@@ -927,6 +1116,14 @@ public interface MRJobConfig {
   
   public static final String MR_APPLICATION_TYPE = "MAPREDUCE";
   
+  public static final String TASK_PREEMPTION =
+      "mapreduce.job.preemption";
+
+  public static final String HEAP_MEMORY_MB_RATIO =
+      "mapreduce.job.heap.memory-mb.ratio";
+
+  public static final float DEFAULT_HEAP_MEMORY_MB_RATIO = 0.8f;
+
   public static final String MR_ENCRYPTED_INTERMEDIATE_DATA =
       "mapreduce.job.encrypted-intermediate-data";
   public static final boolean DEFAULT_MR_ENCRYPTED_INTERMEDIATE_DATA = false;
@@ -942,7 +1139,58 @@ public interface MRJobConfig {
           128;
 
   /**
+   * The maximum number of resources a map reduce job is allowed to submit for
+   * localization via files, libjars, archives, and jobjar command line
+   * arguments and through the distributed cache. If set to 0 the limit is
+   * ignored.
+   */
+  String MAX_RESOURCES = "mapreduce.job.cache.limit.max-resources";
+  int MAX_RESOURCES_DEFAULT = 0;
+
+  /**
+   * The maximum size (in MB) a map reduce job is allowed to submit for
+   * localization via files, libjars, archives, and jobjar command line
+   * arguments and through the distributed cache. If set to 0 the limit is
+   * ignored.
+   */
+  String MAX_RESOURCES_MB = "mapreduce.job.cache.limit.max-resources-mb";
+  long MAX_RESOURCES_MB_DEFAULT = 0;
+
+  /**
+   * The maximum size (in MB) of a single resource a map reduce job is allow to
+   * submit for localization via files, libjars, archives, and jobjar command
+   * line arguments and through the distributed cache. If set to 0 the limit is
+   * ignored.
+   */
+  String MAX_SINGLE_RESOURCE_MB =
+      "mapreduce.job.cache.limit.max-single-resource-mb";
+  long MAX_SINGLE_RESOURCE_MB_DEFAULT = 0;
+
+  /**
+   * Number of OPPORTUNISTIC Containers per 100 containers that will be
+   * requested by the MRAppMaster. The Default value is 0, which implies all
+   * maps will be guaranteed. A value of 100 means all maps will be requested
+   * as opportunistic. For any other value say 'x', the FIRST 'x' maps
+   * requested by the AM will be opportunistic. If the total number of maps
+   * for the job is less than 'x', then ALL maps will be OPPORTUNISTIC
+   */
+  public static final String MR_NUM_OPPORTUNISTIC_MAPS_PERCENT =
+      "mapreduce.job.num-opportunistic-maps-percent";
+  public static final int DEFAULT_MR_NUM_OPPORTUNISTIC_MAPS_PERCENT = 0;
+
+  /**
    * A comma-separated list of properties whose value will be redacted.
    */
   String MR_JOB_REDACTED_PROPERTIES = "mapreduce.job.redacted-properties";
+
+  String MR_JOB_SEND_TOKEN_CONF = "mapreduce.job.send-token-conf";
+
+  String FINISH_JOB_WHEN_REDUCERS_DONE =
+      "mapreduce.job.finish-when-all-reducers-done";
+  boolean DEFAULT_FINISH_JOB_WHEN_REDUCERS_DONE = true;
+
+  String MR_AM_STAGING_DIR_ERASURECODING_ENABLED =
+      MR_AM_STAGING_DIR + ".erasurecoding.enabled";
+
+  boolean DEFAULT_MR_AM_STAGING_ERASURECODING_ENABLED = false;
 }

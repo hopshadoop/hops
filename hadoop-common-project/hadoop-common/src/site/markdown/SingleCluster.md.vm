@@ -41,7 +41,8 @@ Required software for Linux include:
 
 1.  Java™ must be installed. Recommended Java versions are described at [HadoopJavaVersions](http://wiki.apache.org/hadoop/HadoopJavaVersions).
 
-2.  ssh must be installed and sshd must be running to use the Hadoop scripts that manage remote Hadoop daemons.
+2.  ssh must be installed and sshd must be running to use the Hadoop scripts that manage remote Hadoop daemons if the optional start and stop scripts are to be used. Additionally, it is recommmended that pdsh also be installed for better ssh resource management.
+
 $H3 Installing Software
 
 If your cluster doesn't have the requisite software you will need to install it.
@@ -49,7 +50,7 @@ If your cluster doesn't have the requisite software you will need to install it.
 For example on Ubuntu Linux:
 
       $ sudo apt-get install ssh
-      $ sudo apt-get install rsync
+      $ sudo apt-get install pdsh
 
 Download
 --------
@@ -143,7 +144,7 @@ The following instructions are to run a MapReduce job locally. If you want to ex
 
 3.  Browse the web interface for the NameNode; by default it is available at:
 
-    * NameNode - `http://localhost:50070/`
+    * NameNode - `http://localhost:9870/`
 
 4.  Make the HDFS directories required to execute MapReduce jobs:
 
@@ -152,7 +153,8 @@ The following instructions are to run a MapReduce job locally. If you want to ex
 
 5.  Copy the input files into the distributed filesystem:
 
-          $ bin/hdfs dfs -put etc/hadoop input
+          $ bin/hdfs dfs -mkdir input
+          $ bin/hdfs dfs -put etc/hadoop/*.xml input
 
 6.  Run some of the examples provided:
 
@@ -179,7 +181,9 @@ You can run a MapReduce job on YARN in a pseudo-distributed mode by setting a fe
 
 The following instructions assume that 1. ~ 4. steps of [the above instructions](#Execution) are already executed.
 
-1.  Configure parameters as follows:`etc/hadoop/mapred-site.xml`:
+1.  Configure parameters as follows:
+
+    `etc/hadoop/mapred-site.xml`:
 
         <configuration>
             <property>
@@ -188,12 +192,24 @@ The following instructions assume that 1. ~ 4. steps of [the above instructions]
             </property>
         </configuration>
 
+        <configuration>
+            <property>
+                <name>mapreduce.application.classpath</name>
+                <value>$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/*:$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib/*</value>
+            </property>
+        </configuration>
+
+
     `etc/hadoop/yarn-site.xml`:
 
         <configuration>
             <property>
                 <name>yarn.nodemanager.aux-services</name>
                 <value>mapreduce_shuffle</value>
+            </property>
+            <property>
+                <name>yarn.nodemanager.env-whitelist</name>
+                <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>
             </property>
         </configuration>
 

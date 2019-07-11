@@ -163,7 +163,7 @@ public class TestJobConf {
    * old property names
    */
   @SuppressWarnings("deprecation")
-  @Test (timeout = 1000)
+  @Test (timeout = 10000)
   public void testDeprecatedPropertyNameForTaskVmem() {
     JobConf configuration = new JobConf();
 
@@ -189,6 +189,7 @@ public class TestJobConf {
     Assert.assertEquals(2048, configuration.getLong(
         JobConf.MAPREDUCE_JOB_REDUCE_MEMORY_MB_PROPERTY, -1));
   }
+
 
   @Test
   public void testProfileParamsDefaults() {
@@ -251,8 +252,10 @@ public class TestJobConf {
     configuration.set("mapred.task.maxvmem" , String.valueOf(-1));
     configuration.set(MRJobConfig.MAP_MEMORY_MB,"-1");
     configuration.set(MRJobConfig.REDUCE_MEMORY_MB,"-1");
-    Assert.assertEquals(configuration.getMemoryForMapTask(),-1);
-    Assert.assertEquals(configuration.getMemoryForReduceTask(),-1);
+    Assert.assertEquals(configuration.getMemoryForMapTask(),
+        MRJobConfig.DEFAULT_MAP_MEMORY_MB);
+    Assert.assertEquals(configuration.getMemoryForReduceTask(),
+        MRJobConfig.DEFAULT_REDUCE_MEMORY_MB);
 
     configuration = new JobConf();
     configuration.set("mapred.task.maxvmem" , String.valueOf(2*1024 * 1024));
@@ -260,7 +263,6 @@ public class TestJobConf {
     configuration.set(MRJobConfig.REDUCE_MEMORY_MB, "3");
     Assert.assertEquals(configuration.getMemoryForMapTask(),2);
     Assert.assertEquals(configuration.getMemoryForReduceTask(),2);
-
   }
 
   /**
@@ -293,8 +295,10 @@ public class TestJobConf {
 
     configuration.set(MRJobConfig.MAP_MEMORY_MB, "-5");
     configuration.set(MRJobConfig.REDUCE_MEMORY_MB, "-6");
-    Assert.assertEquals(-5, configuration.getMemoryForMapTask());
-    Assert.assertEquals(-6, configuration.getMemoryForReduceTask());
+    Assert.assertEquals(MRJobConfig.DEFAULT_MAP_MEMORY_MB,
+        configuration.getMemoryForMapTask());
+    Assert.assertEquals(MRJobConfig.DEFAULT_REDUCE_MEMORY_MB,
+        configuration.getMemoryForReduceTask());
   }
 
   /**
@@ -308,13 +312,13 @@ public class TestJobConf {
     configuration.set(MRJobConfig.MAP_MEMORY_MB, String.valueOf(300));
     configuration.set(MRJobConfig.REDUCE_MEMORY_MB, String.valueOf(-1));
     Assert.assertEquals(
-      configuration.getMaxVirtualMemoryForTask(), 300 * 1024 * 1024);
+      configuration.getMaxVirtualMemoryForTask(), 1024 * 1024 * 1024);
 
     configuration = new JobConf();
     configuration.set(MRJobConfig.MAP_MEMORY_MB, String.valueOf(-1));
     configuration.set(MRJobConfig.REDUCE_MEMORY_MB, String.valueOf(200));
     Assert.assertEquals(
-      configuration.getMaxVirtualMemoryForTask(), 200 * 1024 * 1024);
+      configuration.getMaxVirtualMemoryForTask(), 1024 * 1024 * 1024);
 
     configuration = new JobConf();
     configuration.set(MRJobConfig.MAP_MEMORY_MB, String.valueOf(-1));
@@ -341,8 +345,6 @@ public class TestJobConf {
     configuration.setMaxVirtualMemoryForTask(2 * 1024 * 1024);
     Assert.assertEquals(configuration.getMemoryForMapTask(), 2);
     Assert.assertEquals(configuration.getMemoryForReduceTask(), 2);
-
-
   }
 
   /**
@@ -358,6 +360,22 @@ public class TestJobConf {
       ,jobConf.getMaxTaskFailuresPerTracker() < jobConf.getMaxMapAttempts() &&
       jobConf.getMaxTaskFailuresPerTracker() < jobConf.getMaxReduceAttempts()
       );
+  }
+
+  /**
+   * Test parsing various types of Java heap options.
+   */
+  @Test
+  public void testParseMaximumHeapSizeMB() {
+    // happy cases
+    Assert.assertEquals(4096, JobConf.parseMaximumHeapSizeMB("-Xmx4294967296"));
+    Assert.assertEquals(4096, JobConf.parseMaximumHeapSizeMB("-Xmx4194304k"));
+    Assert.assertEquals(4096, JobConf.parseMaximumHeapSizeMB("-Xmx4096m"));
+    Assert.assertEquals(4096, JobConf.parseMaximumHeapSizeMB("-Xmx4g"));
+
+    // sad cases
+    Assert.assertEquals(-1, JobConf.parseMaximumHeapSizeMB("-Xmx4?"));
+    Assert.assertEquals(-1, JobConf.parseMaximumHeapSizeMB(""));
   }
 
   /**

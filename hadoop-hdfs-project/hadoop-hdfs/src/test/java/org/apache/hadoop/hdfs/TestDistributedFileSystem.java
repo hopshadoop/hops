@@ -20,8 +20,7 @@ package org.apache.hadoop.hdfs;
 
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.logging.impl.Log4JLogger;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
@@ -38,7 +37,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.VolumeId;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeFaultInjector;
-import org.apache.hadoop.hdfs.web.HftpFileSystem;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.DataChecksum;
@@ -76,13 +74,19 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestDistributedFileSystem {
   private static final Random RAN = new Random();
 
-  {
-    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.ALL);
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestDistributedFileSystem.class);
+
+  static {
+    GenericTestUtils.setLogLevel(DFSClient.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(LeaseRenewer.LOG, Level.DEBUG);
+}
 
   private boolean dualPortTesting = false;
   
@@ -447,8 +451,6 @@ public class TestDistributedFileSystem {
 
   @Test
   public void testFileChecksum() throws Exception {
-    ((Log4JLogger) HftpFileSystem.LOG).getLogger().setLevel(Level.ALL);
-
     final long seed = RAN.nextLong();
     System.out.println("seed=" + seed);
     RAN.setSeed(seed);
@@ -484,17 +486,6 @@ public class TestDistributedFileSystem {
       assertTrue("Not throwing the intended exception message",
           e.getMessage().contains("Path is not a file: /test/TestExistingDir"));
     }
-    
-    //hftp
-    final String hftpuri = "hftp://" + nnAddr;
-    System.out.println("hftpuri=" + hftpuri);
-    final FileSystem hftp =
-        ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
-              @Override
-              public FileSystem run() throws Exception {
-                return new Path(hftpuri).getFileSystem(conf);
-              }
-            });
 
     //webhdfs
     final String webhdfsuri = WebHdfsFileSystem.SCHEME + "://" + nnAddr;
@@ -533,14 +524,6 @@ public class TestDistributedFileSystem {
       //compute checksum
       final FileChecksum hdfsfoocs = hdfs.getFileChecksum(foo);
       System.out.println("hdfsfoocs=" + hdfsfoocs);
-
-      //hftp
-      final FileChecksum hftpfoocs = hftp.getFileChecksum(foo);
-      System.out.println("hftpfoocs=" + hftpfoocs);
-
-      final Path qualified = new Path(hftpuri + dir, "foo" + n);
-      final FileChecksum qfoocs = hftp.getFileChecksum(qualified);
-      System.out.println("qfoocs=" + qfoocs);
 
       //webhdfs
       final FileChecksum webhdfsfoocs = webhdfs.getFileChecksum(foo);
@@ -582,13 +565,6 @@ public class TestDistributedFileSystem {
         assertEquals(hdfsfoocs.hashCode(), barhashcode);
         assertEquals(hdfsfoocs, barcs);
 
-        //hftp
-        assertEquals(hftpfoocs.hashCode(), barhashcode);
-        assertEquals(hftpfoocs, barcs);
-
-        assertEquals(qfoocs.hashCode(), barhashcode);
-        assertEquals(qfoocs, barcs);
-
         //webhdfs
         assertEquals(webhdfsfoocs.hashCode(), barhashcode);
         assertEquals(webhdfsfoocs, barcs);
@@ -598,15 +574,6 @@ public class TestDistributedFileSystem {
       }
 
       hdfs.setPermission(dir, new FsPermission((short) 0));
-      { //test permission error on hftp 
-        try {
-          hftp.getFileChecksum(qualified);
-          fail();
-        } catch (IOException ioe) {
-          FileSystem.LOG.info("GOOD: getting an exception", ioe);
-        }
-      }
-
       { //test permission error on webhdfs 
         try {
           webhdfs.getFileChecksum(webhdfsqualified);
@@ -639,9 +606,6 @@ public class TestDistributedFileSystem {
   @Test(timeout=60000)
   public void testGetFileBlockStorageLocationsBatching() throws Exception {
     final Configuration conf = getTestConfiguration();
-    ((Log4JLogger) ProtobufRpcEngine.LOG).getLogger().setLevel(Level.TRACE);
-    ((Log4JLogger) BlockStorageLocationUtil.LOG).getLogger().setLevel(Level.TRACE);
-    ((Log4JLogger) DFSClient.LOG).getLogger().setLevel(Level.TRACE);
 
     conf.setBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED, true);
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();

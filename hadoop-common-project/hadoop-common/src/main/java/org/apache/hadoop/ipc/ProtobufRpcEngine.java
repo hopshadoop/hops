@@ -21,8 +21,6 @@ package org.apache.hadoop.ipc;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.*;
 import com.google.protobuf.Descriptors.MethodDescriptor;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -31,7 +29,6 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
 import org.apache.hadoop.ipc.RPC.RpcInvoker;
-import org.apache.hadoop.ipc.RpcWritable;
 import org.apache.hadoop.ipc.protobuf.ProtobufRpcEngineProtos.RequestHeaderProto;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
@@ -40,6 +37,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.AsyncGet;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.SocketFactory;
 import java.io.IOException;
@@ -56,11 +55,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @InterfaceStability.Evolving
 public class ProtobufRpcEngine implements RpcEngine {
-  public static final Log LOG = LogFactory.getLog(ProtobufRpcEngine.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ProtobufRpcEngine.class);
   private static final ThreadLocal<AsyncGet<Message, Exception>>
       ASYNC_RETURN_MESSAGE = new ThreadLocal<>();
 
-  static { // Register the rpcRequest deserializer for WritableRpcEngine 
+  static { // Register the rpcRequest deserializer for ProtobufRpcEngine
     org.apache.hadoop.ipc.Server.registerProtocolEngine(
         RPC.RpcKind.RPC_PROTOCOL_BUFFER, RpcProtobufRequest.class,
         new Server.ProtoBufRpcInvoker());
@@ -194,7 +194,8 @@ public class ProtobufRpcEngine implements RpcEngine {
       }
       
       if (args.length != 2) { // RpcController + Message
-        throw new ServiceException("Too many parameters for request. Method: ["
+        throw new ServiceException(
+            "Too many or few parameters for request. Method: ["
             + method.getName() + "]" + ", Expected: 2, Actual: "
             + args.length);
       }
@@ -344,6 +345,60 @@ public class ProtobufRpcEngine implements RpcEngine {
   }
   
   public static class Server extends RPC.Server {
+
+    static final ThreadLocal<ProtobufRpcEngineCallback> currentCallback =
+        new ThreadLocal<>();
+
+    static final ThreadLocal<CallInfo> currentCallInfo = new ThreadLocal<>();
+
+    static class CallInfo {
+      private final RPC.Server server;
+      private final String methodName;
+
+      public CallInfo(RPC.Server server, String methodName) {
+        this.server = server;
+        this.methodName = methodName;
+      }
+    }
+
+    static class ProtobufRpcEngineCallbackImpl
+        implements ProtobufRpcEngineCallback {
+
+      private final RPC.Server server;
+      private final Call call;
+      private final String methodName;
+      private final long setupTime;
+
+      public ProtobufRpcEngineCallbackImpl() {
+        this.server = currentCallInfo.get().server;
+        this.call = Server.getCurCall().get();
+        this.methodName = currentCallInfo.get().methodName;
+        this.setupTime = Time.now();
+      }
+
+      @Override
+      public void setResponse(Message message) {
+        long processingTime = Time.now() - setupTime;
+        call.setDeferredResponse(RpcWritable.wrap(message));
+        server.updateDeferredMetrics(methodName, processingTime);
+      }
+
+      @Override
+      public void error(Throwable t) {
+        long processingTime = Time.now() - setupTime;
+        String detailedMetricsName = t.getClass().getSimpleName();
+        server.updateDeferredMetrics(detailedMetricsName, processingTime);
+        call.setDeferredError(t);
+      }
+    }
+
+    @InterfaceStability.Unstable
+    public static ProtobufRpcEngineCallback registerForDeferredResponse() {
+      ProtobufRpcEngineCallback callback = new ProtobufRpcEngineCallbackImpl();
+      currentCallback.set(callback);
+      return callback;
+    }
+
     /**
      * Construct an RPC server.
      * 
@@ -364,8 +419,9 @@ public class ProtobufRpcEngine implements RpcEngine {
         String portRangeConfig)
         throws IOException {
       super(bindAddress, port, null, numHandlers,
-          numReaders, queueSizePerHandler, conf, classNameBase(protocolImpl
-              .getClass().getName()), secretManager, portRangeConfig);
+          numReaders, queueSizePerHandler, conf,
+          serverNameFromClass(protocolImpl.getClass()), secretManager,
+          portRangeConfig);
       this.verbose = verbose;  
       registerProtocolAndImpl(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocolClass,
           protocolImpl);
@@ -414,24 +470,43 @@ public class ProtobufRpcEngine implements RpcEngine {
        * it is.</li>
        * </ol>
        */
-      public Writable call(RPC.Server server, String protocol,
+      public Writable call(RPC.Server server, String connectionProtocolName,
           Writable writableRequest, long receiveTime) throws Exception {
         RpcProtobufRequest request = (RpcProtobufRequest) writableRequest;
         RequestHeaderProto rpcRequest = request.getRequestHeader();
         String methodName = rpcRequest.getMethodName();
-        String protoName = rpcRequest.getDeclaringClassProtocolName();
+
+        /** 
+         * RPCs for a particular interface (ie protocol) are done using a
+         * IPC connection that is setup using rpcProxy.
+         * The rpcProxy's has a declared protocol name that is 
+         * sent form client to server at connection time. 
+         * 
+         * Each Rpc call also sends a protocol name 
+         * (called declaringClassprotocolName). This name is usually the same
+         * as the connection protocol name except in some cases. 
+         * For example metaProtocols such ProtocolInfoProto which get info
+         * about the protocol reuse the connection but need to indicate that
+         * the actual protocol is different (i.e. the protocol is
+         * ProtocolInfoProto) since they reuse the connection; in this case
+         * the declaringClassProtocolName field is set to the ProtocolInfoProto.
+         */
+
+        String declaringClassProtoName = 
+            rpcRequest.getDeclaringClassProtocolName();
         long clientVersion = rpcRequest.getClientProtocolVersion();
         if (server.verbose)
-          LOG.info("Call: protocol=" + protocol + ", method=" + methodName);
+          LOG.info("Call: connectionProtocolName=" + connectionProtocolName + 
+              ", method=" + methodName);
         
-        ProtoClassProtoImpl protocolImpl = getProtocolImpl(server, protoName,
-            clientVersion);
+        ProtoClassProtoImpl protocolImpl = getProtocolImpl(server, 
+                              declaringClassProtoName, clientVersion);
         BlockingService service = (BlockingService) protocolImpl.protocolImpl;
         MethodDescriptor methodDescriptor = service.getDescriptorForType()
             .findMethodByName(methodName);
         if (methodDescriptor == null) {
-          String msg = "Unknown method " + methodName + " called on " + protocol
-              + " protocol.";
+          String msg = "Unknown method " + methodName + " called on " 
+                                + connectionProtocolName + " protocol.";
           LOG.warn(msg);
           throw new RpcNoSuchMethodException(msg);
         }
@@ -442,9 +517,19 @@ public class ProtobufRpcEngine implements RpcEngine {
         long startTime = Time.now();
         int qTime = (int) (startTime - receiveTime);
         Exception exception = null;
+        boolean isDeferred = false;
         try {
           server.rpcDetailedMetrics.init(protocolImpl.protocolClass);
+          currentCallInfo.set(new CallInfo(server, methodName));
           result = service.callBlockingMethod(methodDescriptor, null, param);
+          // Check if this needs to be a deferred response,
+          // by checking the ThreadLocal callback being set
+          if (currentCallback.get() != null) {
+            Server.getCurCall().get().deferResponse();
+            isDeferred = true;
+            currentCallback.set(null);
+            return null;
+          }
         } catch (ServiceException e) {
           exception = (Exception) e.getCause();
           throw (Exception) e.getCause();
@@ -452,10 +537,13 @@ public class ProtobufRpcEngine implements RpcEngine {
           exception = e;
           throw e;
         } finally {
+          currentCallInfo.set(null);
           int processingTime = (int) (Time.now() - startTime);
           if (LOG.isDebugEnabled()) {
-            String msg = "Served: " + methodName + " queueTime= " + qTime +
-                " procesingTime= " + processingTime;
+            String msg =
+                "Served: " + methodName + (isDeferred ? ", deferred" : "") +
+                    ", queueTime= " + qTime +
+                    " procesingTime= " + processingTime;
             if (exception != null) {
               msg += " exception= " + exception.getClass().getSimpleName();
             }
@@ -464,7 +552,8 @@ public class ProtobufRpcEngine implements RpcEngine {
           String detailedMetricsName = (exception == null) ?
               methodName :
               exception.getClass().getSimpleName();
-          server.updateMetrics(detailedMetricsName, qTime, processingTime);
+          server.updateMetrics(detailedMetricsName, qTime, processingTime,
+              isDeferred);
         }
         return RpcWritable.wrap(result);
       }

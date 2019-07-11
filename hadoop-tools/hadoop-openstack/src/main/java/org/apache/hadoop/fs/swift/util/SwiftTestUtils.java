@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.fs.swift.util;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -40,8 +40,8 @@ import java.util.Properties;
  */
 public class SwiftTestUtils extends org.junit.Assert {
 
-  private static final Log LOG =
-    LogFactory.getLog(SwiftTestUtils.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SwiftTestUtils.class);
 
   public static final String TEST_FS_SWIFT = "test.fs.swift.name";
   public static final String IO_FILE_BUFFER_SIZE = "io.file.buffer.size";
@@ -165,7 +165,7 @@ public class SwiftTestUtils extends org.junit.Assert {
   }
 
   /**
-   * Read the file and convert to a byte dataaset
+   * Read the file and convert to a byte dataset
    * @param fs filesystem
    * @param path path to read from
    * @param len length of data to read
@@ -185,7 +185,7 @@ public class SwiftTestUtils extends org.junit.Assert {
   }
 
   /**
-   * Assert that tthe array src[0..len] and dest[] are equal
+   * Assert that the array src[0..len] and dest[] are equal
    * @param src source data
    * @param dest actual
    * @param len length of bytes to compare
@@ -278,7 +278,7 @@ public class SwiftTestUtils extends org.junit.Assert {
     noteAction(action);
     try {
       if (fileSystem != null) {
-        fileSystem.delete(new Path(cleanupPath).makeQualified(fileSystem),
+        fileSystem.delete(fileSystem.makeQualified(new Path(cleanupPath)),
                           true);
       }
     } catch (Exception e) {
@@ -489,10 +489,13 @@ public class SwiftTestUtils extends org.junit.Assert {
    */
   public static void assertPathExists(FileSystem fileSystem, String message,
                                Path path) throws IOException {
-    if (!fileSystem.exists(path)) {
+    try {
+      fileSystem.getFileStatus(path);
+    } catch (FileNotFoundException e) {
       //failure, report it
-      fail(message + ": not found " + path + " in " + path.getParent());
-           ls(fileSystem, path.getParent());
+      throw (IOException)new FileNotFoundException(message + ": not found "
+          + path + " in " + path.getParent() + ": " + e + " -- "
+           + ls(fileSystem, path.getParent())).initCause(e);
     }
   }
 
@@ -522,7 +525,7 @@ public class SwiftTestUtils extends org.junit.Assert {
    * @param fs filesystem
    * @param dir directory to scan
    * @param subdir full path to look for
-   * @throws IOException IO probles
+   * @throws IOException IO problems
    */
   public static void assertListStatusFinds(FileSystem fs,
                                            Path dir,

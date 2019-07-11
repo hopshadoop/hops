@@ -22,12 +22,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.slive.OperationOutput.OutputType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Operation which selects a random file and truncates a random amount of bytes
@@ -40,7 +40,7 @@ import org.apache.hadoop.fs.slive.OperationOutput.OutputType;
  */
 class TruncateOp extends Operation {
 
-  private static final Log LOG = LogFactory.getLog(TruncateOp.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TruncateOp.class);
 
   TruncateOp(ConfigExtractor cfg, Random rnd) {
     super(TruncateOp.class.getSimpleName(), cfg, rnd);
@@ -94,7 +94,7 @@ class TruncateOp extends Operation {
       out.add(new OperationOutput(OutputType.LONG, getType(),
           ReportWriter.NOT_FOUND, 1L));
       LOG.warn("Error with truncating", e);
-    } catch (IOException e) {
+    } catch (IOException | UnsupportedOperationException e) {
       out.add(new OperationOutput(OutputType.LONG, getType(),
           ReportWriter.FAILURES, 1L));
       LOG.warn("Error with truncating", e);

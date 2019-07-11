@@ -250,7 +250,6 @@ public class TestTFileSeqFileComparison {
     public SeqFileAppendable(FileSystem fs, Path path, int osBufferSize,
         String compress, int minBlkSize) throws IOException {
       Configuration conf = new Configuration();
-      conf.setBoolean("hadoop.native.lib", true);
 
       CompressionCodec codec = null;
       if ("lzo".equals(compress)) {

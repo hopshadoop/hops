@@ -18,17 +18,16 @@
 
 package org.apache.hadoop.tools;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.tools.DistCpOptions.FileAttribute;
+import java.util.Collections;
 
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.Collections;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.tools.DistCpOptions.FileAttribute;
 
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
-import static org.apache.hadoop.tools.DistCpOptions.maxNumListstatusThreads;
-import static org.junit.Assert.assertFalse;
+import static org.apache.hadoop.tools.DistCpOptions.MAX_NUM_LISTSTATUS_THREADS;
 import static org.junit.Assert.fail;
 
 /**
@@ -39,29 +38,31 @@ import static org.junit.Assert.fail;
  */
 public class TestDistCpOptions {
 
+  private static final float DELTA = 0.001f;
+
   @Test
   public void testSetIgnoreFailure() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertFalse(options.shouldIgnoreFailures());
+    Assert.assertFalse(builder.build().shouldIgnoreFailures());
 
-    options.setIgnoreFailures(true);
-    Assert.assertTrue(options.shouldIgnoreFailures());
+    builder.withIgnoreFailures(true);
+    Assert.assertTrue(builder.build().shouldIgnoreFailures());
   }
 
   @Test
   public void testSetOverwrite() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertFalse(options.shouldOverwrite());
+    Assert.assertFalse(builder.build().shouldOverwrite());
 
-    options.setOverwrite(true);
-    Assert.assertTrue(options.shouldOverwrite());
+    builder.withOverwrite(true);
+    Assert.assertTrue(builder.build().shouldOverwrite());
 
     try {
-      options.setSyncFolder(true);
+      builder.withSyncFolder(true).build();
       Assert.fail("Update and overwrite aren't allowed together");
     } catch (IllegalArgumentException ignore) {
     }
@@ -69,80 +70,81 @@ public class TestDistCpOptions {
 
   @Test
   public void testLogPath() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertNull(options.getLogPath());
+    Assert.assertNull(builder.build().getLogPath());
 
     final Path logPath = new Path("hdfs://localhost:8020/logs");
-    options.setLogPath(logPath);
-    Assert.assertEquals(logPath, options.getLogPath());
+    builder.withLogPath(logPath);
+    Assert.assertEquals(logPath, builder.build().getLogPath());
   }
 
   @Test
   public void testSetBlokcing() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertTrue(options.shouldBlock());
+    Assert.assertTrue(builder.build().shouldBlock());
 
-    options.setBlocking(false);
-    Assert.assertFalse(options.shouldBlock());
+    builder.withBlocking(false);
+    Assert.assertFalse(builder.build().shouldBlock());
   }
 
   @Test
   public void testSetBandwidth() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertEquals(DistCpConstants.DEFAULT_BANDWIDTH_MB,
-        options.getMapBandwidth());
+    Assert.assertEquals(0, builder.build().getMapBandwidth(), DELTA);
 
-    options.setMapBandwidth(11);
-    Assert.assertEquals(11, options.getMapBandwidth());
+    builder.withMapBandwidth(11);
+    Assert.assertEquals(11, builder.build().getMapBandwidth(), DELTA);
   }
 
-  @Test(expected = AssertionError.class)
+  @Test(expected = IllegalArgumentException.class)
   public void testSetNonPositiveBandwidth() {
-    final DistCpOptions options = new DistCpOptions(
+    new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-        new Path("hdfs://localhost:8020/target/"));
-    options.setMapBandwidth(-11);
+        new Path("hdfs://localhost:8020/target/"))
+        .withMapBandwidth(-11)
+        .build();
   }
 
-  @Test(expected = AssertionError.class)
+  @Test(expected = IllegalArgumentException.class)
   public void testSetZeroBandwidth() {
-    final DistCpOptions options = new DistCpOptions(
+    new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-        new Path("hdfs://localhost:8020/target/"));
-    options.setMapBandwidth(0);
+        new Path("hdfs://localhost:8020/target/"))
+        .withMapBandwidth(0)
+        .build();
   }
 
   @Test
   public void testSetSkipCRC() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertFalse(options.shouldSkipCRC());
+    Assert.assertFalse(builder.build().shouldSkipCRC());
 
-    options.setSyncFolder(true);
-    options.setSkipCRC(true);
+    final DistCpOptions options = builder.withSyncFolder(true).withCRC(true)
+        .build();
     Assert.assertTrue(options.shouldSyncFolder());
     Assert.assertTrue(options.shouldSkipCRC());
   }
 
   @Test
   public void testSetAtomicCommit() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertFalse(options.shouldAtomicCommit());
+    Assert.assertFalse(builder.build().shouldAtomicCommit());
 
-    options.setAtomicCommit(true);
-    Assert.assertTrue(options.shouldAtomicCommit());
+    builder.withAtomicCommit(true);
+    Assert.assertTrue(builder.build().shouldAtomicCommit());
 
     try {
-      options.setSyncFolder(true);
+      builder.withSyncFolder(true).build();
       Assert.fail("Atomic and sync folders were mutually exclusive");
     } catch (IllegalArgumentException ignore) {
     }
@@ -150,167 +152,142 @@ public class TestDistCpOptions {
 
   @Test
   public void testSetWorkPath() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertNull(options.getAtomicWorkPath());
+    Assert.assertNull(builder.build().getAtomicWorkPath());
 
-    options.setAtomicCommit(true);
-    Assert.assertNull(options.getAtomicWorkPath());
+    builder.withAtomicCommit(true);
+    Assert.assertNull(builder.build().getAtomicWorkPath());
 
     final Path workPath = new Path("hdfs://localhost:8020/work");
-    options.setAtomicWorkPath(workPath);
-    Assert.assertEquals(workPath,
-        options.getAtomicWorkPath());
+    builder.withAtomicWorkPath(workPath);
+    Assert.assertEquals(workPath, builder.build().getAtomicWorkPath());
   }
 
   @Test
   public void testSetSyncFolders() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         Collections.singletonList(new Path("hdfs://localhost:8020/source")),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertFalse(options.shouldSyncFolder());
+    Assert.assertFalse(builder.build().shouldSyncFolder());
 
-    options.setSyncFolder(true);
-    Assert.assertTrue(options.shouldSyncFolder());
+    builder.withSyncFolder(true);
+    Assert.assertTrue(builder.build().shouldSyncFolder());
   }
 
   @Test
   public void testSetDeleteMissing() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      Assert.assertFalse(options.shouldDeleteMissing());
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+        new Path("hdfs://localhost:8020/target/"));
+    Assert.assertFalse(builder.build().shouldDeleteMissing());
 
-      options.setSyncFolder(true);
-      options.setDeleteMissing(true);
-      Assert.assertTrue(options.shouldSyncFolder());
-      Assert.assertTrue(options.shouldDeleteMissing());
-    }
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setOverwrite(true);
-      options.setDeleteMissing(true);
-      Assert.assertTrue(options.shouldOverwrite());
-      Assert.assertTrue(options.shouldDeleteMissing());
-    }
+    DistCpOptions options = builder.withSyncFolder(true)
+        .withDeleteMissing(true)
+        .build();
+    Assert.assertTrue(options.shouldSyncFolder());
+    Assert.assertTrue(options.shouldDeleteMissing());
+
+    options = new DistCpOptions.Builder(
+        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+        new Path("hdfs://localhost:8020/target/"))
+        .withOverwrite(true)
+        .withDeleteMissing(true)
+        .build();
+    Assert.assertTrue(options.shouldOverwrite());
+    Assert.assertTrue(options.shouldDeleteMissing());
+
     try {
-      final DistCpOptions options = new DistCpOptions(
+      new DistCpOptions.Builder(
           Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setDeleteMissing(true);
+          new Path("hdfs://localhost:8020/target/"))
+          .withDeleteMissing(true)
+          .build();
       fail("Delete missing should fail without update or overwrite options");
     } catch (IllegalArgumentException e) {
       assertExceptionContains("Delete missing is applicable only with update " +
           "or overwrite options", e);
     }
     try {
-      final DistCpOptions options = new DistCpOptions(
+      new DistCpOptions.Builder(
           new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setSyncFolder(true);
-      options.setDeleteMissing(true);
-      options.setUseDiff(true, "s1", "s2");
-      assertFalse("-delete should be ignored when -diff is specified",
-          options.shouldDeleteMissing());
+          new Path("hdfs://localhost:8020/target/"))
+          .withSyncFolder(true)
+          .withDeleteMissing(true)
+          .withUseDiff("s1", "s2")
+          .build();
+      fail("Should have failed as -delete and -diff are mutually exclusive.");
     } catch (IllegalArgumentException e) {
-      fail("Got unexpected IllegalArgumentException: " + e.getMessage());
+      assertExceptionContains(
+          "-delete and -diff/-rdiff are mutually exclusive.", e);
     }
-  }
-
-  @Test
-  public void testSetSSLConf() {
-    final DistCpOptions options = new DistCpOptions(
-        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-        new Path("hdfs://localhost:8020/target/"));
-    Assert.assertNull(options.getSslConfigurationFile());
-
-    options.setSslConfigurationFile("/tmp/ssl-client.xml");
-    Assert.assertEquals("/tmp/ssl-client.xml",
-        options.getSslConfigurationFile());
   }
 
   @Test
   public void testSetMaps() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      Assert.assertEquals(DistCpConstants.DEFAULT_MAPS, options.getMaxMaps());
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+        new Path("hdfs://localhost:8020/target/"));
+    Assert.assertEquals(DistCpConstants.DEFAULT_MAPS,
+        builder.build().getMaxMaps());
 
-      options.setMaxMaps(1);
-      Assert.assertEquals(1, options.getMaxMaps());
-    }
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setMaxMaps(0);
-      Assert.assertEquals(1, options.getMaxMaps());
-    }
+    builder.maxMaps(1);
+    Assert.assertEquals(1, builder.build().getMaxMaps());
+
+    builder.maxMaps(0);
+    Assert.assertEquals(1, builder.build().getMaxMaps());
   }
 
   @Test
   public void testSetNumListtatusThreads() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      // If command line argument isn't set, we expect .getNumListstatusThreads
-      // option to be zero (so that we know when to override conf properties).
-      Assert.assertEquals(0, options.getNumListstatusThreads());
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"));
+    // If command line argument isn't set, we expect .getNumListstatusThreads
+    // option to be zero (so that we know when to override conf properties).
+    Assert.assertEquals(0, builder.build().getNumListstatusThreads());
 
-      options.setNumListstatusThreads(12);
-      Assert.assertEquals(12, options.getNumListstatusThreads());
-    }
+    builder.withNumListstatusThreads(12);
+    Assert.assertEquals(12, builder.build().getNumListstatusThreads());
 
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setNumListstatusThreads(0);
-      Assert.assertEquals(0, options.getNumListstatusThreads());
-    }
+    builder.withNumListstatusThreads(0);
+    Assert.assertEquals(0, builder.build().getNumListstatusThreads());
 
     // Ignore large number of threads.
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setNumListstatusThreads(maxNumListstatusThreads * 2);
-      Assert.assertEquals(maxNumListstatusThreads,
-          options.getNumListstatusThreads());
-    }
+    builder.withNumListstatusThreads(MAX_NUM_LISTSTATUS_THREADS * 2);
+    Assert.assertEquals(MAX_NUM_LISTSTATUS_THREADS,
+        builder.build().getNumListstatusThreads());
   }
 
   @Test
   public void testSourceListing() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         new Path("hdfs://localhost:8020/source/first"),
         new Path("hdfs://localhost:8020/target/"));
     Assert.assertEquals(new Path("hdfs://localhost:8020/source/first"),
-        options.getSourceFileListing());
+        builder.build().getSourceFileListing());
   }
 
-  @Test(expected = AssertionError.class)
+  @Test(expected = IllegalArgumentException.class)
   public void testMissingTarget() {
-    new DistCpOptions(new Path("hdfs://localhost:8020/source/first"), null);
+    new DistCpOptions.Builder(new Path("hdfs://localhost:8020/source/first"),
+        null);
   }
 
   @Test
   public void testToString() {
-    DistCpOptions option = new DistCpOptions(new Path("abc"), new Path("xyz"));
-    final String val = "DistCpOptions{atomicCommit=false, syncFolder=false, "
-        + "deleteMissing=false, ignoreFailures=false, overwrite=false, "
-        + "skipCRC=false, blocking=true, numListstatusThreads=0, maxMaps=20, "
-        + "mapBandwidth=100, sslConfigurationFile='null', "
-        + "copyStrategy='uniformsize', preserveStatus=[], "
-        + "preserveRawXattrs=false, atomicWorkPath=null, logPath=null, "
-        + "sourceFileListing=abc, sourcePaths=null, targetPath=xyz, "
-        + "targetPathExists=true, filtersFile='null'}";
+    DistCpOptions option = new DistCpOptions.Builder(new Path("abc"),
+        new Path("xyz")).build();
+    String val = "DistCpOptions{atomicCommit=false, syncFolder=false, " +
+        "deleteMissing=false, ignoreFailures=false, overwrite=false, " +
+        "append=false, useDiff=false, useRdiff=false, " +
+        "fromSnapshot=null, toSnapshot=null, " +
+        "skipCRC=false, blocking=true, numListstatusThreads=0, maxMaps=20, " +
+        "mapBandwidth=0.0, copyStrategy='uniformsize', preserveStatus=[], " +
+        "atomicWorkPath=null, logPath=null, sourceFileListing=abc, " +
+        "sourcePaths=null, targetPath=xyz, filtersFile='null'," +
+        " blocksPerChunk=0, copyBufferSize=8192, verboseLog=false}";
     String optionString = option.toString();
     Assert.assertEquals(val, optionString);
     Assert.assertNotSame(DistCpOptionSwitch.ATOMIC_COMMIT.toString(),
@@ -319,90 +296,86 @@ public class TestDistCpOptions {
 
   @Test
   public void testCopyStrategy() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      Assert.assertEquals(DistCpConstants.UNIFORMSIZE,
-          options.getCopyStrategy());
-      options.setCopyStrategy("dynamic");
-      Assert.assertEquals("dynamic", options.getCopyStrategy());
-    }
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"));
+    Assert.assertEquals(DistCpConstants.UNIFORMSIZE,
+        builder.build().getCopyStrategy());
+    builder.withCopyStrategy("dynamic");
+    Assert.assertEquals("dynamic", builder.build().getCopyStrategy());
   }
 
   @Test
   public void testTargetPath() {
-    final DistCpOptions options = new DistCpOptions(
+    final DistCpOptions options = new DistCpOptions.Builder(
         new Path("hdfs://localhost:8020/source/first"),
-        new Path("hdfs://localhost:8020/target/"));
+        new Path("hdfs://localhost:8020/target/")).build();
     Assert.assertEquals(new Path("hdfs://localhost:8020/target/"),
         options.getTargetPath());
   }
 
   @Test
   public void testPreserve() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.BLOCKSIZE));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.REPLICATION));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.PERMISSION));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.USER));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.GROUP));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
-    }
-    {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.preserve(FileAttribute.ACL);
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.BLOCKSIZE));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.REPLICATION));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.PERMISSION));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.USER));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.GROUP));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.ACL));
-    }
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source/")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.preserve(FileAttribute.BLOCKSIZE);
-      options.preserve(FileAttribute.REPLICATION);
-      options.preserve(FileAttribute.PERMISSION);
-      options.preserve(FileAttribute.USER);
-      options.preserve(FileAttribute.GROUP);
-      options.preserve(FileAttribute.CHECKSUMTYPE);
+    DistCpOptions options = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"))
+        .build();
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.BLOCKSIZE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.REPLICATION));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.PERMISSION));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.USER));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.GROUP));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
 
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.BLOCKSIZE));
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.REPLICATION));
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.PERMISSION));
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.USER));
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.GROUP));
-      Assert.assertTrue(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
-      Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
-    }
+    options = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"))
+        .preserve(FileAttribute.ACL)
+        .build();
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.BLOCKSIZE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.REPLICATION));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.PERMISSION));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.USER));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.GROUP));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.ACL));
+
+    options = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"))
+        .preserve(FileAttribute.BLOCKSIZE)
+        .preserve(FileAttribute.REPLICATION)
+        .preserve(FileAttribute.PERMISSION)
+        .preserve(FileAttribute.USER)
+        .preserve(FileAttribute.GROUP)
+        .preserve(FileAttribute.CHECKSUMTYPE)
+        .build();
+
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.BLOCKSIZE));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.REPLICATION));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.PERMISSION));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.USER));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.GROUP));
+    Assert.assertTrue(options.shouldPreserve(FileAttribute.CHECKSUMTYPE));
+    Assert.assertFalse(options.shouldPreserve(FileAttribute.XATTR));
   }
 
   @Test
   public void testAppendOption() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source/")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setSyncFolder(true);
-      options.setAppend(true);
-      Assert.assertTrue(options.shouldAppend());
-    }
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+        new Path("hdfs://localhost:8020/target/"))
+        .withSyncFolder(true)
+        .withAppend(true);
+    Assert.assertTrue(builder.build().shouldAppend());
 
     try {
       // make sure -append is only valid when -update is specified
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source/")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setAppend(true);
+      new DistCpOptions.Builder(
+          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+          new Path("hdfs://localhost:8020/target/"))
+          .withAppend(true)
+          .build();
       fail("Append should fail if update option is not specified");
     } catch (IllegalArgumentException e) {
       assertExceptionContains(
@@ -411,12 +384,13 @@ public class TestDistCpOptions {
 
     try {
       // make sure -append is invalid when skipCrc is specified
-      final DistCpOptions options = new DistCpOptions(
-          Collections.singletonList(new Path("hdfs://localhost:8020/source/")),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setSyncFolder(true);
-      options.setAppend(true);
-      options.setSkipCRC(true);
+      new DistCpOptions.Builder(
+          Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+          new Path("hdfs://localhost:8020/target/"))
+          .withSyncFolder(true)
+          .withAppend(true)
+          .withCRC(true)
+          .build();
       fail("Append should fail if skipCrc option is specified");
     } catch (IllegalArgumentException e) {
       assertExceptionContains(
@@ -426,85 +400,137 @@ public class TestDistCpOptions {
 
   @Test
   public void testDiffOption() {
-    {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setSyncFolder(true);
-      options.setUseDiff(true, "s1", "s2");
-      Assert.assertTrue(options.shouldUseDiff());
-      Assert.assertEquals("s1", options.getFromSnapshot());
-      Assert.assertEquals("s2", options.getToSnapshot());
-    }
-    {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setSyncFolder(true);
-      options.setUseDiff(true, "s1", ".");
-      Assert.assertTrue(options.shouldUseDiff());
-      Assert.assertEquals("s1", options.getFromSnapshot());
-      Assert.assertEquals(".", options.getToSnapshot());
-    }
+    DistCpOptions options = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"))
+        .withSyncFolder(true)
+        .withUseDiff("s1", "s2")
+        .build();
+    Assert.assertTrue(options.shouldUseDiff());
+    Assert.assertEquals("s1", options.getFromSnapshot());
+    Assert.assertEquals("s2", options.getToSnapshot());
+
+    options = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/first"),
+        new Path("hdfs://localhost:8020/target/"))
+        .withSyncFolder(true)
+        .withUseDiff("s1", ".")
+        .build();
+    Assert.assertTrue(options.shouldUseDiff());
+    Assert.assertEquals("s1", options.getFromSnapshot());
+    Assert.assertEquals(".", options.getToSnapshot());
 
     // make sure -diff is only valid when -update is specified
     try {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setUseDiff(true, "s1", "s2");
+      new DistCpOptions.Builder(new Path("hdfs://localhost:8020/source/first"),
+          new Path("hdfs://localhost:8020/target/"))
+          .withUseDiff("s1", "s2")
+          .build();
       fail("-diff should fail if -update option is not specified");
     } catch (IllegalArgumentException e) {
       assertExceptionContains(
-          "Diff is valid only with update options", e);
+          "-diff/-rdiff is valid only with -update option", e);
     }
 
     try {
-      final DistCpOptions options = new DistCpOptions(
+      new DistCpOptions.Builder(
           new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setSyncFolder(true);
-      options.setUseDiff(true, "s1", "s2");
-      options.setDeleteMissing(true);
-      assertFalse("-delete should be ignored when -diff is specified",
-          options.shouldDeleteMissing());
+          new Path("hdfs://localhost:8020/target/"))
+          .withSyncFolder(true)
+          .withUseDiff("s1", "s2")
+          .withDeleteMissing(true)
+          .build();
+      fail("Should fail as -delete and -diff/-rdiff are mutually exclusive.");
     } catch (IllegalArgumentException e) {
-      fail("Got unexpected IllegalArgumentException: " + e.getMessage());
+      assertExceptionContains(
+          "-delete and -diff/-rdiff are mutually exclusive.", e);
     }
 
     try {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setUseDiff(true, "s1", "s2");
-      options.setDeleteMissing(true);
+      new DistCpOptions.Builder(new Path("hdfs://localhost:8020/source/first"),
+          new Path("hdfs://localhost:8020/target/"))
+          .withUseDiff("s1", "s2")
+          .withDeleteMissing(true)
+          .build();
       fail("-diff should fail if -update option is not specified");
     } catch (IllegalArgumentException e) {
       assertExceptionContains(
-          "Diff is valid only with update options", e);
+          "-delete and -diff/-rdiff are mutually exclusive.", e);
     }
 
     try {
-      final DistCpOptions options = new DistCpOptions(
-          new Path("hdfs://localhost:8020/source/first"),
-          new Path("hdfs://localhost:8020/target/"));
-      options.setDeleteMissing(true);
-      options.setUseDiff(true, "s1", "s2");
-      fail("-delete should fail if -update option is not specified");
+      new DistCpOptions.Builder(new Path("hdfs://localhost:8020/source/first"),
+          new Path("hdfs://localhost:8020/target/"))
+          .withDeleteMissing(true)
+          .withUseDiff("s1", "s2")
+          .build();
+      fail("Should have failed as -delete and -diff are mutually exclusive");
     } catch (IllegalArgumentException e) {
-      assertExceptionContains("Delete missing is applicable only with update " +
-          "or overwrite options", e);
+      assertExceptionContains(
+          "-delete and -diff/-rdiff are mutually exclusive", e);
     }
   }
 
   @Test
   public void testExclusionsOption() {
-    DistCpOptions options = new DistCpOptions(
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
         new Path("hdfs://localhost:8020/source/first"),
         new Path("hdfs://localhost:8020/target/"));
-    Assert.assertNull(options.getFiltersFile());
+    Assert.assertNull(builder.build().getFiltersFile());
 
-    options.setFiltersFile("/tmp/filters.txt");
-    Assert.assertEquals("/tmp/filters.txt", options.getFiltersFile());
+    builder.withFiltersFile("/tmp/filters.txt");
+    Assert.assertEquals("/tmp/filters.txt", builder.build().getFiltersFile());
+  }
+
+  @Test
+  public void testSetOptionsForSplitLargeFile() {
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        new Path("hdfs://localhost:8020/source/"),
+        new Path("hdfs://localhost:8020/target/"))
+        .withAppend(true)
+        .withSyncFolder(true);
+    Assert.assertFalse(builder.build().shouldPreserve(FileAttribute.BLOCKSIZE));
+    Assert.assertTrue(builder.build().shouldAppend());
+
+    builder.withBlocksPerChunk(5440);
+    Assert.assertTrue(builder.build().shouldPreserve(FileAttribute.BLOCKSIZE));
+    Assert.assertFalse(builder.build().shouldAppend());
+  }
+
+  @Test
+  public void testSetCopyBufferSize() {
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+        new Path("hdfs://localhost:8020/target/"));
+
+    Assert.assertEquals(DistCpConstants.COPY_BUFFER_SIZE_DEFAULT,
+        builder.build().getCopyBufferSize());
+
+    builder.withCopyBufferSize(4194304);
+    Assert.assertEquals(4194304,
+        builder.build().getCopyBufferSize());
+
+    builder.withCopyBufferSize(-1);
+    Assert.assertEquals(DistCpConstants.COPY_BUFFER_SIZE_DEFAULT,
+        builder.build().getCopyBufferSize());
+  }
+
+  @Test
+  public void testVerboseLog() {
+    final DistCpOptions.Builder builder = new DistCpOptions.Builder(
+        Collections.singletonList(new Path("hdfs://localhost:8020/source")),
+        new Path("hdfs://localhost:8020/target/"));
+    Assert.assertFalse(builder.build().shouldVerboseLog());
+
+    try {
+      builder.withVerboseLog(true).build();
+      fail("-v should fail if -log option is not specified");
+    } catch (IllegalArgumentException e) {
+      assertExceptionContains("-v is valid only with -log option", e);
+    }
+
+    final Path logPath = new Path("hdfs://localhost:8020/logs");
+    builder.withLogPath(logPath).withVerboseLog(true);
+    Assert.assertTrue(builder.build().shouldVerboseLog());
   }
 }

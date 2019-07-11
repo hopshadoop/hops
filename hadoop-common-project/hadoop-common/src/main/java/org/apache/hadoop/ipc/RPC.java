@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ipc;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
@@ -26,7 +28,6 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
-import java.io.*;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,14 +35,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.net.SocketFactory;
 
-import org.apache.commons.logging.*;
-
 import org.apache.hadoop.HadoopIllegalArgumentException;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.io.*;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
 import org.apache.hadoop.ipc.protobuf.ProtocolInfoProtos.ProtocolInfoService;
@@ -54,12 +56,12 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.*;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.protobuf.BlockingService;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** A simple RPC mechanism.
  *
@@ -88,7 +90,7 @@ public class RPC {
     RPC_WRITABLE ((short) 2),        // Use WritableRpcEngine 
     RPC_PROTOCOL_BUFFER ((short) 3); // Use ProtobufRpcEngine
     final static short MAX_INDEX = RPC_PROTOCOL_BUFFER.value; // used for array size
-    public final short value; //TODO make it private
+    private final short value;
 
     RpcKind(short val) {
       this.value = val;
@@ -110,7 +112,7 @@ public class RPC {
         Writable rpcRequest, long receiveTime) throws Exception ;
   }
   
-  static final Log LOG = LogFactory.getLog(RPC.class);
+  static final Logger LOG = LoggerFactory.getLogger(RPC.class);
   
   /**
    * Get all superInterfaces that extend VersionedProtocol
@@ -158,8 +160,9 @@ public class RPC {
   
   /**
    * Get the protocol version from protocol class.
-   * If the protocol class has a ProtocolAnnotation, then get the protocol
-   * name from the annotation; otherwise the class name is the protocol name.
+   * If the protocol class has a ProtocolAnnotation,
+   * then get the protocol version from the annotation;
+   * otherwise get it from the versionID field of the protocol class.
    */
   static public long getProtocolVersion(Class<?> protocol) {
     if (protocol == null) {
@@ -700,7 +703,7 @@ public class RPC {
     return conf.getInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY,
         CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_DEFAULT);
   }
-  
+
   /**
    * Class to construct instances of RPC server with specific options.
    */
@@ -709,7 +712,6 @@ public class RPC {
     private Object instance = null;
     private String bindAddress = "0.0.0.0";
     private int port = 0;
-    private String name = "";
     private int numHandlers = 1;
     private int numReaders = -1;
     private int queueSizePerHandler = -1;
@@ -743,11 +745,6 @@ public class RPC {
     /** Default: 0 */
     public Builder setPort(int port) {
       this.port = port;
-      return this;
-    }
-
-    public Builder setName(String name){
-      this.name = name;
       return this;
     }
     
@@ -813,13 +810,45 @@ public class RPC {
   
   /** An RPC Server. */
   public abstract static class Server extends org.apache.hadoop.ipc.Server {
-   boolean verbose;
-   static String classNameBase(String className) {
-      String[] names = className.split("\\.", -1);
-      if (names == null || names.length == 0) {
-        return className;
+
+    boolean verbose;
+
+    private static final Pattern COMPLEX_SERVER_NAME_PATTERN =
+        Pattern.compile("(?:[^\\$]*\\$)*([A-Za-z][^\\$]+)(?:\\$\\d+)?");
+
+    /**
+     * Get a meaningful and short name for a server based on a java class.
+     *
+     * The rules are defined to support the current naming schema of the
+     * generated protobuf classes where the final class usually an anonymous
+     * inner class of an inner class.
+     *
+     * 1. For simple classes it returns with the simple name of the classes
+     *     (with the name without package name)
+     *
+     * 2. For inner classes, this is the simple name of the inner class.
+     *
+     * 3.  If it is an Object created from a class factory
+     *   E.g., org.apache.hadoop.ipc.TestRPC$TestClass$2
+     * this method returns parent class TestClass.
+     *
+     * 4. If it is an anonymous class E.g., 'org.apache.hadoop.ipc.TestRPC$10'
+     * serverNameFromClass returns parent class TestRPC.
+     *
+     *
+     */
+    static String serverNameFromClass(Class<?> clazz) {
+      String name = clazz.getName();
+      String[] names = clazz.getName().split("\\.", -1);
+      if (names != null && names.length > 0) {
+        name = names[names.length - 1];
       }
-      return names[names.length-1];
+      Matcher matcher = COMPLEX_SERVER_NAME_PATTERN.matcher(name);
+      if (matcher.find()) {
+        return matcher.group(1);
+      } else {
+        return name;
+      }
     }
    
    /**

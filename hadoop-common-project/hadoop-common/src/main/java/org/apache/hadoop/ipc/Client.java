@@ -21,49 +21,6 @@ package org.apache.hadoop.ipc;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import static org.apache.hadoop.ipc.RpcConstants.*;
-
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.FilterInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InterruptedIOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-import java.security.PrivilegedExceptionAction;
-import java.util.Arrays;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import javax.net.SocketFactory;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLSocket;
-import javax.security.sasl.Sasl;
-
-import org.apache.commons.collections.functors.ExceptionClosure;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -86,9 +43,7 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 import org.apache.hadoop.net.ConnectTimeoutException;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.SSLCertificateException;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.SaslRpcClient;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
@@ -100,6 +55,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.AsyncGet;
 import org.apache.htrace.core.Span;
 import org.apache.htrace.core.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.SocketFactory;
 import javax.security.sasl.Sasl;
@@ -113,8 +70,11 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
+import org.apache.hadoop.net.SSLCertificateException;
 
 /** A client for an IPC service.  IPC calls take a single {@link Writable} as a
  * parameter, and return a {@link Writable} as their value.  A service runs on
@@ -126,7 +86,7 @@ import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
 @InterfaceStability.Evolving
 public class Client implements AutoCloseable {
   
-  public static final Log LOG = LogFactory.getLog(Client.class);
+  public static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
   /** A counter for generating call IDs. */
   private static final AtomicInteger callIdCounter = new AtomicInteger();
@@ -177,11 +137,10 @@ public class Client implements AutoCloseable {
   private final int connectionTimeout;
 
   private final boolean fallbackAllowed;
+  private final boolean bindToWildCardAddress;
   private final byte[] clientId;
   private final int maxAsyncCalls;
   private final AtomicInteger asyncCallCounter = new AtomicInteger(0);
-  
-  final static int CONNECTION_CONTEXT_CALL_ID = -3;
 
   /**
    * Executor on which IPC calls' parameters are sent.
@@ -256,7 +215,8 @@ public class Client implements AutoCloseable {
    * @param conf Configuration
    * @param pingInterval the ping interval
    */
-  static final void setPingInterval(Configuration conf, int pingInterval) {
+  public static final void setPingInterval(Configuration conf,
+      int pingInterval) {
     conf.setInt(CommonConfigurationKeys.IPC_PING_INTERVAL_KEY, pingInterval);
   }
 
@@ -481,6 +441,8 @@ public class Client implements AutoCloseable {
     
     private final Object sendRpcRequestLock = new Object();
 
+    private AtomicReference<Thread> connectingThread = new AtomicReference<>();
+
     public Connection(ConnectionId remoteId, int serviceClass) throws IOException {
       this.remoteId = remoteId;
       this.server = remoteId.getAddress();
@@ -677,7 +639,8 @@ public class Client implements AutoCloseable {
       return false;
     }
     
-    private synchronized void setupConnection() throws IOException {
+    private synchronized void setupConnection(
+        UserGroupInformation ticket) throws IOException {
       short ioFailures = 0;
       short timeoutFailures = 0;
       while (true) {
@@ -705,23 +668,27 @@ public class Client implements AutoCloseable {
            * client, to ensure Server matching address of the client connection
            * to host name in principal passed.
            */
-          UserGroupInformation ticket = remoteId.getTicket();
+          InetSocketAddress bindAddr = null;
           if (ticket != null && ticket.hasKerberosCredentials()) {
-            KerberosInfo krbInfo =
-                    remoteId.getProtocol().getAnnotation(KerberosInfo.class);
-            if (krbInfo != null && krbInfo.clientPrincipal() != null) {
-              String host =
-                      SecurityUtil.getHostFromPrincipal(remoteId.getTicket().getUserName());
-
+            KerberosInfo krbInfo = 
+              remoteId.getProtocol().getAnnotation(KerberosInfo.class);
+            if (krbInfo != null) {
+              String principal = ticket.getUserName();
+              String host = SecurityUtil.getHostFromPrincipal(principal);
               // If host name is a valid local address then bind socket to it
               InetAddress localAddr = NetUtils.getLocalInetAddress(host);
               if (localAddr != null) {
+                this.socket.setReuseAddress(true);
+                localAddr = NetUtils.bindToLocalAddress(localAddr,
+                    bindToWildCardAddress);
+                LOG.debug("Binding {} to {}", principal,
+                    (bindToWildCardAddress) ? "0.0.0.0" : localAddr);
                 this.socket.bind(new InetSocketAddress(localAddr, 0));
               }
             }
           }
-
-          NetUtils.connect(this.socket, server, connectionTimeout);
+          
+          NetUtils.connect(this.socket, server, bindAddr, connectionTimeout);
           this.socket.setSoTimeout(soTimeout);
           return;
         } catch (ConnectTimeoutException toe) {
@@ -805,8 +772,16 @@ public class Client implements AutoCloseable {
         AtomicBoolean fallbackToSimpleAuth) {
       if (socket != null || shouldCloseConnection.get()) {
         return;
-      } 
+      }
+      UserGroupInformation ticket = remoteId.getTicket();
+      if (ticket != null) {
+        final UserGroupInformation realUser = ticket.getRealUser();
+        if (realUser != null) {
+          ticket = realUser;
+        }
+      }
       try {
+        connectingThread.set(Thread.currentThread());
         if (LOG.isDebugEnabled()) {
           LOG.debug("Connecting to "+server);
         }
@@ -817,18 +792,10 @@ public class Client implements AutoCloseable {
         short numRetries = 0;
         Random rand = null;
         while (true) {
-          setupConnection();
+          setupConnection(ticket);
           ipcStreams = new IpcStreams(socket, maxResponseLength);
-          try{
-            writeConnectionHeader(ipcStreams);
-          } catch (SSLException ex) {
-            throw new IOException(ex.getMessage()).initCause(ex);
-          }
+          writeConnectionHeader(ipcStreams);
           if (authProtocol == AuthProtocol.SASL) {
-            UserGroupInformation ticket = remoteId.getTicket();
-            if (ticket.getRealUser() != null) {
-              ticket = ticket.getRealUser();
-            }
             try {
               authMethod = ticket
                   .doAs(new PrivilegedExceptionAction<AuthMethod>() {
@@ -895,11 +862,13 @@ public class Client implements AutoCloseable {
         }
       } catch (Throwable t) {
         if (t instanceof IOException) {
-          markClosed((IOException) t);
+          markClosed((IOException)t);
         } else {
           markClosed(new IOException("Couldn't set up IO streams: " + t, t));
         }
         close();
+      } finally {
+        connectingThread.set(null);
       }
     }
     
@@ -957,8 +926,10 @@ public class Client implements AutoCloseable {
       }
       if (action.action == RetryAction.RetryDecision.FAIL) {
         if (action.reason != null) {
-          LOG.warn("Failed to connect to server: " + server + ": "
-              + action.reason, ioe);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Failed to connect to server: " + server + ": "
+                    + action.reason, ioe);
+          }
         }
         throw ioe;
       }
@@ -992,7 +963,7 @@ public class Client implements AutoCloseable {
      * +----------------------------------+
      */
     private void writeConnectionHeader(IpcStreams streams)
-        throws IOException, SSLException {
+        throws IOException {
       // Write out the header, version and authentication method.
       // The output stream is buffered but we must not flush it yet.  The
       // connection setup protocol requires the client to send multiple
@@ -1006,12 +977,10 @@ public class Client implements AutoCloseable {
       // before all messages are sent.
       final DataOutputStream out = streams.out;
       synchronized (out) {
-        
         out.write(RpcConstants.HEADER.array());
         out.write(RpcConstants.CURRENT_VERSION);
         out.write(serviceClass);
         out.write(authProtocol.callId);
-
       }
     }
 
@@ -1156,7 +1125,8 @@ public class Client implements AutoCloseable {
                   return;
                 }
                 if (LOG.isDebugEnabled()) {
-                  LOG.debug(getName() + " sending #" + call.id);
+                  LOG.debug(getName() + " sending #" + call.id
+                      + " " + call.rpcRequest);
                 }
                 // RpcRequestHeader + RpcRequest
                 ipcStreams.sendRequest(buf.toByteArray());
@@ -1252,6 +1222,13 @@ public class Client implements AutoCloseable {
         notifyAll();
       }
     }
+
+    private void interruptConnectingThread() {
+      Thread connThread = connectingThread.get();
+      if (connThread != null) {
+        connThread.interrupt();
+      }
+    }
     
     /** Close the connection. */
     private synchronized void close() {
@@ -1316,6 +1293,10 @@ public class Client implements AutoCloseable {
         CommonConfigurationKeys.IPC_CLIENT_CONNECT_TIMEOUT_DEFAULT);
     this.fallbackAllowed = conf.getBoolean(CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
         CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT);
+    this.bindToWildCardAddress = conf
+        .getBoolean(CommonConfigurationKeys.IPC_CLIENT_BIND_WILDCARD_ADDR_KEY,
+            CommonConfigurationKeys.IPC_CLIENT_BIND_WILDCARD_ADDR_DEFAULT);
+
     this.clientId = ClientId.getClientId();
     this.sendParamsExecutor = clientExcecutorFactory.refAndGetInstance();
     this.maxAsyncCalls = conf.getInt(
@@ -1355,6 +1336,7 @@ public class Client implements AutoCloseable {
     // wake up all connections
     for (Connection conn : connections.values()) {
       conn.interrupt();
+      conn.interruptConnectingThread();
     }
     
     // wait until all connections are closed
@@ -1366,10 +1348,6 @@ public class Client implements AutoCloseable {
     }
     
     clientExcecutorFactory.unrefAndCleanup();
-    
-    if (socketFactory instanceof HopsSSLSocketFactory) {
-      ((HopsSSLSocketFactory) socketFactory).stopReloadingKeyManagers();
-    }
   }
 
   /** 
@@ -1534,9 +1512,6 @@ public class Client implements AutoCloseable {
         if (call.error instanceof RemoteException) {
           call.error.fillInStackTrace();
           throw call.error;
-        } else if (call.error instanceof SSLException) {
-          LOG.error("Connection " + connection.getName() + " encountered TLS error", call.error.getCause());
-          throw new SSLException(call.error.getMessage());
         } else { // local exception
           InetSocketAddress address = connection.getRemoteAddress();
           throw NetUtils.wrapException(address.getHostName(),

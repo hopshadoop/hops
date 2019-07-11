@@ -41,14 +41,10 @@ public class DelegationTokenSelector
    * Select the delegation token for hdfs.  The port will be rewritten to
    * the port of hdfs.service.host_$nnAddr, or the default rpc namenode port.
    * This method should only be called by non-hdfs filesystems that do not
-   * use the rpc port to acquire tokens.  Ex. webhdfs, hftp
-   *
-   * @param nnUri
-   *     of the remote namenode
-   * @param tokens
-   *     as a collection
-   * @param conf
-   *     hadoop configuration
+   * use the rpc port to acquire tokens.  Ex. webhdfs
+   * @param nnUri of the remote namenode
+   * @param tokens as a collection
+   * @param conf hadoop configuration
    * @return Token
    */
   public Token<DelegationTokenIdentifier> selectToken(final URI nnUri,

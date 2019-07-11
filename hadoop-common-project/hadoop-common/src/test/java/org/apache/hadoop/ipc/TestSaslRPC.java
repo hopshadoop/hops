@@ -19,10 +19,7 @@
 package org.apache.hadoop.ipc;
 
 import com.google.protobuf.ServiceException;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -36,7 +33,7 @@ import org.apache.hadoop.security.SaslRpcServer.QualityOfProtection;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.*;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
-import org.apache.log4j.Level;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -44,31 +41,59 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-import javax.security.auth.callback.*;
-import javax.security.sasl.*;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
 import java.security.Security;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.*;
-import static org.junit.Assert.*;
+import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
+import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.SIMPLE;
+import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.TOKEN;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /** Unit tests for using Sasl over RPC. */
 @RunWith(Parameterized.class)
 public class TestSaslRPC extends TestRpcBase {
   @Parameters
   public static Collection<Object[]> data() {
-    Collection<Object[]> params = new ArrayList<Object[]>();
+    Collection<Object[]> params = new ArrayList<>();
     for (QualityOfProtection qop : QualityOfProtection.values()) {
       params.add(new Object[]{ new QualityOfProtection[]{qop},qop, null });
     }
@@ -95,8 +120,7 @@ public class TestSaslRPC extends TestRpcBase {
     this.saslPropertiesResolver = saslPropertiesResolver;
   }
 
-  public static final Log LOG =
-    LogFactory.getLog(TestSaslRPC.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TestSaslRPC.class);
   
   static final String ERROR_MESSAGE = "Token is invalid";
   static final String SERVER_KEYTAB_KEY = "test.ipc.server.keytab";
@@ -114,7 +138,7 @@ public class TestSaslRPC extends TestRpcBase {
     NONE(),
     VALID(),
     INVALID(),
-    OTHER();
+    OTHER()
   }
   
   @BeforeClass
@@ -161,12 +185,12 @@ public class TestSaslRPC extends TestRpcBase {
   }
 
   static {
-    ((Log4JLogger) Client.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) Server.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslRpcClient.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslRpcServer.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SaslInputStream.LOG).getLogger().setLevel(Level.ALL);
-    ((Log4JLogger) SecurityUtil.LOG).getLogger().setLevel(Level.ALL);
+    GenericTestUtils.setLogLevel(Client.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(Server.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(SaslRpcClient.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(SaslRpcServer.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(SaslInputStream.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(SecurityUtil.LOG, Level.TRACE);
   }
 
   public static class BadTokenSecretManager extends TestTokenSecretManager {
@@ -230,7 +254,7 @@ public class TestSaslRPC extends TestRpcBase {
       final Server server = setupTestServer(conf, 5, sm);
       doDigestRpc(server, sm);
     } finally {
-      SecurityUtil.setSecurityInfoProviders(new SecurityInfo[0]);
+      SecurityUtil.setSecurityInfoProviders();
     }
   }
 
@@ -259,7 +283,7 @@ public class TestSaslRPC extends TestRpcBase {
     addr = NetUtils.getConnectAddress(server);
     TestTokenIdentifier tokenId = new TestTokenIdentifier(new Text(current
         .getUserName()));
-    Token<TestTokenIdentifier> token = new Token<TestTokenIdentifier>(tokenId, sm);
+    Token<TestTokenIdentifier> token = new Token<>(tokenId, sm);
     SecurityUtil.setTokenService(token, addr);
     current.addToken(token);
 
@@ -296,8 +320,8 @@ public class TestSaslRPC extends TestRpcBase {
 
     // set doPing to true
     newConf.setBoolean(CommonConfigurationKeys.IPC_CLIENT_PING_KEY, true);
-    ConnectionId remoteId = ConnectionId.getConnectionId(new InetSocketAddress(0),
-        TestRpcService.class, null, 0, null, newConf);
+    ConnectionId remoteId = ConnectionId.getConnectionId(
+        new InetSocketAddress(0), TestRpcService.class, null, 0, null, newConf);
     assertEquals(CommonConfigurationKeys.IPC_PING_INTERVAL_DEFAULT,
         remoteId.getPingInterval());
     // set doPing to false
@@ -806,13 +830,13 @@ public class TestSaslRPC extends TestRpcBase {
     final TestTokenSecretManager sm = new TestTokenSecretManager();
     boolean useSecretManager = (serverAuth != SIMPLE);
     if (enableSecretManager != null) {
-      useSecretManager &= enableSecretManager.booleanValue();
+      useSecretManager &= enableSecretManager;
     }
     if (forceSecretManager != null) {
-      useSecretManager |= forceSecretManager.booleanValue();
+      useSecretManager |= forceSecretManager;
     }
     final SecretManager<?> serverSm = useSecretManager ? sm : null;
-    
+
     Server server = serverUgi.doAs(new PrivilegedExceptionAction<Server>() {
       @Override
       public Server run() throws IOException {
@@ -867,13 +891,13 @@ public class TestSaslRPC extends TestRpcBase {
             proxy.ping(null, newEmptyRequest());
             // make sure the other side thinks we are who we said we are!!!
             assertEquals(clientUgi.getUserName(),
-                convert(proxy.getAuthUser(null, newEmptyRequest())));
+                proxy.getAuthUser(null, newEmptyRequest()).getUser());
             AuthMethod authMethod =
                 convert(proxy.getAuthMethod(null, newEmptyRequest()));
             // verify sasl completed with correct QOP
             assertEquals((authMethod != SIMPLE) ? expectedQop.saslQop : null,
-                RPC.getConnectionIdForProxy(proxy).getSaslQop());
-            return authMethod.toString();
+                         RPC.getConnectionIdForProxy(proxy).getSaslQop());
+            return authMethod != null ? authMethod.toString() : null;
           } catch (ServiceException se) {
             if (se.getCause() instanceof RemoteException) {
               throw (RemoteException) se.getCause();
@@ -898,21 +922,18 @@ public class TestSaslRPC extends TestRpcBase {
       String actual) {
     assertEquals(expect.toString(), actual);
   }
-  
-  private static void assertAuthEquals(Pattern expect,
-      String actual) {
+
+  private static void assertAuthEquals(Pattern expect, String actual) {
     // this allows us to see the regexp and the value it didn't match
     if (!expect.matcher(actual).matches()) {
-      assertEquals(expect, actual); // it failed
-    } else {
-      assertTrue(true); // it matched
+      fail(); // it failed
     }
   }
 
   /*
    * Class used to test overriding QOP values using SaslPropertiesResolver
    */
-  static class AuthSaslPropertiesResolver extends SaslPropertiesResolver{
+  static class AuthSaslPropertiesResolver extends SaslPropertiesResolver {
 
     @Override
     public Map<String, String> getServerProperties(InetAddress address) {
@@ -921,7 +942,7 @@ public class TestSaslRPC extends TestRpcBase {
       return newPropertes;
     }
   }
-  
+
   public static void main(String[] args) throws Exception {
     System.out.println("Testing Kerberos authentication over RPC");
     if (args.length != 2) {

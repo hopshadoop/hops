@@ -24,43 +24,45 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.UTF8;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs a job multiple times and takes average of all runs.
  */
 public class MRBench extends Configured implements Tool{
   
-  private static final Log LOG = LogFactory.getLog(MRBench.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MRBench.class);
+  private static final String DEFAULT_INPUT_SUB = "mr_input";
+  private static final String DEFAULT_OUTPUT_SUB = "mr_output";
+
   private static Path BASE_DIR =
     new Path(System.getProperty("test.build.data","/benchmarks/MRBench"));
-  private static Path INPUT_DIR = new Path(BASE_DIR, "mr_input");
-  private static Path OUTPUT_DIR = new Path(BASE_DIR, "mr_output");
+  private static Path INPUT_DIR = new Path(BASE_DIR, DEFAULT_INPUT_SUB);
+  private static Path OUTPUT_DIR = new Path(BASE_DIR, DEFAULT_OUTPUT_SUB);
   
-  public static enum Order {RANDOM, ASCENDING, DESCENDING}; 
+  public enum Order {RANDOM, ASCENDING, DESCENDING};
   
   /**
    * Takes input format as text lines, runs some processing on it and 
    * writes out data as text again. 
    */
   public static class Map extends MapReduceBase
-    implements Mapper<WritableComparable, Text, UTF8, UTF8> {
+      implements Mapper<WritableComparable<?>, Text, Text, Text> {
     
-    public void map(WritableComparable key, Text value,
-                    OutputCollector<UTF8, UTF8> output,
+    public void map(WritableComparable<?> key, Text value,
+                    OutputCollector<Text, Text> output,
                     Reporter reporter) throws IOException 
     {
       String line = value.toString();
-      output.collect(new UTF8(process(line)), new UTF8(""));		
+      output.collect(new Text(process(line)), new Text(""));
     }
     public String process(String line) {
       return line; 
@@ -71,13 +73,14 @@ public class MRBench extends Configured implements Tool{
    * Ignores the key and writes values to the output. 
    */
   public static class Reduce extends MapReduceBase
-    implements Reducer<UTF8, UTF8, UTF8, UTF8> {
+      implements Reducer<Text, Text, Text, Text> {
     
-    public void reduce(UTF8 key, Iterator<UTF8> values,
-                       OutputCollector<UTF8, UTF8> output, Reporter reporter) throws IOException 
+    public void reduce(Text key, Iterator<Text> values,
+                       OutputCollector<Text, Text> output,
+                       Reporter reporter) throws IOException
     {
       while(values.hasNext()) {
-        output.collect(key, new UTF8(values.next().toString()));
+        output.collect(key, new Text(values.next().toString()));
       }
     }
   }
@@ -148,10 +151,10 @@ public class MRBench extends Configured implements Tool{
     jobConf.setInputFormat(TextInputFormat.class);
     jobConf.setOutputFormat(TextOutputFormat.class);
     
-    jobConf.setOutputValueClass(UTF8.class);
+    jobConf.setOutputValueClass(Text.class);
     
-    jobConf.setMapOutputKeyClass(UTF8.class);
-    jobConf.setMapOutputValueClass(UTF8.class);
+    jobConf.setMapOutputKeyClass(Text.class);
+    jobConf.setMapOutputValueClass(Text.class);
     
     if (null != jarFile) {
       jobConf.setJar(jarFile);
@@ -230,7 +233,7 @@ public class MRBench extends Configured implements Tool{
       "[-verbose]";
     
     String jarFile = null;
-    int inputLines = 1; 
+    long inputLines = 1; 
     int numRuns = 1;
     int numMaps = 2; 
     int numReduces = 1;
@@ -243,12 +246,14 @@ public class MRBench extends Configured implements Tool{
         numRuns = Integer.parseInt(args[++i]);
       } else if (args[i].equals("-baseDir")) {
         BASE_DIR = new Path(args[++i]);
+        INPUT_DIR = new Path(BASE_DIR, DEFAULT_INPUT_SUB);
+        OUTPUT_DIR = new Path(BASE_DIR, DEFAULT_OUTPUT_SUB);
       } else if (args[i].equals("-maps")) {
         numMaps = Integer.parseInt(args[++i]);
       } else if (args[i].equals("-reduces")) {
         numReduces = Integer.parseInt(args[++i]);
       } else if (args[i].equals("-inputLines")) {
-        inputLines = Integer.parseInt(args[++i]);
+        inputLines = Long.parseLong(args[++i]);
       } else if (args[i].equals("-inputType")) {
         String s = args[++i]; 
         if (s.equalsIgnoreCase("ascending")) {
@@ -283,14 +288,15 @@ public class MRBench extends Configured implements Tool{
     Path inputFile = new Path(INPUT_DIR, "input_" + (new Random()).nextInt() + ".txt");
     generateTextFile(fs, inputFile, inputLines, inputSortOrder);
 
-    // setup test output directory
-    fs.mkdirs(BASE_DIR); 
     ArrayList<Long> execTimes = new ArrayList<Long>();
     try {
       execTimes = runJobInSequence(jobConf, numRuns);
     } finally {
-      // delete output -- should we really do this?
-      fs.delete(BASE_DIR, true);
+      // delete all generated data -- should we really do this?
+      // we don't know how much of the path was created for the run but this
+      // cleans up as much as we can
+      fs.delete(OUTPUT_DIR, true);
+      fs.delete(INPUT_DIR, true);
     }
     
     if (verbose) {

@@ -59,7 +59,7 @@ public class MemoryRMStateStore extends RMStateStore {
   @Override
   public synchronized long getAndIncrementEpoch() throws Exception {
     long currentEpoch = epoch;
-    epoch = epoch + 1;
+    epoch = nextEpoch(epoch);
     return currentEpoch;
   }
 
@@ -83,6 +83,7 @@ public class MemoryRMStateStore extends RMStateStore {
   
   @Override
   public synchronized void initInternal(Configuration conf) {
+    epoch = baseEpoch;
   }
 
   @Override
@@ -142,6 +143,19 @@ public class MemoryRMStateStore extends RMStateStore {
   }
 
   @Override
+  public synchronized void removeApplicationAttemptInternal(
+      ApplicationAttemptId appAttemptId) throws Exception {
+    ApplicationStateData appState =
+        state.getApplicationState().get(appAttemptId.getApplicationId());
+    ApplicationAttemptStateData attemptState =
+        appState.attempts.remove(appAttemptId);
+    LOG.info("Removing state for attempt: " + appAttemptId);
+    if (attemptState == null) {
+      throw new YarnRuntimeException("Application doesn't exist");
+    }
+  }
+
+  @Override
   public synchronized void removeApplicationStateInternal(
       ApplicationStateData appState) throws Exception {
     ApplicationId appId =
@@ -149,7 +163,7 @@ public class MemoryRMStateStore extends RMStateStore {
     ApplicationStateData removed = state.appState.remove(appId);
 
     if (removed == null) {
-      throw new YarnRuntimeException("Removing non-exsisting application state");
+      throw new YarnRuntimeException("Removing non-existing application state");
     }
   }
 
@@ -295,4 +309,8 @@ public class MemoryRMStateStore extends RMStateStore {
   public void removeApplication(ApplicationId removeAppId) throws Exception {
   }
 
+  @Override
+  public void fence() throws IOException {
+    // Do nothing
+  }
 }

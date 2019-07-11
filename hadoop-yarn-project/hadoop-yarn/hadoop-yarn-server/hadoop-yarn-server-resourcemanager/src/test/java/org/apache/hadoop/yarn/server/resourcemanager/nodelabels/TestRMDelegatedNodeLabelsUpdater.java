@@ -43,16 +43,13 @@ import org.junit.Test;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 
 public class TestRMDelegatedNodeLabelsUpdater extends NodeLabelTestBase {
   private YarnConfiguration conf;
   private static Map<NodeId, Set<NodeLabel>> nodeLabelsMap = Maps.newHashMap();
 
   @Before
-  public void setup() throws IOException {
+  public void setup() {
     conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.NODE_LABELS_ENABLED, true);
     conf.set(YarnConfiguration.NODELABEL_CONFIGURATION_TYPE,
@@ -60,9 +57,6 @@ public class TestRMDelegatedNodeLabelsUpdater extends NodeLabelTestBase {
     conf.setClass(YarnConfiguration.RM_NODE_LABELS_PROVIDER_CONFIG,
         DummyRMNodeLabelsMappingProvider.class,
         RMNodeLabelsMappingProvider.class);
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
   }
 
   @Test
@@ -86,19 +80,10 @@ public class TestRMDelegatedNodeLabelsUpdater extends NodeLabelTestBase {
         1000);
     MockRM rm = new MockRM(conf);
     rm.init(conf);
-    
-    rm.start();
-
-    while(!rm.getRMContext().isLeader()){
-      Thread.sleep(500);
-    }
-    rm.getRMContext().getRMDelegatedNodeLabelsUpdater().serviceStop();
-    rm.getRMContext().setRMDelegatedNodeLabelsUpdater(new RMDelegatedNodeLabelsUpdater(rm.getRMContext()));
     rm.getRMContext().getRMDelegatedNodeLabelsUpdater().nodeLabelsUpdateInterval
         = 3 * 1000;
-    rm.getRMContext().getRMDelegatedNodeLabelsUpdater().serviceInit(conf);
-    rm.getRMContext().getRMDelegatedNodeLabelsUpdater().serviceStart();
-    
+    rm.start();
+
     RMNodeLabelsManager mgr = rm.getRMContext().getNodeLabelManager();
     mgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x", "y"));
 
@@ -124,18 +109,10 @@ public class TestRMDelegatedNodeLabelsUpdater extends NodeLabelTestBase {
         RMDelegatedNodeLabelsUpdater.DISABLE_DELEGATED_NODE_LABELS_UPDATE);
     MockRM rm = new MockRM(conf);
     rm.init(conf);
-    rm.start();
-    
-    while(!rm.getRMContext().isLeader()){
-      Thread.sleep(500);
-    }
-    rm.getRMContext().getRMDelegatedNodeLabelsUpdater().serviceStop();
-    rm.getRMContext().setRMDelegatedNodeLabelsUpdater(new RMDelegatedNodeLabelsUpdater(rm.getRMContext()));
     rm.getRMContext().getRMDelegatedNodeLabelsUpdater().nodeLabelsUpdateInterval
         = 3 * 1000;
-    rm.getRMContext().getRMDelegatedNodeLabelsUpdater().serviceInit(conf);
-    rm.getRMContext().getRMDelegatedNodeLabelsUpdater().serviceStart();
-    
+    rm.start();
+
     RMNodeLabelsManager mgr = rm.getRMContext().getNodeLabelManager();
     mgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x"));
 

@@ -54,6 +54,8 @@ public class FsServerDefaults implements Writable {
   private boolean encryptDataTransfer;
   private long trashInterval;
   private DataChecksum.Type checksumType;
+  private String keyProviderUri;
+  private byte storagepolicyId;
   private boolean quotaEnabled;
 
   public FsServerDefaults() {
@@ -63,6 +65,25 @@ public class FsServerDefaults implements Writable {
       int writePacketSize, short replication, int fileBufferSize,
       boolean encryptDataTransfer, long trashInterval,
       DataChecksum.Type checksumType, boolean quotaEnabled) {
+    this(blockSize, bytesPerChecksum, writePacketSize, replication,
+        fileBufferSize, encryptDataTransfer, trashInterval, checksumType,
+        null, (byte) 0, quotaEnabled);
+  }
+
+  public FsServerDefaults(long blockSize, int bytesPerChecksum,
+      int writePacketSize, short replication, int fileBufferSize,
+      boolean encryptDataTransfer, long trashInterval,
+      DataChecksum.Type checksumType, String keyProviderUri, boolean quotaEnabled) {
+    this(blockSize, bytesPerChecksum, writePacketSize, replication,
+        fileBufferSize, encryptDataTransfer, trashInterval, checksumType,
+        keyProviderUri, (byte) 0, quotaEnabled);
+  }
+
+  public FsServerDefaults(long blockSize, int bytesPerChecksum,
+      int writePacketSize, short replication, int fileBufferSize,
+      boolean encryptDataTransfer, long trashInterval,
+      DataChecksum.Type checksumType,
+      String keyProviderUri, byte storagepolicy, boolean quotaEnabled) {
     this.blockSize = blockSize;
     this.bytesPerChecksum = bytesPerChecksum;
     this.writePacketSize = writePacketSize;
@@ -71,6 +92,8 @@ public class FsServerDefaults implements Writable {
     this.encryptDataTransfer = encryptDataTransfer;
     this.trashInterval = trashInterval;
     this.checksumType = checksumType;
+    this.keyProviderUri = keyProviderUri;
+    this.storagepolicyId = storagepolicy;
     this.quotaEnabled = quotaEnabled;
   }
 
@@ -109,6 +132,18 @@ public class FsServerDefaults implements Writable {
   public boolean getQuotaEnabled(){
     return quotaEnabled;
   }
+  
+  /* null means old style namenode.
+   * "" (empty string) means namenode is upgraded but EZ is not supported.
+   * some string means that value is the key provider.
+   */
+  public String getKeyProviderUri() {
+    return keyProviderUri;
+  }
+
+  public byte getDefaultStoragePolicyId() {
+    return storagepolicyId;
+  }
 
   // /////////////////////////////////////////
   // Writable
@@ -123,6 +158,7 @@ public class FsServerDefaults implements Writable {
     out.writeInt(fileBufferSize);
     out.writeBoolean(quotaEnabled);
     WritableUtils.writeEnum(out, checksumType);
+    out.writeByte(storagepolicyId);
   }
 
   @Override
@@ -135,5 +171,6 @@ public class FsServerDefaults implements Writable {
     fileBufferSize = in.readInt();
     quotaEnabled = in.readBoolean();
     checksumType = WritableUtils.readEnum(in, DataChecksum.Type.class);
+    storagepolicyId = in.readByte();
   }
 }

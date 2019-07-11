@@ -18,19 +18,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.TestUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSLeafQueue;
+import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -44,8 +45,9 @@ public class TestAppSchedulingInfo {
 
     FSLeafQueue queue = mock(FSLeafQueue.class);
     doReturn("test").when(queue).getQueueName();
-    AppSchedulingInfo  appSchedulingInfo = new AppSchedulingInfo(
-        appAttemptId, "test", queue, null, 0, new ResourceUsage(), new RMContextImpl());
+    AppSchedulingInfo appSchedulingInfo = new AppSchedulingInfo(appAttemptId,
+        "test", queue, null, 0, new ResourceUsage(),
+        new HashMap<String, String>(), null);
 
     appSchedulingInfo.updatePlacesBlacklistedByApp(new ArrayList<String>(),
         new ArrayList<String>());
@@ -78,7 +80,37 @@ public class TestAppSchedulingInfo {
   }
 
   @Test
-  public void testPriorityAccounting() {
+  public void testSchedulerRequestKeyOrdering() {
+    TreeSet<SchedulerRequestKey> ts = new TreeSet<>();
+    ts.add(TestUtils.toSchedulerKey(Priority.newInstance(1), 1));
+    ts.add(TestUtils.toSchedulerKey(Priority.newInstance(1), 2));
+    ts.add(TestUtils.toSchedulerKey(Priority.newInstance(0), 4));
+    ts.add(TestUtils.toSchedulerKey(Priority.newInstance(0), 3));
+    ts.add(TestUtils.toSchedulerKey(Priority.newInstance(2), 5));
+    ts.add(TestUtils.toSchedulerKey(Priority.newInstance(2), 6));
+    Iterator<SchedulerRequestKey> iter = ts.iterator();
+    SchedulerRequestKey sk = iter.next();
+    Assert.assertEquals(0, sk.getPriority().getPriority());
+    Assert.assertEquals(3, sk.getAllocationRequestId());
+    sk = iter.next();
+    Assert.assertEquals(0, sk.getPriority().getPriority());
+    Assert.assertEquals(4, sk.getAllocationRequestId());
+    sk = iter.next();
+    Assert.assertEquals(1, sk.getPriority().getPriority());
+    Assert.assertEquals(1, sk.getAllocationRequestId());
+    sk = iter.next();
+    Assert.assertEquals(1, sk.getPriority().getPriority());
+    Assert.assertEquals(2, sk.getAllocationRequestId());
+    sk = iter.next();
+    Assert.assertEquals(2, sk.getPriority().getPriority());
+    Assert.assertEquals(5, sk.getAllocationRequestId());
+    sk = iter.next();
+    Assert.assertEquals(2, sk.getPriority().getPriority());
+    Assert.assertEquals(6, sk.getAllocationRequestId());
+  }
+
+  @Test
+  public void testSchedulerKeyAccounting() {
     ApplicationId appIdImpl = ApplicationId.newInstance(0, 1);
     ApplicationAttemptId appAttemptId =
         ApplicationAttemptId.newInstance(appIdImpl, 1);
@@ -87,8 +119,8 @@ public class TestAppSchedulingInfo {
     doReturn(mock(QueueMetrics.class)).when(queue).getMetrics();
     AppSchedulingInfo  info = new AppSchedulingInfo(
         appAttemptId, "test", queue, mock(ActiveUsersManager.class), 0,
-        new ResourceUsage(), new RMContextImpl());
-    Assert.assertEquals(0, info.getPriorities().size());
+        new ResourceUsage(), new HashMap<>(), mock(RMContext.class));
+    Assert.assertEquals(0, info.getSchedulerKeys().size());
 
     Priority pri1 = Priority.newInstance(1);
     ResourceRequest req1 = ResourceRequest.newInstance(pri1,
@@ -100,40 +132,42 @@ public class TestAppSchedulingInfo {
     reqs.add(req1);
     reqs.add(req2);
     info.updateResourceRequests(reqs, false);
-    ArrayList<Priority> priorities = new ArrayList<>(info.getPriorities());
-    Assert.assertEquals(2, priorities.size());
-    Assert.assertEquals(req1.getPriority(), priorities.get(0));
-    Assert.assertEquals(req2.getPriority(), priorities.get(1));
+    ArrayList<SchedulerRequestKey> keys =
+        new ArrayList<>(info.getSchedulerKeys());
+    Assert.assertEquals(2, keys.size());
+    Assert.assertEquals(SchedulerRequestKey.create(req1), keys.get(0));
+    Assert.assertEquals(SchedulerRequestKey.create(req2), keys.get(1));
 
     // iterate to verify no ConcurrentModificationException
-    for (Priority priority: info.getPriorities()) {
-      info.allocate(NodeType.OFF_SWITCH, null, priority, req1, null);
+    for (SchedulerRequestKey schedulerKey : info.getSchedulerKeys()) {
+      info.allocate(NodeType.OFF_SWITCH, null, schedulerKey, null);
     }
-    Assert.assertEquals(1, info.getPriorities().size());
-    Assert.assertEquals(req2.getPriority(),
-        info.getPriorities().iterator().next());
+    Assert.assertEquals(1, info.getSchedulerKeys().size());
+    Assert.assertEquals(SchedulerRequestKey.create(req2),
+        info.getSchedulerKeys().iterator().next());
 
     req2 = ResourceRequest.newInstance(pri2,
         ResourceRequest.ANY, Resource.newInstance(1024, 1), 1);
     reqs.clear();
     reqs.add(req2);
     info.updateResourceRequests(reqs, false);
-    info.allocate(NodeType.OFF_SWITCH, null, req2.getPriority(), req2, null);
-    Assert.assertEquals(0, info.getPriorities().size());
+    info.allocate(NodeType.OFF_SWITCH, null, SchedulerRequestKey.create(req2),
+        null);
+    Assert.assertEquals(0, info.getSchedulerKeys().size());
 
     req1 = ResourceRequest.newInstance(pri1,
         ResourceRequest.ANY, Resource.newInstance(1024, 1), 5);
     reqs.clear();
     reqs.add(req1);
     info.updateResourceRequests(reqs, false);
-    Assert.assertEquals(1, info.getPriorities().size());
-    Assert.assertEquals(req1.getPriority(),
-        info.getPriorities().iterator().next());
+    Assert.assertEquals(1, info.getSchedulerKeys().size());
+    Assert.assertEquals(SchedulerRequestKey.create(req1),
+        info.getSchedulerKeys().iterator().next());
     req1 = ResourceRequest.newInstance(pri1,
         ResourceRequest.ANY, Resource.newInstance(1024, 1), 0);
     reqs.clear();
     reqs.add(req1);
     info.updateResourceRequests(reqs, false);
-    Assert.assertEquals(0, info.getPriorities().size());
+    Assert.assertEquals(0, info.getSchedulerKeys().size());
   }
 }

@@ -20,8 +20,8 @@ package org.apache.hadoop.net;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-/**
- * A base class that implements interface Node
+/** A base class that implements interface Node
+ * 
  */
 
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
@@ -45,7 +45,7 @@ public class NodeBase implements Node {
   
   /** Construct a node from its path
    * @param path 
-   *   a concatenation of this node's location, the path seperator, and its name 
+   *   a concatenation of this node's location, the path separator, and its name
    */
   public NodeBase(String path) {
     path = normalize(path);
@@ -112,7 +112,32 @@ public class NodeBase implements Node {
   public static String getPath(Node node) {
     return node.getNetworkLocation() + PATH_SEPARATOR_STR + node.getName();
   }
-  
+
+  /**
+   * Get the path components of a node.
+   * @param node a non-null node
+   * @return the path of a node
+   */
+  public static String[] getPathComponents(Node node) {
+    return getPath(node).split(PATH_SEPARATOR_STR);
+  }
+
+  @Override
+  public boolean equals(Object to) {
+    if (this == to) {
+      return true;
+    }
+    if (!(to instanceof NodeBase)) {
+      return false;
+    }
+    return getPath(this).equals(getPath((NodeBase)to));
+  }
+
+  @Override
+  public int hashCode() {
+    return getPath(this).hashCode();
+  }
+
   /** @return this node's path as its string representation */
   @Override
   public String toString() {

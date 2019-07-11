@@ -19,35 +19,52 @@ package org.apache.hadoop.yarn.server.nodemanager.metrics;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.source.JvmMetrics;
 import static org.apache.hadoop.test.MetricsAsserts.*;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
 
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 public class TestNodeManagerMetrics {
   static final int GiB = 1024; // MiB
 
-  @Test public void testNames() {
+  private NodeManagerMetrics metrics;
+
+  @Before
+  public void setup() {
     DefaultMetricsSystem.initialize("NodeManager");
-    NodeManagerMetrics metrics = NodeManagerMetrics.create();
+    metrics = NodeManagerMetrics.create();
+  }
+
+  @After
+  public void tearDown() {
+    DefaultMetricsSystem.shutdown();
+  }
+
+  @Test
+  public void testReferenceOfSingletonJvmMetrics()  {
+    JvmMetrics jvmMetrics = JvmMetrics.initSingleton("NodeManagerModule", null);
+    Assert.assertEquals("NodeManagerMetrics should reference the singleton" +
+        " JvmMetrics instance", jvmMetrics, metrics.getJvmMetrics());
+  }
+
+  @Test public void testNames() {
     Resource total = Records.newRecord(Resource.class);
     total.setMemorySize(8*GiB);
     total.setVirtualCores(16);
-    total.setGPUs(16);
     Resource resource = Records.newRecord(Resource.class);
     resource.setMemorySize(512); //512MiB
     resource.setVirtualCores(2);
-    resource.setGPUs(1);
     Resource largerResource = Records.newRecord(Resource.class);
     largerResource.setMemorySize(1024);
     largerResource.setVirtualCores(2);
-    largerResource.setGPUs(2);
     Resource smallerResource = Records.newRecord(Resource.class);
     smallerResource.setMemorySize(256);
     smallerResource.setVirtualCores(1);
-    smallerResource.setGPUs(1);
 
     metrics.addResource(total);
 
@@ -87,13 +104,19 @@ public class TestNodeManagerMetrics {
     // while allocatedGB is expected to be ceiled.
     // allocatedGB: 3.75GB allocated memory is shown as 4GB
     // availableGB: 4.25GB available memory is shown as 4GB
-    checkMetrics(10, 1, 1, 1, 1, 1, 4, 7, 4, 13, 3, 9);
+    checkMetrics(10, 1, 1, 1, 1, 1, 4, 7, 4, 13, 3);
+
+    // Update resource and check available resource again
+    metrics.addResource(total);
+    MetricsRecordBuilder rb = getMetrics("NodeManagerMetrics");
+    assertGauge("AvailableGB", 12, rb);
+    assertGauge("AvailableVCores", 19, rb);
   }
 
-  private void checkMetrics(int launched, int completed, int failed, int killed,
-      int initing, int running, int allocatedGB,
+  public static void checkMetrics(int launched, int completed, int failed,
+      int killed, int initing, int running, int allocatedGB,
       int allocatedContainers, int availableGB, int allocatedVCores,
-      int availableVCores, int availableGPUs) {
+      int availableVCores) {
     MetricsRecordBuilder rb = getMetrics("NodeManagerMetrics");
     assertCounter("ContainersLaunched", launched, rb);
     assertCounter("ContainersCompleted", completed, rb);
@@ -106,7 +129,6 @@ public class TestNodeManagerMetrics {
     assertGauge("AllocatedContainers", allocatedContainers, rb);
     assertGauge("AvailableGB", availableGB, rb);
     assertGauge("AvailableVCores",availableVCores, rb);
-    assertGauge("AvailableGPUs", availableGPUs, rb);
 
   }
 }

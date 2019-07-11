@@ -26,9 +26,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -40,6 +40,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.LocalResourceProto;
 import org.apache.hadoop.yarn.proto.YarnServerNodemanagerRecoveryProtos.LocalizedResourceProto;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.FileDeletionTask;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ResourceRecoveredEvent;
@@ -57,7 +58,8 @@ import com.google.common.annotations.VisibleForTesting;
 
 class LocalResourcesTrackerImpl implements LocalResourcesTracker {
 
-  static final Log LOG = LogFactory.getLog(LocalResourcesTrackerImpl.class);
+  static final Logger LOG =
+       LoggerFactory.getLogger(LocalResourcesTrackerImpl.class);
   private static final String RANDOM_DIR_REGEX = "-?\\d+";
   private static final Pattern RANDOM_DIR_PATTERN = Pattern
       .compile(RANDOM_DIR_REGEX);
@@ -113,9 +115,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
     this.useLocalCacheDirectoryManager = useLocalCacheDirectoryManager;
     if (this.useLocalCacheDirectoryManager) {
       directoryManagers =
-          new ConcurrentHashMap<Path, LocalCacheDirectoryManager>();
+          new ConcurrentHashMap<>();
       inProgressLocalResourcesMap =
-          new ConcurrentHashMap<LocalResourceRequest, Path>();
+          new ConcurrentHashMap<>();
     }
     this.conf = conf;
     this.stateStore = stateStore;
@@ -393,7 +395,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       return false;
     } else { // ResourceState is LOCALIZED or INIT
       if (ResourceState.LOCALIZED.equals(rsrc.getState())) {
-        delService.delete(getUser(), getPathToDelete(rsrc.getLocalPath()));
+        FileDeletionTask deletionTask = new FileDeletionTask(delService,
+            getUser(), getPathToDelete(rsrc.getLocalPath()), null);
+        delService.delete(deletionTask);
       }
       removeResource(rem.getRequest());
       LOG.info("Removed " + rsrc.getLocalPath() + " from localized cache");
@@ -488,12 +492,19 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       LOG.warn("Directory " + uniquePath + " already exists, " +
           "try next one.");
       if (delService != null) {
-        delService.delete(getUser(), uniquePath);
+        FileDeletionTask deletionTask = new FileDeletionTask(delService,
+            getUser(), uniquePath, null);
+        delService.delete(deletionTask);
       }
     }
 
     Path localPath = new Path(rPath, req.getPath().getName());
     LocalizedResource rsrc = localrsrc.get(req);
+    if (rsrc == null) {
+      LOG.warn("Resource " + req + " has been removed"
+          + " and will no longer be localized");
+      return null;
+    }
     rsrc.setLocalPath(localPath);
     LocalResource lr = LocalResource.newInstance(req.getResource(),
         req.getType(), req.getVisibility(), req.getSize(),

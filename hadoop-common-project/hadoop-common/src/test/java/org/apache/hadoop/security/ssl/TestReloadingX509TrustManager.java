@@ -17,14 +17,12 @@
  */
 package org.apache.hadoop.security.ssl;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 
 import com.google.common.base.Supplier;
 
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -32,14 +30,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.assertEquals;
@@ -47,7 +41,6 @@ import static org.apache.hadoop.security.ssl.KeyStoreTestUtil.createTrustStore;
 import static org.apache.hadoop.security.ssl.KeyStoreTestUtil.generateCertificate;
 import static org.apache.hadoop.security.ssl.KeyStoreTestUtil.generateKeyPair;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class TestReloadingX509TrustManager {
 
@@ -64,11 +57,6 @@ public class TestReloadingX509TrustManager {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
     base.mkdirs();
-  }
-  
-  @Before
-  public void beforeTest() {
-    KeyManagersReloaderThreadPool.getInstance(true).clearListOfTasks();
   }
 
   @Test(expected = IOException.class)
@@ -191,56 +179,8 @@ public class TestReloadingX509TrustManager {
 
       assertEquals(1, tm.getAcceptedIssuers().length);
       assertEquals(cert, tm.getAcceptedIssuers()[0]);
-  
-      TimeUnit.SECONDS.sleep(1);
-      List<ScheduledFuture> reloadTasks = KeyManagersReloaderThreadPool.getInstance(true).getListOfTasks();
-      assertEquals(1, reloadTasks.size());
-      for (ScheduledFuture task : reloadTasks) {
-        assertTrue(task.isCancelled());
-      }
-      
-      assertEquals(KeyManagersReloaderThreadPool.MAX_NUMBER_OF_RETRIES + 1, tm.getNumberOfFailures());
     } finally {
       reloaderLog.stopCapturing();
-      tm.destroy();
-    }
-  }
-
-  @Test (timeout = 30000)
-  public void testReloadWithPasswordFile() throws Exception {
-    KeyPair kp = generateKeyPair("RSA");
-    cert1 = generateCertificate("CN=Cert1", kp, 30, "SHA1withRSA");
-    cert2 = generateCertificate("CN=Cert2", kp, 30, "SHA1withRSA");
-    String truststoreLocation = BASEDIR + "/testreload.jks";
-    createTrustStore(truststoreLocation, "password", "cert1", cert1);
-
-    String passwordFileLocation = Paths.get(BASEDIR, "password_file").toString();
-    FileUtils.write(new File(passwordFileLocation), "password");
-
-    final ReloadingX509TrustManager tm =
-        new ReloadingX509TrustManager("jks", truststoreLocation, "wrong-password",
-            passwordFileLocation, 10);
-    try {
-      tm.init();
-      assertEquals(1, tm.getAcceptedIssuers().length);
-
-      // Wait so that the file modification time is different
-      Thread.sleep((tm.getReloadInterval() + 1000));
-
-      // Add another cert
-      Map<String, X509Certificate> certs = new HashMap<String, X509Certificate>();
-      certs.put("cert1", cert1);
-      certs.put("cert2", cert2);
-      FileUtils.write(new File(passwordFileLocation), "password1");
-      createTrustStore(truststoreLocation, "password1", certs);
-
-      GenericTestUtils.waitFor(new Supplier<Boolean>() {
-        @Override
-        public Boolean get() {
-          return tm.getAcceptedIssuers().length == 2;
-        }
-      }, (int) tm.getReloadInterval(), 10000);
-    } finally {
       tm.destroy();
     }
   }
@@ -259,4 +199,22 @@ public class TestReloadingX509TrustManager {
     }, reloadInterval, 10 * 1000);
   }
 
+  /** No password when accessing a trust store is legal. */
+  @Test
+  public void testNoPassword() throws Exception {
+    KeyPair kp = generateKeyPair("RSA");
+    cert1 = generateCertificate("CN=Cert1", kp, 30, "SHA1withRSA");
+    cert2 = generateCertificate("CN=Cert2", kp, 30, "SHA1withRSA");
+    String truststoreLocation = BASEDIR + "/testreload.jks";
+    createTrustStore(truststoreLocation, "password", "cert1", cert1);
+
+    final ReloadingX509TrustManager tm =
+        new ReloadingX509TrustManager("jks", truststoreLocation, null, 10);
+    try {
+      tm.init();
+      assertEquals(1, tm.getAcceptedIssuers().length);
+    } finally {
+      tm.destroy();
+    }
+  }
 }

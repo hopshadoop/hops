@@ -21,15 +21,17 @@ package org.apache.hadoop.security.token;
 import java.io.*;
 import java.util.Arrays;
 
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 import org.apache.hadoop.security.token.delegation.TestDelegationToken.TestDelegationTokenIdentifier;
 import org.apache.hadoop.security.token.delegation.TestDelegationToken.TestDelegationTokenSecretManager;
+import org.junit.Test;
 
-import junit.framework.TestCase;
+import static org.junit.Assert.*;
 
 /** Unit tests for Token */
-public class TestToken extends TestCase {
+public class TestToken {
 
   static boolean isEqual(Object a, Object b) {
     return a == null ? b == null : a.equals(b);
@@ -45,6 +47,7 @@ public class TestToken extends TestCase {
   /**
    * Test token serialization
    */
+  @Test
   public void testTokenSerialization() throws IOException {
     // Get a token
     Token<TokenIdentifier> sourceToken = new Token<TokenIdentifier>();
@@ -76,7 +79,8 @@ public class TestToken extends TestCase {
     }
   }
 
-  public static void testEncodeWritable() throws Exception {
+  @Test
+  public void testEncodeWritable() throws Exception {
     String[] values = new String[]{"", "a", "bb", "ccc", "dddd", "eeeee",
         "ffffff", "ggggggg", "hhhhhhhh", "iiiiiiiii",
         "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM" +
@@ -96,7 +100,25 @@ public class TestToken extends TestCase {
       checkUrlSafe(encode);
     }
   }
-  
+
+  /*
+   * Test decodeWritable() with null newValue string argument,
+   * should throw HadoopIllegalArgumentException.
+   */
+  @Test
+  public void testDecodeWritableArgSanityCheck() throws Exception {
+    Token<AbstractDelegationTokenIdentifier> token =
+            new Token<AbstractDelegationTokenIdentifier>();
+    try {
+      token.decodeFromUrlString(null);
+      fail("Should have thrown HadoopIllegalArgumentException");
+    }
+    catch (HadoopIllegalArgumentException e) {
+      Token.LOG.info("Test decodeWritable() sanity check success.");
+    }
+  }
+
+  @Test
   public void testDecodeIdentifier() throws IOException {
     TestDelegationTokenSecretManager secretManager =
       new TestDelegationTokenSecretManager(0, 0, 0, 0);

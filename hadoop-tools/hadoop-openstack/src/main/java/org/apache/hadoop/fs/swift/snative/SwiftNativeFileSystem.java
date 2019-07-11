@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.fs.swift.snative;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -54,8 +54,8 @@ public class SwiftNativeFileSystem extends FileSystem {
 
   /** filesystem prefix: {@value} */
   public static final String SWIFT = "swift";
-  private static final Log LOG =
-          LogFactory.getLog(SwiftNativeFileSystem.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SwiftNativeFileSystem.class);
 
   /**
    * path to user work directory for storing temporary files
@@ -201,6 +201,7 @@ public class SwiftNativeFileSystem extends FileSystem {
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public boolean isFile(Path f) throws IOException {
     try {
       FileStatus fileStatus = getFileStatus(f);
@@ -210,6 +211,7 @@ public class SwiftNativeFileSystem extends FileSystem {
     }
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public boolean isDirectory(Path f) throws IOException {
 
@@ -219,6 +221,15 @@ public class SwiftNativeFileSystem extends FileSystem {
     } catch (FileNotFoundException e) {
       return false;               // f does not exist
     }
+  }
+
+  /**
+   * Override getCononicalServiceName because we don't support token in Swift
+   */
+  @Override
+  public String getCanonicalServiceName() {
+    // Does not support Token
+    return null;
   }
 
   /**
@@ -301,7 +312,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    * creating directories until one that exists is found.
    *
    * This strategy means if a file is created in an existing directory,
-   * one quick poll sufficies.
+   * one quick poll suffices.
    *
    * There is a big assumption here: that all parent directories of an existing
    * directory also exists.
@@ -540,7 +551,7 @@ public class SwiftNativeFileSystem extends FileSystem {
    * Low-level operation to also set the block size for this operation
    * @param path       the file name to open
    * @param bufferSize the size of the buffer to be used.
-   * @param readBlockSize how big should the read blockk/buffer size be?
+   * @param readBlockSize how big should the read block/buffer size be?
    * @return the input stream
    * @throws FileNotFoundException if the file is not found
    * @throws IOException any IO problem

@@ -19,44 +19,27 @@
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 
 public class UpdatedContainerInfo {
-  private static AtomicInteger nextUCIId = new AtomicInteger(0);
-  
   private List<ContainerStatus> newlyLaunchedContainers;
   private List<ContainerStatus> completedContainers;
-  private final int uciId;
   
   public UpdatedContainerInfo() {
-    uciId = nextUCIId.incrementAndGet();
   }
 
   public UpdatedContainerInfo(List<ContainerStatus> newlyLaunchedContainers
       , List<ContainerStatus> completedContainers) {
     this.newlyLaunchedContainers = newlyLaunchedContainers;
     this.completedContainers = completedContainers;
-    uciId=nextUCIId.incrementAndGet();
   } 
 
-  public UpdatedContainerInfo(List<ContainerStatus> newlyLaunchedContainers
-      , List<ContainerStatus> completedContainers, int uciId) {
-    this.newlyLaunchedContainers = newlyLaunchedContainers;
-    this.completedContainers = completedContainers;
-    this.uciId= uciId;
-  }
-  
   public List<ContainerStatus> getNewlyLaunchedContainers() {
     return this.newlyLaunchedContainers;
   }
 
   public List<ContainerStatus> getCompletedContainers() {
     return this.completedContainers;
-  }
-
-  public int getUciId() {
-    return uciId;
   }
 }

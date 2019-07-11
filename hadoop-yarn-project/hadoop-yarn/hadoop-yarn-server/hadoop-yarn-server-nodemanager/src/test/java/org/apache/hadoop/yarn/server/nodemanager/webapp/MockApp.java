@@ -35,22 +35,23 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 public class MockApp implements Application {
 
   final String user;
-  final String userFolder;
   final ApplicationId appId;
   Map<ContainerId, Container> containers = new HashMap<ContainerId, Container>();
   ApplicationState appState;
   Application app;
+  private String flowName;
+  private String flowVersion;
+  private long flowRunId;
   int x509Version;
   long jwtExpiration;
 
   public MockApp(int uniqId) {
-    this("mockUser", 1234, uniqId, "mockUserFolder");
+    this("mockUser", 1234, uniqId);
   }
 
-  public MockApp(String user, long clusterTimeStamp, int uniqId, String userFolder) {
+  public MockApp(String user, long clusterTimeStamp, int uniqId) {
     super();
     this.user = user;
-    this.userFolder = userFolder;
     // Add an application and the corresponding containers
     RecordFactory recordFactory = RecordFactoryProvider
         .getRecordFactory(new Configuration());
@@ -61,16 +62,20 @@ public class MockApp implements Application {
     this.jwtExpiration = -1L;
   }
 
+  public MockApp(String user, long clusterTimeStamp, int uniqId,
+      String flowName, String flowVersion, long flowRunId) {
+    this(user, clusterTimeStamp, uniqId);
+    this.flowName = flowName;
+    this.flowVersion = flowVersion;
+    this.flowRunId = flowRunId;
+  }
+
   public void setState(ApplicationState state) {
     this.appState = state;
   }
 
   public String getUser() {
     return user;
-  }
-
-  public String getUserFolder() {
-    return userFolder;
   }
 
   public Map<ContainerId, Container> getContainers() {
@@ -85,6 +90,20 @@ public class MockApp implements Application {
     return appState;
   }
 
+  public void handle(ApplicationEvent event) {}
+
+  public String getFlowName() {
+    return flowName;
+  }
+
+  public String getFlowVersion() {
+    return flowVersion;
+  }
+
+  public long getFlowRunId() {
+    return flowRunId;
+  }
+  
   @Override
   public int getX509Version() {
     return x509Version;
@@ -104,7 +123,4 @@ public class MockApp implements Application {
   public void setJWTExpiration(long jwtExpiration) {
     this.jwtExpiration = jwtExpiration;
   }
-  
-  public void handle(ApplicationEvent event) {}
-
 }

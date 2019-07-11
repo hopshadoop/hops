@@ -22,8 +22,6 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.ipc.metrics.RetryCacheMetrics;
 import org.apache.hadoop.util.LightWeightCache;
@@ -32,6 +30,8 @@ import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Maintains a cache of non-idempotent requests that have been successfully
@@ -44,7 +44,7 @@ import com.google.common.base.Preconditions;
  */
 @InterfaceAudience.Private
 public class RetryCache {
-  public static final Log LOG = LogFactory.getLog(RetryCache.class);
+  public static final Logger LOG = LoggerFactory.getLogger(RetryCache.class);
   protected final RetryCacheMetrics retryCacheMetrics;
   protected static final int MAX_CAPACITY = 16;
 
@@ -55,9 +55,9 @@ public class RetryCache {
     /**
      * Processing state of the requests
      */
-    public final static byte INPROGRESS = 0;
-    public final static byte SUCCESS = 1;
-    public final static byte FAILED = 2;
+    public static byte INPROGRESS = 0;
+    protected static byte SUCCESS = 1;
+    public static byte FAILED = 2;
 
     protected byte state = INPROGRESS;
     
@@ -65,7 +65,7 @@ public class RetryCache {
     protected final long clientIdMsb; // Most signficant bytes
     protected final long clientIdLsb; // Least significant bytes
     protected final byte[] clientIdByte;
-        
+    
     protected final int callId;
     private final long expirationTime;
     private LightWeightGSet.LinkedElement next;

@@ -29,7 +29,7 @@ import org.apache.hadoop.classification.InterfaceStability.Stable;
 public enum YarnApplicationState {
   /** Application which was just created. */
   NEW,
-  
+
   /** Application which is waiting for its security material (X.509 certificates, JWT) to be generated. */
   GENERATING_SECURITY_MATERIAL,
 

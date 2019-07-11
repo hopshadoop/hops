@@ -23,10 +23,8 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.concurrent.TimeoutException;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -42,6 +40,9 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStartedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
@@ -60,10 +61,6 @@ public class TestResourceManager {
   @Before
   public void setUp() throws Exception {
     Configuration conf = new YarnConfiguration();
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
-
     UserGroupInformation.setConfiguration(conf);
     resourceManager = new ResourceManager();
     resourceManager.init(conf);
@@ -92,8 +89,9 @@ public class TestResourceManager {
   }
 
   @Test
-  public void testResourceAllocation() throws IOException,
-      YarnException, InterruptedException {
+  public void testResourceAllocation()
+      throws IOException, YarnException, InterruptedException,
+      TimeoutException {
     LOG.info("--- START: testResourceAllocation ---");
         
     final int memory = 4 * 1024;
@@ -111,6 +109,14 @@ public class TestResourceManager {
       registerNode(host2, 1234, 2345, NetworkTopology.DEFAULT_RACK, 
           Resources.createResource(memory/2, vcores/2));
 
+    // nodes should be in RUNNING state
+    RMNodeImpl node1 = (RMNodeImpl) resourceManager.getRMContext().getRMNodes().get(
+        nm1.getNodeId());
+    RMNodeImpl node2 = (RMNodeImpl) resourceManager.getRMContext().getRMNodes().get(
+        nm2.getNodeId());
+    node1.handle(new RMNodeStartedEvent(nm1.getNodeId(), null, null));
+    node2.handle(new RMNodeStartedEvent(nm2.getNodeId(), null, null));
+
     // Submit an application
     Application application = new Application("user1", resourceManager);
     application.submit();
@@ -121,8 +127,7 @@ public class TestResourceManager {
     // Application resource requirements
     final int memory1 = 1024;
     Resource capability1 = Resources.createResource(memory1, 1);
-    Priority priority1 = 
-      org.apache.hadoop.yarn.server.resourcemanager.resource.Priority.create(1);
+    Priority priority1 = Priority.newInstance(1);
     application.addResourceRequestSpec(priority1, capability1);
     
     Task t1 = new Task(application, priority1, new String[] {host1, host2});
@@ -130,8 +135,7 @@ public class TestResourceManager {
     
     final int memory2 = 2048;
     Resource capability2 = Resources.createResource(memory2, 1);
-    Priority priority0 = 
-        org.apache.hadoop.yarn.server.resourcemanager.resource.Priority.create(0); // higher
+    Priority priority0 = Priority.newInstance(0); // higher
     application.addResourceRequestSpec(priority0, capability2);
     
     // Send resource requests to the scheduler
@@ -139,6 +143,7 @@ public class TestResourceManager {
 
    // Send a heartbeat to kick the tires on the Scheduler
     nodeUpdate(nm1);
+    ((AbstractYarnScheduler)resourceManager.getResourceScheduler()).update();
     
     // Get allocations from the scheduler
     application.schedule();

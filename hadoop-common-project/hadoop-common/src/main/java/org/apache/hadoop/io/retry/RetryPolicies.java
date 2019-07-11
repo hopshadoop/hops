@@ -32,16 +32,19 @@ import java.util.Map.Entry;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.ipc.NotALeaderException;
+import javax.security.sasl.SaslException;
+
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
+import org.ietf.jgss.GSSException;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ipc.NotALeaderException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -50,7 +53,7 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public class RetryPolicies {
   
-  public static final Log LOG = LogFactory.getLog(RetryPolicies.class);
+  public static final Logger LOG = LoggerFactory.getLogger(RetryPolicies.class);
   
   /**
    * <p>
@@ -640,12 +643,12 @@ public class RetryPolicies {
    */
   static class FailoverOnNetworkExceptionRetry implements RetryPolicy {
     
-    protected RetryPolicy fallbackPolicy;
-    protected int maxFailovers;
-    protected int maxRetries;
-    protected long delayMillis;
-    protected long maxDelayBase;
-    protected Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap;
+    private RetryPolicy fallbackPolicy;
+    private int maxFailovers;
+    private int maxRetries;
+    private long delayMillis;
+    private long maxDelayBase;
+     protected Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap;
     
     public FailoverOnNetworkExceptionRetry(RetryPolicy fallbackPolicy,
         int maxFailovers) {
@@ -684,7 +687,7 @@ public class RetryPolicies {
     @Override
     public RetryAction shouldRetry(Exception e, int retries,
         int failovers, boolean isIdempotentOrAtMostOnce) throws Exception {
-
+      
       RetryAction action = checkRetryCount(e , retries, failovers);
       if(action != null){
         return action;
@@ -698,7 +701,7 @@ public class RetryPolicies {
           }
         }
       }
-
+      
       if (e instanceof ConnectException ||
           e instanceof EOFException ||
           e instanceof NoRouteToHostException ||
@@ -719,7 +722,8 @@ public class RetryPolicies {
       } else if (e instanceof SocketException
           || (e instanceof IOException && !(e instanceof RemoteException))) {
         if (isIdempotentOrAtMostOnce) {
-          return RetryAction.FAILOVER_AND_RETRY;
+          return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+              getFailoverOrRetrySleepTime(retries));
         } else {
           return new RetryAction(RetryAction.RetryDecision.FAIL, 0,
               "the invoked method is not idempotent, and unable to determine "
@@ -730,19 +734,22 @@ public class RetryPolicies {
               isIdempotentOrAtMostOnce);
       }
     }
-
-    protected RetryAction checkRetryCount(Exception e, int retries, int failovers)
-            throws Exception {
+    
+    protected RetryAction checkRetryCount(Exception e, int retries, int failovers) throws Exception {
       if (failovers >= maxFailovers) {
         return new RetryAction(RetryAction.RetryDecision.FAIL, 0,
-                "failovers (" + failovers + ") exceeded maximum allowed ("
-                        + maxFailovers + ")");
+            "failovers (" + failovers + ") exceeded maximum allowed ("
+            + maxFailovers + ")");
       }
       if (retries - failovers > maxRetries) {
         return new RetryAction(RetryAction.RetryDecision.FAIL, 0, "retries ("
-                + retries + ") exceeded maximum allowed (" + maxRetries + ")");
+            + retries + ") exceeded maximum allowed (" + maxRetries + ")");
       }
 
+      if (isSaslFailure(e)) {
+          return new RetryAction(RetryAction.RetryDecision.FAIL, 0,
+                  "SASL failure");
+      }
       return null;
     }
   }
@@ -769,17 +776,17 @@ public class RetryPolicies {
     }
 
     @Override
-    public RetryAction shouldRetry(Exception e, int retries,
+    public RetryPolicy.RetryAction shouldRetry(Exception e, int retries,
                                    int failovers,
                                    boolean isIdempotentOrAtMostOnce) throws Exception {
 
-      RetryAction action = checkRetryCount(e , retries, failovers);
+      RetryPolicy.RetryAction action = checkRetryCount(e , retries, failovers);
       if(action != null){
         return action;
       }
 
       if (isWrappedNotALeaderException(e)) {
-        return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+        return new RetryPolicy.RetryAction(RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
                 getFailoverOrRetrySleepTime(failovers));
       }
 
@@ -797,7 +804,7 @@ public class RetryPolicies {
    * @param cap value at which to cap the base sleep time
    * @return an amount of time to sleep
    */
-  public static long calculateExponentialTime(long time, int retries,
+  private static long calculateExponentialTime(long time, int retries,
       long cap) {
     long baseTime = Math.min(time * (1L << retries), cap);
     return (long) (baseTime * (ThreadLocalRandom.current().nextDouble() + 0.5));
@@ -806,7 +813,7 @@ public class RetryPolicies {
   private static long calculateExponentialTime(long time, int retries) {
     return calculateExponentialTime(time, retries, Long.MAX_VALUE);
   }
-  
+
   private static boolean isWrappedStandbyException(Exception e) {
     if (!(e instanceof RemoteException)) {
       return false;
@@ -814,6 +821,18 @@ public class RetryPolicies {
     Exception unwrapped = ((RemoteException)e).unwrapRemoteException(
         StandbyException.class);
     return unwrapped instanceof StandbyException;
+  }
+
+  private static boolean isSaslFailure(Exception e) {
+      Throwable current = e;
+      do {
+          if (current instanceof SaslException) {
+            return true;
+          }
+          current = current.getCause();
+      } while (current != null);
+
+      return false;
   }
   
   static RetriableException getWrappedRetriableException(Exception e) {
@@ -825,7 +844,7 @@ public class RetryPolicies {
     return unwrapped instanceof RetriableException ? 
         (RetriableException) unwrapped : null;
   }
-
+  
   private static boolean isWrappedNotALeaderException(Exception e) {
     if (!(e instanceof RemoteException)) {
       return false;
@@ -841,5 +860,5 @@ public class RetryPolicies {
     }
     return wrappedException.getName().equals(((RemoteException)wrapper).getClassName());
   }
-
+  
 }

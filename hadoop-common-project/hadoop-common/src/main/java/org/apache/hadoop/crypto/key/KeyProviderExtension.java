@@ -44,11 +44,11 @@ public abstract class KeyProviderExtension
     this.keyProvider = keyProvider;
     this.extension = extensions;
   }
-
+  
   protected E getExtension() {
     return extension;
   }
-
+  
   protected KeyProvider getKeyProvider() {
     return keyProvider;
   }
@@ -115,6 +115,11 @@ public abstract class KeyProviderExtension
   public KeyVersion rollNewVersion(String name, byte[] material)
       throws IOException {
     return keyProvider.rollNewVersion(name, material);
+  }
+
+  @Override
+  public void invalidateCache(String name) throws IOException {
+    keyProvider.invalidateCache(name);
   }
 
   @Override

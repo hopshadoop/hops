@@ -1,6 +1,4 @@
 /*
- * Copyright 2012 The Apache Software Foundation.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,12 +13,13 @@
  */
 package org.apache.hadoop.maven.plugin.versioninfo;
 
+import java.io.Serializable;
+import java.util.Locale;
 import org.apache.hadoop.maven.plugin.util.Exec;
 import org.apache.hadoop.maven.plugin.util.FileSetUtils;
 import org.apache.maven.model.FileSet;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
@@ -49,7 +48,7 @@ import java.util.TimeZone;
 @Mojo(name="version-info")
 public class VersionInfoMojo extends AbstractMojo {
 
-  @Parameter(defaultValue="${project}")
+  @Parameter(defaultValue="${project}", readonly=true)
   private MavenProject project;
 
   @Parameter(required=true)
@@ -73,10 +72,7 @@ public class VersionInfoMojo extends AbstractMojo {
   @Parameter(defaultValue="git")
   private String gitCommand;
 
-  @Parameter(defaultValue="svn")
-  private String svnCommand;
-
-  private enum SCM {NONE, SVN, GIT}
+  private enum SCM {NONE, GIT}
 
   @Override
   public void execute() throws MojoExecutionException {
@@ -105,7 +101,7 @@ public class VersionInfoMojo extends AbstractMojo {
   private List<String> scmOut;
 
   /**
-   * Determines which SCM is in use (Subversion, git, or none) and captures
+   * Determines which SCM is in use (git or none) and captures
    * output of the SCM command for later parsing.
    * 
    * @return SCM in use for this build
@@ -115,65 +111,29 @@ public class VersionInfoMojo extends AbstractMojo {
     Exec exec = new Exec(this);
     SCM scm = SCM.NONE;
     scmOut = new ArrayList<String>();
-    int ret = exec.run(Arrays.asList(svnCommand, "info"), scmOut);
+    int ret;
+    ret = exec.run(Arrays.asList(gitCommand, "branch"), scmOut);
     if (ret == 0) {
-      scm = SCM.SVN;
-    } else {
-      ret = exec.run(Arrays.asList(gitCommand, "branch"), scmOut);
-      if (ret == 0) {
-        ret = exec.run(Arrays.asList(gitCommand, "remote", "-v"), scmOut);
+      ret = exec.run(Arrays.asList(gitCommand, "remote", "-v"), scmOut);
+      if (ret != 0) {
+        scm = SCM.NONE;
+        scmOut = null;
+      } else {
+        ret = exec.run(Arrays.asList(gitCommand, "log", "-n", "1"), scmOut);
         if (ret != 0) {
           scm = SCM.NONE;
           scmOut = null;
         } else {
-          ret = exec.run(Arrays.asList(gitCommand, "log", "-n", "1"), scmOut);
-          if (ret != 0) {
-            scm = SCM.NONE;
-            scmOut = null;
-          } else {
-            scm = SCM.GIT;
-          }
+          scm = SCM.GIT;
         }
       }
     }
+
     if (scmOut != null) {
       getLog().debug(scmOut.toString());
     }
     getLog().info("SCM: " + scm);
     return scm;
-  }
-
-  /**
-   * Return URI and branch of Subversion repository.
-   * 
-   * @param str String Subversion info output containing URI and branch
-   * @return String[] containing URI and branch
-   */
-  private String[] getSvnUriInfo(String str) {
-    String[] res = new String[]{"Unknown", "Unknown"};
-    try {
-      String path = str;
-      int index = path.indexOf("trunk");
-      if (index > -1) {
-        res[0] = path.substring(0, index - 1);
-        res[1] = "trunk";
-      } else {
-        index = path.indexOf("branches");
-        if (index > -1) {
-          res[0] = path.substring(0, index - 1);
-          int branchIndex = index + "branches".length() + 1;
-          index = path.indexOf("/", branchIndex);
-          if (index > -1) {
-            res[1] = path.substring(branchIndex, index);
-          } else {
-            res[1] = path.substring(branchIndex);
-          }
-        }
-      }
-    } catch (Exception ex) {
-      getLog().warn("Could not determine URI & branch from SVN URI: " + str);
-    }
-    return res;
   }
 
   /**
@@ -185,15 +145,6 @@ public class VersionInfoMojo extends AbstractMojo {
   private String getSCMUri(SCM scm) {
     String uri = "Unknown";
     switch (scm) {
-      case SVN:
-        for (String s : scmOut) {
-          if (s.startsWith("URL:")) {
-            uri = s.substring(4).trim();
-            uri = getSvnUriInfo(uri)[0];
-            break;
-          }
-        }
-        break;
       case GIT:
         for (String s : scmOut) {
           if (s.startsWith("origin") && s.endsWith("(fetch)")) {
@@ -216,14 +167,6 @@ public class VersionInfoMojo extends AbstractMojo {
   private String getSCMCommit(SCM scm) {
     String commit = "Unknown";
     switch (scm) {
-      case SVN:
-        for (String s : scmOut) {
-          if (s.startsWith("Revision:")) {
-            commit = s.substring("Revision:".length());
-            break;
-          }
-        }
-        break;
       case GIT:
         for (String s : scmOut) {
           if (s.startsWith("commit")) {
@@ -245,15 +188,6 @@ public class VersionInfoMojo extends AbstractMojo {
   private String getSCMBranch(SCM scm) {
     String branch = "Unknown";
     switch (scm) {
-      case SVN:
-        for (String s : scmOut) {
-          if (s.startsWith("URL:")) {
-            branch = s.substring(4).trim();
-            branch = getSvnUriInfo(branch)[1];
-            break;
-          }
-        }
-        break;
       case GIT:
         for (String s : scmOut) {
           if (s.startsWith("*")) {
@@ -313,6 +247,20 @@ public class VersionInfoMojo extends AbstractMojo {
     return sb.toString();
   }
 
+  static class MD5Comparator implements Comparator<File>, Serializable {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public int compare(File lhs, File rhs) {
+      return normalizePath(lhs).compareTo(normalizePath(rhs));
+    }
+
+    private String normalizePath(File file) {
+      return file.getPath().toUpperCase(Locale.ENGLISH)
+          .replaceAll("\\\\", "/");
+    }
+  }
+
   /**
    * Computes and returns an MD5 checksum of the contents of all files in the
    * input Maven FileSet.
@@ -325,16 +273,7 @@ public class VersionInfoMojo extends AbstractMojo {
     // File order of MD5 calculation is significant.  Sorting is done on
     // unix-format names, case-folded, in order to get a platform-independent
     // sort and calculate the same MD5 on all platforms.
-    Collections.sort(files, new Comparator<File>() {
-      @Override
-      public int compare(File lhs, File rhs) {
-        return normalizePath(lhs).compareTo(normalizePath(rhs));
-      }
-
-      private String normalizePath(File file) {
-        return file.getPath().toUpperCase().replaceAll("\\\\", "/");
-      }
-    });
+    Collections.sort(files, new MD5Comparator());
     byte[] md5 = computeMD5(files);
     String md5str = byteArrayToString(md5);
     getLog().info("Computed MD5: " + md5str);

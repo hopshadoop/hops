@@ -270,7 +270,7 @@ import org.apache.log4j.AsyncAppender;
 import org.apache.log4j.Logger;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.mortbay.util.ajax.JSON;
+import org.eclipse.jetty.util.ajax.JSON;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;

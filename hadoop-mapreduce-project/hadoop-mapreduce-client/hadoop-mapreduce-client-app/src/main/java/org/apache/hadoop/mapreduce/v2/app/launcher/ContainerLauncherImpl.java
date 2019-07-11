@@ -18,12 +18,8 @@
 
 package org.apache.hadoop.mapreduce.v2.app.launcher;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,13 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.hops.security.HopsUtil;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.mapred.ShuffleHandler;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
@@ -51,11 +41,10 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerLaunched
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.concurrent.HadoopThreadPoolExecutor;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
@@ -67,10 +56,20 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.security.HopsUtil;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for launching of containers.
@@ -78,7 +77,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 public class ContainerLauncherImpl extends AbstractService implements
     ContainerLauncher {
 
-  static final Log LOG = LogFactory.getLog(ContainerLauncherImpl.class);
+  static final Logger LOG =
+      LoggerFactory.getLogger(ContainerLauncherImpl.class);
 
   private ConcurrentHashMap<ContainerId, Container> containers = 
     new ConcurrentHashMap<ContainerId, Container>(); 
@@ -91,7 +91,7 @@ public class ContainerLauncherImpl extends AbstractService implements
       new LinkedBlockingQueue<ContainerLauncherEvent>();
   private final AtomicBoolean stopped;
   private ContainerManagementProtocolProxy cmProxy;
-  
+
   private String certificatePassword = null;
 
   private Container getContainer(ContainerLauncherEvent event) {
@@ -115,7 +115,7 @@ public class ContainerLauncherImpl extends AbstractService implements
     }
   }
   
-  private static enum ContainerState {
+  private enum ContainerState {
     PREP, FAILED, RUNNING, DONE, KILLED_BEFORE_LAUNCH
   }
 
@@ -213,7 +213,7 @@ public class ContainerLauncherImpl extends AbstractService implements
     public void kill() {
       kill(false);
     }
-  
+
     private void setupCryptoMaterial(StartContainersRequest request) throws IOException {
       if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
           CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
@@ -331,7 +331,7 @@ public class ContainerLauncherImpl extends AbstractService implements
         "ContainerLauncher #%d").setDaemon(true).build();
 
     // Start with a default core-pool size of 10 and change it dynamically.
-    launcherPool = new ThreadPoolExecutor(initialPoolSize,
+    launcherPool = new HadoopThreadPoolExecutor(initialPoolSize,
         Integer.MAX_VALUE, 1, TimeUnit.HOURS,
         new LinkedBlockingQueue<Runnable>(),
         tf);

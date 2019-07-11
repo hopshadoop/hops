@@ -35,8 +35,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
@@ -48,6 +46,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
+import org.apache.hadoop.mapreduce.v2.app.MRAppMaster;
 import org.apache.hadoop.mapreduce.v2.app.client.ClientService;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobCounterUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobDiagnosticsUpdateEvent;
@@ -59,6 +58,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdate
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptKillEvent;
+import org.apache.hadoop.mapreduce.v2.app.rm.preemption.AMPreemptionPolicy;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.util.StringUtils;
@@ -71,6 +71,7 @@ import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
+import org.apache.hadoop.yarn.api.records.PreemptionMessage;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.Token;
@@ -87,6 +88,8 @@ import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Allocates the container from the ResourceManager scheduler.
@@ -94,7 +97,7 @@ import com.google.common.annotations.VisibleForTesting;
 public class RMContainerAllocator extends RMContainerRequestor
     implements ContainerAllocator {
 
-  static final Log LOG = LogFactory.getLog(RMContainerAllocator.class);
+  static final Logger LOG = LoggerFactory.getLogger(RMContainerAllocator.class);
   
   public static final 
   float DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART = 0.05f;
@@ -102,6 +105,7 @@ public class RMContainerAllocator extends RMContainerRequestor
   static final Priority PRIORITY_FAST_FAIL_MAP;
   static final Priority PRIORITY_REDUCE;
   static final Priority PRIORITY_MAP;
+  static final Priority PRIORITY_OPPORTUNISTIC_MAP;
 
   @VisibleForTesting
   public static final String RAMPDOWN_DIAGNOSTIC = "Reducer preempted "
@@ -117,6 +121,10 @@ public class RMContainerAllocator extends RMContainerRequestor
     PRIORITY_REDUCE.setPriority(10);
     PRIORITY_MAP = RecordFactoryProvider.getRecordFactory(null).newRecordInstance(Priority.class);
     PRIORITY_MAP.setPriority(20);
+    PRIORITY_OPPORTUNISTIC_MAP =
+        RecordFactoryProvider.getRecordFactory(null).newRecordInstance(
+            Priority.class);
+    PRIORITY_OPPORTUNISTIC_MAP.setPriority(19);
   }
   
   /*
@@ -143,10 +151,10 @@ public class RMContainerAllocator extends RMContainerRequestor
 
   //holds information about the assigned containers to task attempts
   private final AssignedRequests assignedRequests;
-  
+
   //holds scheduled requests to be fulfilled by RM
   private final ScheduledRequests scheduledRequests = new ScheduledRequests();
-  
+
   private int containersAllocated = 0;
   private int containersReleased = 0;
   private int hostLocalAssigned = 0;
@@ -174,6 +182,8 @@ public class RMContainerAllocator extends RMContainerRequestor
   private long retrystartTime;
   private Clock clock;
 
+  private final AMPreemptionPolicy preemptionPolicy;
+
   @VisibleForTesting
   protected BlockingQueue<ContainerAllocatorEvent> eventQueue
     = new LinkedBlockingQueue<ContainerAllocatorEvent>();
@@ -184,8 +194,10 @@ public class RMContainerAllocator extends RMContainerRequestor
 
   private String reduceNodeLabelExpression;
 
-  public RMContainerAllocator(ClientService clientService, AppContext context) {
+  public RMContainerAllocator(ClientService clientService, AppContext context,
+      AMPreemptionPolicy preemptionPolicy) {
     super(clientService, context);
+    this.preemptionPolicy = preemptionPolicy;
     this.stopped = new AtomicBoolean(false);
     this.clock = context.getClock();
     this.assignedRequests = createAssignedRequests();
@@ -225,6 +237,11 @@ public class RMContainerAllocator extends RMContainerRequestor
     // Init startTime to current time. If all goes well, it will be reset after
     // first attempt to contact RM.
     retrystartTime = System.currentTimeMillis();
+    this.scheduledRequests.setNumOpportunisticMapsPercent(
+        conf.getInt(MRJobConfig.MR_NUM_OPPORTUNISTIC_MAPS_PERCENT,
+            MRJobConfig.DEFAULT_MR_NUM_OPPORTUNISTIC_MAPS_PERCENT));
+    LOG.info(this.scheduledRequests.getNumOpportunisticMapsPercent() +
+        "% of the mappers will be scheduled using OPPORTUNISTIC containers");
   }
 
   @Override
@@ -355,80 +372,20 @@ public class RMContainerAllocator extends RMContainerRequestor
     }
   }
 
-  @SuppressWarnings({ "unchecked" })
   protected synchronized void handleEvent(ContainerAllocatorEvent event) {
     recalculateReduceSchedule = true;
     if (event.getType() == ContainerAllocator.EventType.CONTAINER_REQ) {
       ContainerRequestEvent reqEvent = (ContainerRequestEvent) event;
-      JobId jobId = getJob().getID();
-      Resource supportedMaxContainerCapability = getMaxContainerCapability();
-      if (reqEvent.getAttemptID().getTaskId().getTaskType().equals(TaskType.MAP)) {
-        if (mapResourceRequest.equals(Resources.none())) {
-          mapResourceRequest = reqEvent.getCapability();
-          eventHandler.handle(new JobHistoryEvent(jobId,
-            new NormalizedResourceEvent(
-              org.apache.hadoop.mapreduce.TaskType.MAP, mapResourceRequest
-                .getMemorySize())));
-          LOG.info("mapResourceRequest:" + mapResourceRequest);
-          if (mapResourceRequest.getMemorySize() > supportedMaxContainerCapability
-            .getMemorySize()
-              || mapResourceRequest.getVirtualCores() > supportedMaxContainerCapability
-                .getVirtualCores()) {
-            String diagMsg =
-                "MAP capability required is more than the supported "
-                    + "max container capability in the cluster. Killing the Job. mapResourceRequest: "
-                    + mapResourceRequest + " maxContainerCapability:"
-                    + supportedMaxContainerCapability;
-            LOG.info(diagMsg);
-            eventHandler.handle(new JobDiagnosticsUpdateEvent(jobId, diagMsg));
-            eventHandler.handle(new JobEvent(jobId, JobEventType.JOB_KILL));
-          }
-        }
-        // set the resources
-        reqEvent.getCapability().setMemorySize(mapResourceRequest.getMemorySize());
-        reqEvent.getCapability().setVirtualCores(
-          mapResourceRequest.getVirtualCores());
-        scheduledRequests.addMap(reqEvent);//maps are immediately scheduled
+      boolean isMap = reqEvent.getAttemptID().getTaskId().getTaskType().
+          equals(TaskType.MAP);
+      if (isMap) {
+        handleMapContainerRequest(reqEvent);
       } else {
-        if (reduceResourceRequest.equals(Resources.none())) {
-          reduceResourceRequest = reqEvent.getCapability();
-          eventHandler.handle(new JobHistoryEvent(jobId,
-            new NormalizedResourceEvent(
-              org.apache.hadoop.mapreduce.TaskType.REDUCE,
-              reduceResourceRequest.getMemorySize())));
-          LOG.info("reduceResourceRequest:" + reduceResourceRequest);
-          if (reduceResourceRequest.getMemorySize() > supportedMaxContainerCapability
-            .getMemorySize()
-              || reduceResourceRequest.getVirtualCores() > supportedMaxContainerCapability
-                .getVirtualCores()) {
-            String diagMsg =
-                "REDUCE capability required is more than the "
-                    + "supported max container capability in the cluster. Killing the "
-                    + "Job. reduceResourceRequest: " + reduceResourceRequest
-                    + " maxContainerCapability:"
-                    + supportedMaxContainerCapability;
-            LOG.info(diagMsg);
-            eventHandler.handle(new JobDiagnosticsUpdateEvent(jobId, diagMsg));
-            eventHandler.handle(new JobEvent(jobId, JobEventType.JOB_KILL));
-          }
-        }
-        // set the resources
-        reqEvent.getCapability().setMemorySize(reduceResourceRequest.getMemorySize());
-        reqEvent.getCapability().setVirtualCores(
-          reduceResourceRequest.getVirtualCores());
-        if (reqEvent.getEarlierAttemptFailed()) {
-          //add to the front of queue for fail fast
-          pendingReduces.addFirst(new ContainerRequest(reqEvent,
-              PRIORITY_REDUCE, reduceNodeLabelExpression));
-        } else {
-          pendingReduces.add(new ContainerRequest(reqEvent, PRIORITY_REDUCE,
-              reduceNodeLabelExpression));
-          //reduces are added to pending and are slowly ramped up
-        }
+        handleReduceContainerRequest(reqEvent);
       }
       
     } else if (
-        event.getType() == ContainerAllocator.EventType.CONTAINER_DEALLOCATE) {
+      event.getType() == ContainerAllocator.EventType.CONTAINER_DEALLOCATE) {
   
       LOG.info("Processing the event " + event.toString());
 
@@ -449,11 +406,112 @@ public class RMContainerAllocator extends RMContainerRequestor
         LOG.error("Could not deallocate container for task attemptId " + 
             aId);
       }
+      preemptionPolicy.handleCompletedContainer(event.getAttemptID());
     } else if (
         event.getType() == ContainerAllocator.EventType.CONTAINER_FAILED) {
       ContainerFailedEvent fEv = (ContainerFailedEvent) event;
       String host = getHost(fEv.getContMgrAddress());
       containerFailedOnHost(host);
+      // propagate failures to preemption policy to discard checkpoints for
+      // failed tasks
+      preemptionPolicy.handleFailedContainer(event.getAttemptID());
+    }
+  }
+
+  @SuppressWarnings({ "unchecked" })
+  private void handleReduceContainerRequest(ContainerRequestEvent reqEvent) {
+    assert(reqEvent.getAttemptID().getTaskId().getTaskType().equals(
+        TaskType.REDUCE));
+
+    Resource supportedMaxContainerCapability = getMaxContainerCapability();
+    JobId jobId = getJob().getID();
+
+    if (reduceResourceRequest.equals(Resources.none())) {
+      reduceResourceRequest = reqEvent.getCapability();
+      eventHandler.handle(new JobHistoryEvent(jobId,
+          new NormalizedResourceEvent(
+              org.apache.hadoop.mapreduce.TaskType.REDUCE,
+              reduceResourceRequest.getMemorySize())));
+      LOG.info("reduceResourceRequest:" + reduceResourceRequest);
+    }
+
+    boolean reduceContainerRequestAccepted = true;
+    if (reduceResourceRequest.getMemorySize() >
+        supportedMaxContainerCapability.getMemorySize()
+        ||
+        reduceResourceRequest.getVirtualCores() >
+        supportedMaxContainerCapability.getVirtualCores()) {
+      reduceContainerRequestAccepted = false;
+    }
+
+    if (reduceContainerRequestAccepted) {
+      // set the resources
+      reqEvent.getCapability().setVirtualCores(
+          reduceResourceRequest.getVirtualCores());
+      reqEvent.getCapability().setMemorySize(
+          reduceResourceRequest.getMemorySize());
+
+      if (reqEvent.getEarlierAttemptFailed()) {
+        //previously failed reducers are added to the front for fail fast
+        pendingReduces.addFirst(new ContainerRequest(reqEvent,
+            PRIORITY_REDUCE, reduceNodeLabelExpression));
+      } else {
+        //reduces are added to pending queue and are slowly ramped up
+        pendingReduces.add(new ContainerRequest(reqEvent,
+            PRIORITY_REDUCE, reduceNodeLabelExpression));
+      }
+    } else {
+      String diagMsg = "REDUCE capability required is more than the " +
+          "supported max container capability in the cluster. Killing" +
+          " the Job. reduceResourceRequest: " + reduceResourceRequest +
+          " maxContainerCapability:" + supportedMaxContainerCapability;
+      LOG.info(diagMsg);
+      eventHandler.handle(new JobDiagnosticsUpdateEvent(jobId, diagMsg));
+      eventHandler.handle(new JobEvent(jobId, JobEventType.JOB_KILL));
+    }
+  }
+
+  @SuppressWarnings({ "unchecked" })
+  private void handleMapContainerRequest(ContainerRequestEvent reqEvent) {
+    assert(reqEvent.getAttemptID().getTaskId().getTaskType().equals(
+        TaskType.MAP));
+
+    Resource supportedMaxContainerCapability = getMaxContainerCapability();
+    JobId jobId = getJob().getID();
+
+    if (mapResourceRequest.equals(Resources.none())) {
+      mapResourceRequest = reqEvent.getCapability();
+      eventHandler.handle(new JobHistoryEvent(jobId,
+          new NormalizedResourceEvent(
+              org.apache.hadoop.mapreduce.TaskType.MAP,
+              mapResourceRequest.getMemorySize())));
+      LOG.info("mapResourceRequest:" + mapResourceRequest);
+    }
+
+    boolean mapContainerRequestAccepted = true;
+    if (mapResourceRequest.getMemorySize() >
+        supportedMaxContainerCapability.getMemorySize()
+        ||
+        mapResourceRequest.getVirtualCores() >
+        supportedMaxContainerCapability.getVirtualCores()) {
+      mapContainerRequestAccepted = false;
+    }
+
+    if(mapContainerRequestAccepted) {
+      // set the resources
+      reqEvent.getCapability().setMemorySize(
+          mapResourceRequest.getMemorySize());
+      reqEvent.getCapability().setVirtualCores(
+          mapResourceRequest.getVirtualCores());
+      scheduledRequests.addMap(reqEvent); //maps are immediately scheduled
+    } else {
+      String diagMsg = "The required MAP capability is more than the " +
+          "supported max container capability in the cluster. Killing" +
+          " the Job. mapResourceRequest: " + mapResourceRequest +
+          " maxContainerCapability:" + supportedMaxContainerCapability;
+      LOG.info(diagMsg);
+      eventHandler.handle(new JobDiagnosticsUpdateEvent(jobId, diagMsg));
+      eventHandler.handle(new JobEvent(jobId, JobEventType.JOB_KILL));
     }
   }
 
@@ -790,7 +848,16 @@ public class RMContainerAllocator extends RMContainerRequestor
       updateAMRMToken(response.getAMRMToken());
     }
 
-    List<ContainerStatus> finishedContainers = response.getCompletedContainersStatuses();
+    List<ContainerStatus> finishedContainers =
+        response.getCompletedContainersStatuses();
+
+    // propagate preemption requests
+    final PreemptionMessage preemptReq = response.getPreemptionMessage();
+    if (preemptReq != null) {
+      preemptionPolicy.preempt(
+          new PreemptionContext(assignedRequests), preemptReq);
+    }
+
     if (newContainers.size() + finishedContainers.size() > 0
         || !headRoom.equals(newHeadRoom)) {
       //something changed
@@ -811,7 +878,13 @@ public class RMContainerAllocator extends RMContainerRequestor
 
     handleUpdatedNodes(response);
     handleJobPriorityChange(response);
-
+    // Handle receiving the timeline collector address and token for this app.
+    MRAppMaster.RunningAppContext appContext =
+        (MRAppMaster.RunningAppContext)this.getContext();
+    if (appContext.getTimelineV2Client() != null) {
+      appContext.getTimelineV2Client().
+          setTimelineCollectorInfo(response.getCollectorInfo());
+    }
     for (ContainerStatus cont : finishedContainers) {
       processFinishedContainer(cont);
     }
@@ -837,12 +910,15 @@ public class RMContainerAllocator extends RMContainerRequestor
 
       // send the container completed event to Task attempt
       eventHandler.handle(createContainerFinishedEvent(container, attemptID));
+
+      preemptionPolicy.handleCompletedContainer(attemptID);
     }
   }
 
   private void applyConcurrentTaskLimits() {
     int numScheduledMaps = scheduledRequests.maps.size();
-    if (maxRunningMaps > 0 && numScheduledMaps > 0) {
+    if (maxRunningMaps > 0 && numScheduledMaps > 0 &&
+        getJob().getTotalMaps() > maxRunningMaps) {
       int maxRequestedMaps = Math.max(0,
           maxRunningMaps - assignedRequests.maps.size());
       int numScheduledFailMaps = scheduledRequests.earlierFailedMaps.size();
@@ -854,10 +930,13 @@ public class RMContainerAllocator extends RMContainerRequestor
       setRequestLimit(PRIORITY_FAST_FAIL_MAP, mapResourceRequest,
           failedMapRequestLimit);
       setRequestLimit(PRIORITY_MAP, mapResourceRequest, normalMapRequestLimit);
+      setRequestLimit(PRIORITY_OPPORTUNISTIC_MAP, mapResourceRequest,
+          normalMapRequestLimit);
     }
 
     int numScheduledReduces = scheduledRequests.reduces.size();
-    if (maxRunningReduces > 0 && numScheduledReduces > 0) {
+    if (maxRunningReduces > 0 && numScheduledReduces > 0 &&
+        getJob().getTotalReduces() > maxRunningReduces) {
       int maxRequestedReduces = Math.max(0,
           maxRunningReduces - assignedRequests.reduces.size());
       int reduceRequestLimit = Math.min(maxRequestedReduces,
@@ -976,6 +1055,16 @@ public class RMContainerAllocator extends RMContainerRequestor
     @VisibleForTesting
     final Map<TaskAttemptId, ContainerRequest> maps =
       new LinkedHashMap<TaskAttemptId, ContainerRequest>();
+    int mapsMod100 = 0;
+    int numOpportunisticMapsPercent = 0;
+
+    void setNumOpportunisticMapsPercent(int numMaps) {
+      this.numOpportunisticMapsPercent = numMaps;
+    }
+
+    int getNumOpportunisticMapsPercent() {
+      return this.numOpportunisticMapsPercent;
+    }
 
     @VisibleForTesting
     final LinkedHashMap<TaskAttemptId, ContainerRequest> reduces =
@@ -1017,34 +1106,47 @@ public class RMContainerAllocator extends RMContainerRequestor
             new ContainerRequest(event, PRIORITY_FAST_FAIL_MAP,
                 mapNodeLabelExpression);
         LOG.info("Added "+event.getAttemptID()+" to list of failed maps");
+        // If its an earlier Failed attempt, do not retry as OPPORTUNISTIC
+        maps.put(event.getAttemptID(), request);
+        addContainerReq(request);
       } else {
-        for (String host : event.getHosts()) {
-          LinkedList<TaskAttemptId> list = mapsHostMapping.get(host);
-          if (list == null) {
-            list = new LinkedList<TaskAttemptId>();
-            mapsHostMapping.put(host, list);
+        if (mapsMod100 < numOpportunisticMapsPercent) {
+          request =
+              new ContainerRequest(event, PRIORITY_OPPORTUNISTIC_MAP,
+                  mapNodeLabelExpression);
+          maps.put(event.getAttemptID(), request);
+          addOpportunisticResourceRequest(request.priority, request.capability);
+        } else {
+          request =
+              new ContainerRequest(event, PRIORITY_MAP, mapNodeLabelExpression);
+          for (String host : event.getHosts()) {
+            LinkedList<TaskAttemptId> list = mapsHostMapping.get(host);
+            if (list == null) {
+              list = new LinkedList<TaskAttemptId>();
+              mapsHostMapping.put(host, list);
+            }
+            list.add(event.getAttemptID());
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Added attempt req to host " + host);
+            }
           }
-          list.add(event.getAttemptID());
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Added attempt req to host " + host);
+          for (String rack : event.getRacks()) {
+            LinkedList<TaskAttemptId> list = mapsRackMapping.get(rack);
+            if (list == null) {
+              list = new LinkedList<TaskAttemptId>();
+              mapsRackMapping.put(rack, list);
+            }
+            list.add(event.getAttemptID());
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Added attempt req to rack " + rack);
+            }
           }
-       }
-       for (String rack: event.getRacks()) {
-         LinkedList<TaskAttemptId> list = mapsRackMapping.get(rack);
-         if (list == null) {
-           list = new LinkedList<TaskAttemptId>();
-           mapsRackMapping.put(rack, list);
-         }
-         list.add(event.getAttemptID());
-         if (LOG.isDebugEnabled()) {
-            LOG.debug("Added attempt req to rack " + rack);
-         }
-       }
-        request =
-            new ContainerRequest(event, PRIORITY_MAP, mapNodeLabelExpression);
+          maps.put(event.getAttemptID(), request);
+          addContainerReq(request);
+        }
+        mapsMod100++;
+        mapsMod100 %= 100;
       }
-      maps.put(event.getAttemptID(), request);
-      addContainerReq(request);
     }
     
     
@@ -1074,7 +1176,8 @@ public class RMContainerAllocator extends RMContainerRequestor
         Priority priority = allocated.getPriority();
         Resource allocatedResource = allocated.getResource();
         if (PRIORITY_FAST_FAIL_MAP.equals(priority) 
-            || PRIORITY_MAP.equals(priority)) {
+            || PRIORITY_MAP.equals(priority)
+            || PRIORITY_OPPORTUNISTIC_MAP.equals(priority)) {
           if (ResourceCalculatorUtils.computeAvailableContainers(allocatedResource,
               mapResourceRequest, getSchedulerResourceTypes()) <= 0
               || maps.isEmpty()) {
@@ -1232,7 +1335,8 @@ public class RMContainerAllocator extends RMContainerRequestor
         LOG.info("Found replacement: " + toBeReplaced);
         return toBeReplaced;
       }
-      else if (PRIORITY_MAP.equals(priority)) {
+      else if (PRIORITY_MAP.equals(priority)
+          || PRIORITY_OPPORTUNISTIC_MAP.equals(priority)) {
         LOG.info("Replacing MAP container " + allocated.getId());
         // allocated container was for a map
         String host = allocated.getNodeId().getHost();
@@ -1295,29 +1399,33 @@ public class RMContainerAllocator extends RMContainerRequestor
       while(it.hasNext() && maps.size() > 0 && canAssignMaps()){
         Container allocated = it.next();        
         Priority priority = allocated.getPriority();
-        assert PRIORITY_MAP.equals(priority);
-        // "if (maps.containsKey(tId))" below should be almost always true.
-        // hence this while loop would almost always have O(1) complexity
-        String host = allocated.getNodeId().getHost();
-        LinkedList<TaskAttemptId> list = mapsHostMapping.get(host);
-        while (list != null && list.size() > 0) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Host matched to the request list " + host);
-          }
-          TaskAttemptId tId = list.removeFirst();
-          if (maps.containsKey(tId)) {
-            ContainerRequest assigned = maps.remove(tId);
-            containerAssigned(allocated, assigned);
-            it.remove();
-            JobCounterUpdateEvent jce =
-              new JobCounterUpdateEvent(assigned.attemptID.getTaskId().getJobId());
-            jce.addCounterUpdate(JobCounter.DATA_LOCAL_MAPS, 1);
-            eventHandler.handle(jce);
-            hostLocalAssigned++;
+        assert (PRIORITY_MAP.equals(priority)
+            || PRIORITY_OPPORTUNISTIC_MAP.equals(priority));
+        if (!PRIORITY_OPPORTUNISTIC_MAP.equals(priority)) {
+          // "if (maps.containsKey(tId))" below should be almost always true.
+          // hence this while loop would almost always have O(1) complexity
+          String host = allocated.getNodeId().getHost();
+          LinkedList<TaskAttemptId> list = mapsHostMapping.get(host);
+          while (list != null && list.size() > 0) {
             if (LOG.isDebugEnabled()) {
-              LOG.debug("Assigned based on host match " + host);
+              LOG.debug("Host matched to the request list " + host);
             }
-            break;
+            TaskAttemptId tId = list.removeFirst();
+            if (maps.containsKey(tId)) {
+              ContainerRequest assigned = maps.remove(tId);
+              containerAssigned(allocated, assigned);
+              it.remove();
+              JobCounterUpdateEvent jce =
+                  new JobCounterUpdateEvent(assigned.attemptID.getTaskId()
+                      .getJobId());
+              jce.addCounterUpdate(JobCounter.DATA_LOCAL_MAPS, 1);
+              eventHandler.handle(jce);
+              hostLocalAssigned++;
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Assigned based on host match " + host);
+              }
+              break;
+            }
           }
         }
       }
@@ -1327,27 +1435,31 @@ public class RMContainerAllocator extends RMContainerRequestor
       while(it.hasNext() && maps.size() > 0 && canAssignMaps()){
         Container allocated = it.next();
         Priority priority = allocated.getPriority();
-        assert PRIORITY_MAP.equals(priority);
-        // "if (maps.containsKey(tId))" below should be almost always true.
-        // hence this while loop would almost always have O(1) complexity
-        String host = allocated.getNodeId().getHost();
-        String rack = RackResolver.resolve(host).getNetworkLocation();
-        LinkedList<TaskAttemptId> list = mapsRackMapping.get(rack);
-        while (list != null && list.size() > 0) {
-          TaskAttemptId tId = list.removeFirst();
-          if (maps.containsKey(tId)) {
-            ContainerRequest assigned = maps.remove(tId);
-            containerAssigned(allocated, assigned);
-            it.remove();
-            JobCounterUpdateEvent jce =
-              new JobCounterUpdateEvent(assigned.attemptID.getTaskId().getJobId());
-            jce.addCounterUpdate(JobCounter.RACK_LOCAL_MAPS, 1);
-            eventHandler.handle(jce);
-            rackLocalAssigned++;
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Assigned based on rack match " + rack);
+        assert (PRIORITY_MAP.equals(priority)
+            || PRIORITY_OPPORTUNISTIC_MAP.equals(priority));
+        if (!PRIORITY_OPPORTUNISTIC_MAP.equals(priority)) {
+          // "if (maps.containsKey(tId))" below should be almost always true.
+          // hence this while loop would almost always have O(1) complexity
+          String host = allocated.getNodeId().getHost();
+          String rack = RackResolver.resolve(host).getNetworkLocation();
+          LinkedList<TaskAttemptId> list = mapsRackMapping.get(rack);
+          while (list != null && list.size() > 0) {
+            TaskAttemptId tId = list.removeFirst();
+            if (maps.containsKey(tId)) {
+              ContainerRequest assigned = maps.remove(tId);
+              containerAssigned(allocated, assigned);
+              it.remove();
+              JobCounterUpdateEvent jce =
+                  new JobCounterUpdateEvent(assigned.attemptID.getTaskId()
+                      .getJobId());
+              jce.addCounterUpdate(JobCounter.RACK_LOCAL_MAPS, 1);
+              eventHandler.handle(jce);
+              rackLocalAssigned++;
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Assigned based on rack match " + rack);
+              }
+              break;
             }
-            break;
           }
         }
       }
@@ -1357,7 +1469,8 @@ public class RMContainerAllocator extends RMContainerRequestor
       while(it.hasNext() && maps.size() > 0 && canAssignMaps()){
         Container allocated = it.next();
         Priority priority = allocated.getPriority();
-        assert PRIORITY_MAP.equals(priority);
+        assert (PRIORITY_MAP.equals(priority)
+            || PRIORITY_OPPORTUNISTIC_MAP.equals(priority));
         TaskAttemptId tId = maps.keySet().iterator().next();
         ContainerRequest assigned = maps.remove(tId);
         containerAssigned(allocated, assigned);
@@ -1517,4 +1630,27 @@ public class RMContainerAllocator extends RMContainerRequestor
         " RackLocal:" + rackLocalAssigned);
     }
   }
+
+  static class PreemptionContext extends AMPreemptionPolicy.Context {
+    final AssignedRequests reqs;
+
+    PreemptionContext(AssignedRequests reqs) {
+      this.reqs = reqs;
+    }
+    @Override
+    public TaskAttemptId getTaskAttempt(ContainerId container) {
+      return reqs.get(container);
+    }
+
+    @Override
+    public List<Container> getContainers(TaskType t){
+      if(TaskType.REDUCE.equals(t))
+        return new ArrayList<Container>(reqs.reduces.values());
+      if(TaskType.MAP.equals(t))
+        return new ArrayList<Container>(reqs.maps.values());
+      return null;
+    }
+
+  }
+
 }

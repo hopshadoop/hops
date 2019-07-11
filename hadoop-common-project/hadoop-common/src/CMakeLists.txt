@@ -20,7 +20,7 @@
 # CMake configuration.
 #
 
-cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/..)
 include(HadoopCommon)
@@ -89,10 +89,75 @@ if(SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
 else()
     set(SNAPPY_INCLUDE_DIR "")
     set(SNAPPY_SOURCE_FILES "")
-    IF(REQUIRE_SNAPPY)
-        MESSAGE(FATAL_ERROR "Required snappy library could not be found.  SNAPPY_LIBRARY=${SNAPPY_LIBRARY}, SNAPPY_INCLUDE_DIR=${SNAPPY_INCLUDE_DIR}, CUSTOM_SNAPPY_INCLUDE_DIR=${CUSTOM_SNAPPY_INCLUDE_DIR}, CUSTOM_SNAPPY_PREFIX=${CUSTOM_SNAPPY_PREFIX}, CUSTOM_SNAPPY_INCLUDE=${CUSTOM_SNAPPY_INCLUDE}")
-    ENDIF(REQUIRE_SNAPPY)
-endif (SNAPPY_LIBRARY AND SNAPPY_INCLUDE_DIR)
+    if(REQUIRE_SNAPPY)
+        message(FATAL_ERROR "Required snappy library could not be found.  SNAPPY_LIBRARY=${SNAPPY_LIBRARY}, SNAPPY_INCLUDE_DIR=${SNAPPY_INCLUDE_DIR}, CUSTOM_SNAPPY_INCLUDE_DIR=${CUSTOM_SNAPPY_INCLUDE_DIR}, CUSTOM_SNAPPY_PREFIX=${CUSTOM_SNAPPY_PREFIX}, CUSTOM_SNAPPY_INCLUDE=${CUSTOM_SNAPPY_INCLUDE}")
+    endif()
+endif()
+
+# Require zstandard
+SET(STORED_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+hadoop_set_find_shared_library_version("1")
+find_library(ZSTD_LIBRARY
+    NAMES zstd
+    PATHS ${CUSTOM_ZSTD_PREFIX} ${CUSTOM_ZSTD_PREFIX}/lib
+          ${CUSTOM_ZSTD_PREFIX}/lib64 ${CUSTOM_ZSTD_LIB})
+SET(CMAKE_FIND_LIBRARY_SUFFIXES ${STORED_CMAKE_FIND_LIBRARY_SUFFIXES})
+find_path(ZSTD_INCLUDE_DIR
+    NAMES zstd.h
+    PATHS ${CUSTOM_ZSTD_PREFIX} ${CUSTOM_ZSTD_PREFIX}/include
+          ${CUSTOM_ZSTD_INCLUDE})
+if (ZSTD_LIBRARY AND ZSTD_INCLUDE_DIR)
+    GET_FILENAME_COMPONENT(HADOOP_ZSTD_LIBRARY ${ZSTD_LIBRARY} NAME)
+    set(ZSTD_SOURCE_FILES
+        "${SRC}/io/compress/zstd/ZStandardCompressor.c"
+        "${SRC}/io/compress/zstd/ZStandardDecompressor.c")
+    set(REQUIRE_ZSTD ${REQUIRE_ZSTD}) # Stop warning about unused variable.
+        message(STATUS "Found ZStandard: ${ZSTD_LIBRARY}")
+else ()
+    set(ZSTD_INCLUDE_DIR "")
+    set(ZSTD_SOURCE_FILES "")
+    IF(REQUIRE_ZSTD)
+        MESSAGE(FATAL_ERROR "Required zstandard library could not be found.  ZSTD_LIBRARY=${ZSTD_LIBRARY}, ZSTD_INCLUDE_DIR=${ZSTD_INCLUDE_DIR}, CUSTOM_ZSTD_INCLUDE_DIR=${CUSTOM_ZSTD_INCLUDE_DIR}, CUSTOM_ZSTD_PREFIX=${CUSTOM_ZSTD_PREFIX}, CUSTOM_ZSTD_INCLUDE=${CUSTOM_ZSTD_INCLUDE}")
+    ENDIF(REQUIRE_ZSTD)
+endif ()
+
+set(STORED_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+hadoop_set_find_shared_library_version("2")
+find_library(ISAL_LIBRARY
+    NAMES isal
+     PATHS ${CUSTOM_ISAL_PREFIX} ${CUSTOM_ISAL_PREFIX}/lib
+              ${CUSTOM_ISAL_PREFIX}/lib64 ${CUSTOM_ISAL_LIB} /usr/lib)
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${STORED_CMAKE_FIND_LIBRARY_SUFFIXES})
+if (ISAL_LIBRARY)
+    GET_FILENAME_COMPONENT(HADOOP_ISAL_LIBRARY ${ISAL_LIBRARY} NAME)
+    set(ISAL_INCLUDE_DIR ${SRC}/io/erasurecode)
+    set(ISAL_SOURCE_FILES
+        ${SRC}/io/erasurecode/isal_load.c
+        ${SRC}/io/erasurecode/erasure_code.c
+        ${SRC}/io/erasurecode/gf_util.c
+        ${SRC}/io/erasurecode/dump.c
+        ${SRC}/io/erasurecode/erasure_coder.c
+        ${SRC}/io/erasurecode/jni_erasure_code_native.c
+        ${SRC}/io/erasurecode/jni_common.c
+        ${SRC}/io/erasurecode/jni_rs_encoder.c
+        ${SRC}/io/erasurecode/jni_rs_decoder.c
+        ${SRC}/io/erasurecode/jni_xor_encoder.c
+        ${SRC}/io/erasurecode/jni_xor_decoder.c)
+
+        add_executable(erasure_code_test
+        ${SRC}/io/erasurecode/isal_load.c
+        ${SRC}/io/erasurecode/erasure_code.c
+        ${SRC}/io/erasurecode/gf_util.c
+        ${SRC}/io/erasurecode/dump.c
+        ${SRC}/io/erasurecode/erasure_coder.c
+        ${TST}/io/erasurecode/erasure_code_test.c
+        )
+        target_link_libraries(erasure_code_test ${CMAKE_DL_LIBS})
+else (ISAL_LIBRARY)
+    IF(REQUIRE_ISAL)
+        MESSAGE(FATAL_ERROR "Required ISA-L library could not be found.  ISAL_LIBRARY=${ISAL_LIBRARY}, CUSTOM_ISAL_PREFIX=${CUSTOM_ISAL_PREFIX}")
+    ENDIF(REQUIRE_ISAL)
+endif (ISAL_LIBRARY)
 
 # Build hardware CRC32 acceleration, if supported on the platform.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^i.86$" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
@@ -121,40 +186,7 @@ find_path(OPENSSL_INCLUDE_DIR
     PATHS ${CUSTOM_OPENSSL_PREFIX} ${CUSTOM_OPENSSL_PREFIX}/include
           ${CUSTOM_OPENSSL_INCLUDE} NO_DEFAULT_PATH)
 find_path(OPENSSL_INCLUDE_DIR NAMES openssl/evp.h)
-hadoop_set_find_shared_library_version("2")
-find_library(ISAL_LIBRARY
-    NAMES isal
-     PATHS ${CUSTOM_ISAL_PREFIX} ${CUSTOM_ISAL_PREFIX}/lib
-              ${CUSTOM_ISAL_PREFIX}/lib64 ${CUSTOM_ISAL_LIB})
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${STORED_CMAKE_FIND_LIBRARY_SUFFIXES})
-if (ISAL_LIBRARY)
-    GET_FILENAME_COMPONENT(HADOOP_ISAL_LIBRARY ${ISAL_LIBRARY} NAME)
-    set(ISAL_INCLUDE_DIR ${SRC}/io/erasurecode)
-    set(ISAL_SOURCE_FILES
-        ${SRC}/io/erasurecode/isal_load.c
-        ${SRC}/io/erasurecode/erasure_code.c
-        ${SRC}/io/erasurecode/gf_util.c
-        ${SRC}/io/erasurecode/dump.c
-        ${SRC}/io/erasurecode/erasure_coder.c
-        ${SRC}/io/erasurecode/jni_erasure_code_native.c
-        ${SRC}/io/erasurecode/jni_common.c
-        ${SRC}/io/erasurecode/jni_rs_encoder.c
-        ${SRC}/io/erasurecode/jni_rs_decoder.c)
-
-        add_executable(erasure_code_test
-        ${SRC}/io/erasurecode/isal_load.c
-        ${SRC}/io/erasurecode/erasure_code.c
-        ${SRC}/io/erasurecode/gf_util.c
-        ${SRC}/io/erasurecode/dump.c
-        ${SRC}/io/erasurecode/erasure_coder.c
-        ${TST}/io/erasurecode/erasure_code_test.c
-        )
-        target_link_libraries(erasure_code_test ${CMAKE_DL_LIBS})
-else (ISAL_LIBRARY)
-    IF(REQUIRE_ISAL)
-        MESSAGE(FATAL_ERROR "Required ISA-L library could not be found.  ISAL_LIBRARY=${ISAL_LIBRARY}, CUSTOM_ISAL_PREFIX=${CUSTOM_ISAL_PREFIX}")
-    ENDIF(REQUIRE_ISAL)
-endif (ISAL_LIBRARY)
 set(USABLE_OPENSSL 0)
 if(OPENSSL_LIBRARY AND OPENSSL_INCLUDE_DIR)
     include(CheckCSourceCompiles)
@@ -202,8 +234,9 @@ include_directories(
     ${ZLIB_INCLUDE_DIRS}
     ${BZIP2_INCLUDE_DIR}
     ${SNAPPY_INCLUDE_DIR}
-    ${OPENSSL_INCLUDE_DIR}
     ${ISAL_INCLUDE_DIR}
+    ${ZSTD_INCLUDE_DIR}
+    ${OPENSSL_INCLUDE_DIR}
     ${SRC}/util
 )
 configure_file(${CMAKE_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
@@ -217,6 +250,7 @@ hadoop_add_dual_library(hadoop
     ${SRC}/io/compress/lz4/lz4hc.c
     ${ISAL_SOURCE_FILES}
     ${SNAPPY_SOURCE_FILES}
+    ${ZSTD_SOURCE_FILES}
     ${OPENSSL_SOURCE_FILES}
     ${SRC}/io/compress/zlib/ZlibCompressor.c
     ${SRC}/io/compress/zlib/ZlibDecompressor.c

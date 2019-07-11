@@ -73,7 +73,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestCommitterEventHandler {
-  public static class WaitForItHandler implements EventHandler {
+  public static class WaitForItHandler implements EventHandler<Event> {
 
     private Event event = null;
     
@@ -127,7 +127,7 @@ public class TestCommitterEventHandler {
     TestingJobEventHandler jeh = new TestingJobEventHandler();
     dispatcher.register(JobEventType.class, jeh);
 
-    SystemClock clock = new SystemClock();
+    SystemClock clock = SystemClock.getInstance();
     AppContext appContext = mock(AppContext.class);
     ApplicationAttemptId attemptid = ApplicationAttemptId.fromString(
         "appattempt_1234567890000_0001_0");

@@ -18,7 +18,7 @@
   <parent>
     <artifactId>hadoop-main</artifactId>
     <groupId>io.hops</groupId>
-    <version>2.8.2.9-SNAPSHOT</version>
+    <version>3.2.0.0-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-build-tools</artifactId>
@@ -84,14 +84,14 @@
         <version>${maven-remote-resources-plugin.version}</version>
         <executions>
           <execution>
-	    <phase>process-resources</phase>
+            <phase>process-resources</phase>
             <goals>
               <goal>bundle</goal>
             </goals>
           </execution>
         </executions>
         <configuration>
-	  <resourcesDirectory>${project.build.outputDirectory}</resourcesDirectory>
+          <resourcesDirectory>${project.build.outputDirectory}</resourcesDirectory>
           <includes>
             <include>META-INF/LICENSE.txt</include>
             <include>META-INF/NOTICE.txt</include>
@@ -110,6 +110,16 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>maven-eclipse.xml</exclude>
+            <exclude>.externalToolBuilders/Maven_Ant_Builder.launch</exclude>
+          </excludes>
+        </configuration>
       </plugin>
     </plugins>
   </build>

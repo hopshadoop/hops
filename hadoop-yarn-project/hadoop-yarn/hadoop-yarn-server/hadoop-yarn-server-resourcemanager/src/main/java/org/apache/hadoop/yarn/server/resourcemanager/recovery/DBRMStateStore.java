@@ -46,11 +46,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ReservationId;
+import org.apache.hadoop.yarn.conf.HAUtil;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.server.records.Version;
@@ -71,18 +74,31 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 public class DBRMStateStore extends RMStateStore {
 
   protected static final Version CURRENT_VERSION_INFO = Version
-          .newInstance(1, 2);
+          .newInstance(1, 5);
+  private Thread verifyActiveStatusThread;
+  private int dbSessionTimeout;
 
   @Override
   public synchronized void initInternal(Configuration conf) throws Exception {
+    dbSessionTimeout = conf.getInt(CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
+        CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT);
   }
 
   @Override
   public synchronized void startInternal() throws Exception {
+    if (HAUtil.isHAEnabled(getConfig()) && !HAUtil
+        .isAutomaticFailoverEnabled(getConfig())) {
+      verifyActiveStatusThread = new VerifyActiveStatusThread();
+      verifyActiveStatusThread.start();
+    }
   }
 
   @Override
   protected synchronized void closeInternal() throws Exception {
+    if (verifyActiveStatusThread != null) {
+      verifyActiveStatusThread.interrupt();
+      verifyActiveStatusThread.join(1000);
+    }
   }
 
   @Override
@@ -104,7 +120,7 @@ public class DBRMStateStore extends RMStateStore {
 
   private void setVariable(final Variable var) throws IOException {
     LightWeightRequestHandler setVersionHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -146,7 +162,7 @@ public class DBRMStateStore extends RMStateStore {
 
   private Variable getVariable(final Variable.Finder finder) throws IOException {
     LightWeightRequestHandler getVersionHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -163,10 +179,10 @@ public class DBRMStateStore extends RMStateStore {
   @Override
   public synchronized long getAndIncrementEpoch() throws Exception {
     final Variable.Finder dbKey = Variable.Finder.RMStateStoreEpoch;
-
+    
     LightWeightRequestHandler getAndIncrementEpochHandler
             = new LightWeightRequestHandler(
-                    YARNOperationType.TEST) {
+                    YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -176,12 +192,12 @@ public class DBRMStateStore extends RMStateStore {
                 .getDataAccess(VariableDataAccess.class);
         LongVariable var = (LongVariable) DA.getVariable(dbKey);
 
-        long currentEpoch = 0;
+        long currentEpoch = baseEpoch;
         if(var!=null && var.getValue()!=null){
           currentEpoch = var.getValue();
         }
 
-        LongVariable newVar = new LongVariable(dbKey, currentEpoch + 1);
+        LongVariable newVar = new LongVariable(dbKey, nextEpoch(currentEpoch));
 
         DA.setVariable(newVar);
 
@@ -196,7 +212,7 @@ public class DBRMStateStore extends RMStateStore {
   public synchronized RMState loadState() throws Exception {
     final RMState rmState = new RMState();
     LightWeightRequestHandler loadStateHandler = new LightWeightRequestHandler(
-            YARNOperationType.TEST) {
+            YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException, IOException {
         connector.beginTransaction();
@@ -265,6 +281,22 @@ public class DBRMStateStore extends RMStateStore {
         }
       }
     }
+  }
+  
+  @VisibleForTesting
+  ApplicationAttemptStateData loadRMAppAttemptState(
+      final ApplicationAttemptId attemptId) throws IOException {
+    LightWeightRequestHandler loadStateHandler = new LightWeightRequestHandler(
+        YARNOperationType.OTHER) {
+      @Override
+      public Object performTask() throws StorageException, IOException {
+        ApplicationAttemptStateDataAccess attemptDA
+            = (ApplicationAttemptStateDataAccess) RMStorageFactory
+                .getDataAccess(ApplicationAttemptStateDataAccess.class);
+        return attemptDA.get(attemptId.getApplicationId().toString(), attemptId.toString());
+      }
+    };
+    return (ApplicationAttemptStateData) loadStateHandler.handle();
   }
   
   private void loadReservationSystemState(RMState rmState) throws IOException {
@@ -412,7 +444,7 @@ public class DBRMStateStore extends RMStateStore {
     }
     final String stateN=stateName;
     LightWeightRequestHandler setApplicationStateHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -446,7 +478,7 @@ public class DBRMStateStore extends RMStateStore {
     final byte[] attemptData = attemptStateDataPB.getProto().toByteArray();
     final String trakingURL = attemptStateDataPB.getTrackingUrl();
     LightWeightRequestHandler setApplicationAttemptIdHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -473,6 +505,32 @@ public class DBRMStateStore extends RMStateStore {
   }
 
   @Override
+  public synchronized void removeApplicationAttemptInternal(
+      ApplicationAttemptId appAttemptId)
+      throws Exception {
+    final String appId = appAttemptId.getApplicationId().toString();
+    final String appAttemptIdString = appAttemptId.toString();
+    final List<ApplicationAttemptState> attemptsToRemove
+            = new ArrayList<ApplicationAttemptState>();
+    attemptsToRemove.add(new ApplicationAttemptState(appId, appAttemptIdString));
+    LightWeightRequestHandler removeApplicationAttemptHandler
+        = new LightWeightRequestHandler(YARNOperationType.OTHER) {
+      @Override
+      public Object performTask() throws StorageException {
+        connector.beginTransaction();
+        connector.writeLock();
+        ApplicationAttemptStateDataAccess attemptDA
+            = (ApplicationAttemptStateDataAccess) RMStorageFactory
+                .getDataAccess(ApplicationAttemptStateDataAccess.class);
+        attemptDA.removeAll(attemptsToRemove);
+        connector.commit();
+        return null;
+      }
+    };
+    removeApplicationAttemptHandler.handle();
+  }
+
+  @Override
   public synchronized void removeApplicationStateInternal(
           ApplicationStateData appState)
           throws Exception {
@@ -489,7 +547,7 @@ public class DBRMStateStore extends RMStateStore {
     }
     //Delete applicationstate and attempts from ndb
     LightWeightRequestHandler setApplicationStateHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         if (appId != null) {
@@ -527,7 +585,7 @@ public class DBRMStateStore extends RMStateStore {
           RMDelegationTokenIdentifier rmDTIdentifier) throws Exception {
     final int seqNumber = rmDTIdentifier.getSequenceNumber();
     LightWeightRequestHandler setDelegationTokenHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws IOException {
         if (seqNumber != Integer.MIN_VALUE) {
@@ -560,7 +618,7 @@ public class DBRMStateStore extends RMStateStore {
             = new RMDelegationTokenIdentifierData(tokenId, renewDate);
 
     LightWeightRequestHandler setTokenAndSequenceNumberHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws IOException {
         connector.beginTransaction();
@@ -597,7 +655,7 @@ public class DBRMStateStore extends RMStateStore {
     }
 
     LightWeightRequestHandler setRMDTMasterKeyHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -621,7 +679,7 @@ public class DBRMStateStore extends RMStateStore {
           DelegationKey delegationKey) throws Exception {
     final int key = delegationKey.getKeyId();
     LightWeightRequestHandler setRMDTMasterKeyHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         LOG.debug("HOP :: key=" + key);
@@ -648,7 +706,7 @@ public class DBRMStateStore extends RMStateStore {
   @Override
   public synchronized void deleteStore() throws Exception {
     LightWeightRequestHandler deleteStoreHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -702,7 +760,7 @@ public class DBRMStateStore extends RMStateStore {
     final String appIdString = appId.toString();
 
     LightWeightRequestHandler getRMAppStateHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -728,7 +786,7 @@ public class DBRMStateStore extends RMStateStore {
   @VisibleForTesting
   public synchronized int getNumEntriesInDatabase() throws Exception {
     LightWeightRequestHandler countEntriesHandler
-            = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -763,7 +821,7 @@ public class DBRMStateStore extends RMStateStore {
   
   @Override
   public void removeApplication(final ApplicationId removeAppId) throws Exception {
-    LightWeightRequestHandler removeApplicationHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler removeApplicationHandler = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         if (removeAppId != null) {
@@ -789,7 +847,7 @@ public class DBRMStateStore extends RMStateStore {
   }
   
   protected void removeReservationState(final String planName, final String reservationIdName) throws Exception{
-    LightWeightRequestHandler removeReservationStateHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler removeReservationStateHandler = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -809,7 +867,7 @@ public class DBRMStateStore extends RMStateStore {
   protected void storeReservationState(final YarnProtos.ReservationAllocationStateProto reservationAllocation,
       final String planName, final String reservationIdName) throws Exception {
 
-    LightWeightRequestHandler storeReservationStateHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+    LightWeightRequestHandler storeReservationStateHandler = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
       public Object performTask() throws StorageException {
         connector.beginTransaction();
@@ -826,4 +884,79 @@ public class DBRMStateStore extends RMStateStore {
     storeReservationStateHandler.handle();
   }
   
+  private long localFenceID = 0;
+  
+  private void checkFence() throws StorageException {
+    Variable var = getVariableInt(Variable.Finder.FenceID);
+    long fenceId = (long) var.getValue();
+    if (fenceId != localFenceID) {
+      throw new StorageException("state store fenced");
+    }
+  }
+
+  private void checkFenceTransaction() throws IOException {
+    LightWeightRequestHandler fenceHandler = new LightWeightRequestHandler(
+            YARNOperationType.OTHER) {
+      @Override
+      public Object performTask() throws StorageException {
+        connector.beginTransaction();
+        connector.writeLock();
+        checkFence();
+        return null;
+        }
+    };
+    fenceHandler.handle();
+  }
+
+  @Override
+  public void fence() throws IOException {
+    LightWeightRequestHandler fenceHandler = new LightWeightRequestHandler(
+            YARNOperationType.OTHER) {
+      @Override
+      public Object performTask() throws StorageException {
+        connector.beginTransaction();
+        connector.writeLock();
+        LongVariable var = (LongVariable) getVariableInt(Variable.Finder.FenceID);
+        long storedFenceID = 0;
+        if(var.getValue()!=null){
+          storedFenceID = (long)var.getValue();
+        }
+        localFenceID = storedFenceID +1 ;
+        var = new LongVariable(Variable.Finder.FenceID, localFenceID);
+        
+        VariableDataAccess vDA = (VariableDataAccess) RMStorageFactory
+                .getDataAccess(VariableDataAccess.class);
+        vDA.setVariable(var);
+        connector.commit();
+        return null;
+      }
+    };
+    fenceHandler.handle();
+  }
+  
+  /**
+   * Helper class that periodically check the fence to ensure that
+   * this RM continues to be the Active.
+   */
+  private class VerifyActiveStatusThread extends Thread {
+    VerifyActiveStatusThread() {
+      super(VerifyActiveStatusThread.class.getName());
+    }
+
+    @Override
+    public void run() {
+      try {
+        while (!isFencedState()) {
+          // Create and delete fencing node
+          checkFenceTransaction();
+          Thread.sleep(dbSessionTimeout);
+        }
+      } catch (InterruptedException ie) {
+        LOG.info(getName() + " thread interrupted! Exiting!");
+        interrupt();
+      } catch (Exception e) {
+        notifyStoreOperationFailed(new StoreFencedException());
+      }
+    }
+  }
 }

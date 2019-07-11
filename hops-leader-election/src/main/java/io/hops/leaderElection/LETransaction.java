@@ -133,6 +133,8 @@ public class LETransaction {
       return null;
     }
   }
+  
+  
 
   private void initPhase() throws IOException {
     LOG.debug("LE Status: id " + context.id +
@@ -396,5 +398,39 @@ public class LETransaction {
   private void setEvictionFlag()
       throws TransactionContextException, StorageException {
     VarsRegister.setEvictFlag(leFactory.getVarsFinder(), true);
+  }
+  
+    public void forceLead(final long id) throws IOException {
+
+    LeaderTransactionalRequestHandler leaderElectionHandler = new LeaderTransactionalRequestHandler(
+        LeaderOperationType.LEADER_ELECTION) {
+      @Override
+      public void preTransactionSetup() throws IOException {
+
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LeLockFactory lockFactory = LeLockFactory.getInstance();
+
+        locks.add(lockFactory.getLeVarsLock(leFactory.getVarsFinder(),
+            TransactionLockTypes.LockType.WRITE)).add(lockFactory
+                .getLeDescriptorLock(leFactory,
+                    TransactionLockTypes.LockType.READ_COMMITTED));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        List<LeDescriptor> descriptors = getAllAliveProcesses();
+        for (LeDescriptor descriptor : descriptors) {
+          if (descriptor.getId() < id) {
+            removeLeaderRow(descriptor);
+          }
+        }
+        return null;
+      }
+    };
+    leaderElectionHandler.handle();
+
   }
 }

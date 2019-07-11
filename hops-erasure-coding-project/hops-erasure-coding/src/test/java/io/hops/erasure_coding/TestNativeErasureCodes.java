@@ -19,6 +19,7 @@
 package io.hops.erasure_coding;
 
 import static io.hops.erasure_coding.TestGaloisField.GF;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 
@@ -48,7 +49,7 @@ public class TestNativeErasureCodes extends TestCase {
           b[i] = 0x00;
       }
   }
-  public void testEncodeDecode() {
+  public void testEncodeDecode() throws IOException {
     long overallEncode = 0L;
     long overallDecode = 0L;
     
@@ -108,7 +109,7 @@ public class TestNativeErasureCodes extends TestCase {
   }
   
   @Test
-  public void testNativeEncodeDecode() {
+  public void testNativeEncodeDecode() throws IOException {
       
     long overallEncode = 0L;
     long overallDecode = 0L;

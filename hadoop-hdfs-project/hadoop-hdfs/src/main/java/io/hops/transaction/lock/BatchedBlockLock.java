@@ -19,7 +19,7 @@ import io.hops.common.INodeUtil;
 import io.hops.common.Pair;
 
 import java.io.IOException;
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 final class BatchedBlockLock extends BaseIndividualBlockLock {

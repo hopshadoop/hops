@@ -51,24 +51,12 @@ import org.junit.Test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
-import java.io.File;
-import java.io.IOException;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.FileSystemRMStateStore;
-import org.junit.After;
 
 public class TestWorkPreservingRMRestartForNodeLabel {
   private Configuration conf;
   private static final int GB = 1024; // 1024 MB
   
   RMNodeLabelsManager mgr;
-
-  private FileSystem fs;
-  private Path tmpDir;
 
   @Before
   public void setUp() throws Exception {
@@ -78,20 +66,10 @@ public class TestWorkPreservingRMRestartForNodeLabel {
     conf.setBoolean(YarnConfiguration.RECOVERY_ENABLED, true);
     conf.setBoolean(YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_ENABLED, true);
     conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
     mgr = new NullRMNodeLabelsManager();
     mgr.init(conf);
   }
-
-  @After
-  public void tearDown() throws IOException {
-    if (fs != null && tmpDir != null) {
-      fs.delete(tmpDir, true);
-    }
-  }
-
+  
   @SuppressWarnings("unchecked")
   private <E> Set<E> toSet(E... elements) {
     Set<E> set = Sets.newHashSet(elements);
@@ -149,22 +127,14 @@ public class TestWorkPreservingRMRestartForNodeLabel {
     // This test is pretty much similar to testContainerAllocateWithLabel.
     // Difference is, this test doesn't specify label expression in ResourceRequest,
     // instead, it uses default queue label expression
-    
+
     // set node -> label
     mgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x", "y"));
     mgr.addLabelsToNode(ImmutableMap.of(NodeId.newInstance("h1", 0), toSet("x"),
         NodeId.newInstance("h2", 0), toSet("y")));
-    
+
     conf = TestUtils.getConfigurationWithDefaultQueueLabels(conf);
-    
-    conf.set(YarnConfiguration.RM_STORE, FileSystemRMStateStore.class.getName());
-    fs = FileSystem.get(conf);
-    tmpDir = new Path(new File("target", this.getClass().getSimpleName()
-            + "-tmpDir").getAbsolutePath());
-    fs.delete(tmpDir, true);
-    fs.mkdirs(tmpDir);
-    conf.set(YarnConfiguration.FS_RM_STATE_STORE_URI, tmpDir.toString());
-    
+
     // inject node label manager
     MockRM rm1 =
         new MockRM(conf) {
@@ -173,7 +143,7 @@ public class TestWorkPreservingRMRestartForNodeLabel {
             return mgr;
           }
         };
-
+    MemoryRMStateStore memStore = (MemoryRMStateStore) rm1.getRMStateStore();
     rm1.getRMContext().setNodeLabelManager(mgr);
     rm1.start();
     MockNM nm1 = rm1.registerNode("h1:1234", 8000); // label = x
@@ -192,7 +162,7 @@ public class TestWorkPreservingRMRestartForNodeLabel {
     containerId =
         ContainerId.newContainerId(am1.getApplicationAttemptId(), 2);
     Assert.assertTrue(rm1.waitForState(nm1, containerId,
-        RMContainerState.ALLOCATED, 10 * 1000));
+        RMContainerState.ALLOCATED));
     checkRMContainerLabelExpression(ContainerId.newContainerId(
         am1.getApplicationAttemptId(), 1), rm1, "x");
     checkRMContainerLabelExpression(ContainerId.newContainerId(
@@ -207,7 +177,7 @@ public class TestWorkPreservingRMRestartForNodeLabel {
     am2.allocate("*", 1024, 1, new ArrayList<ContainerId>());
     containerId = ContainerId.newContainerId(am2.getApplicationAttemptId(), 2);
     Assert.assertTrue(rm1.waitForState(nm2, containerId,
-        RMContainerState.ALLOCATED, 10 * 1000));
+        RMContainerState.ALLOCATED));
     checkRMContainerLabelExpression(ContainerId.newContainerId(
         am2.getApplicationAttemptId(), 1), rm1, "y");
     checkRMContainerLabelExpression(ContainerId.newContainerId(
@@ -222,7 +192,7 @@ public class TestWorkPreservingRMRestartForNodeLabel {
     am3.allocate("*", 1024, 1, new ArrayList<ContainerId>());
     containerId = ContainerId.newContainerId(am3.getApplicationAttemptId(), 2);
     Assert.assertTrue(rm1.waitForState(nm3, containerId,
-        RMContainerState.ALLOCATED, 10 * 1000));
+        RMContainerState.ALLOCATED));
     checkRMContainerLabelExpression(ContainerId.newContainerId(
         am3.getApplicationAttemptId(), 1), rm1, "");
     checkRMContainerLabelExpression(ContainerId.newContainerId(
@@ -235,7 +205,8 @@ public class TestWorkPreservingRMRestartForNodeLabel {
     mgr.addLabelsToNode(ImmutableMap.of(NodeId.newInstance("h1", 0), toSet("x"),
         NodeId.newInstance("h2", 0), toSet("y")));
     MockRM rm2 =
-        new MockRM(conf) {
+        new MockRM(conf,
+            memStore) {
           @Override
           public RMNodeLabelsManager createNodeLabelManager() {
             return mgr;

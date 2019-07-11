@@ -26,6 +26,7 @@ import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenSecretManager;
 import org.apache.hadoop.yarn.util.Clock;
@@ -51,8 +52,7 @@ public interface AppContext {
 
   Map<JobId, Job> getAllJobs();
 
-  @SuppressWarnings("rawtypes")
-  EventHandler getEventHandler();
+  EventHandler<Event> getEventHandler();
 
   Clock getClock();
   
@@ -69,4 +69,8 @@ public interface AppContext {
   String getNMHostname();
 
   TaskAttemptFinishingMonitor getTaskAttemptFinishingMonitor();
+
+  String getHistoryUrl();
+
+  void setHistoryUrl(String historyUrl);
 }

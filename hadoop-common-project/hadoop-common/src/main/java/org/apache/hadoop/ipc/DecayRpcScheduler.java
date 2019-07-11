@@ -35,9 +35,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.management.ObjectName;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDoubleArray;
-import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -49,7 +51,6 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.metrics2.util.Metrics2Util.NameValuePair;
 import org.apache.hadoop.metrics2.util.Metrics2Util.TopN;
 
-import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,6 +128,8 @@ public class DecayRpcScheduler implements RpcScheduler,
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DecayRpcScheduler.class);
+
+  private static final ObjectWriter WRITER = new ObjectMapper().writer();
 
   // Track the decayed and raw (no decay) number of calls for each schedulable
   // identity from all previous decay windows: idx 0 for decayed call count and
@@ -233,8 +236,8 @@ public class DecayRpcScheduler implements RpcScheduler,
     DecayTask task = new DecayTask(this, timer);
     timer.scheduleAtFixedRate(task, decayPeriodMillis, decayPeriodMillis);
 
-    metricsProxy = MetricsProxy.getInstance(ns, numLevels);
-    metricsProxy.setDelegate(this);
+    metricsProxy = MetricsProxy.getInstance(ns, numLevels, this);
+    recomputeScheduleCache();
   }
 
   // Load configs
@@ -388,6 +391,7 @@ public class DecayRpcScheduler implements RpcScheduler,
    * counts current.
    */
   private void decayCurrentCounts() {
+    LOG.debug("Start to decay current counts.");
     try {
       long totalDecayedCount = 0;
       long totalRawCount = 0;
@@ -407,7 +411,12 @@ public class DecayRpcScheduler implements RpcScheduler,
         totalDecayedCount += nextValue;
         decayedCount.set(nextValue);
 
+        LOG.debug("Decaying counts for the user: {}, " +
+            "its decayedCount: {}, rawCount: {}", entry.getKey(),
+            nextValue, rawCount.get());
         if (nextValue == 0) {
+          LOG.debug("The decayed count for the user {} is zero " +
+              "and being cleaned.", entry.getKey());
           // We will clean up unused keys here. An interesting optimization
           // might be to have an upper bound on keyspace in callCounts and only
           // clean once we pass it.
@@ -419,6 +428,8 @@ public class DecayRpcScheduler implements RpcScheduler,
       totalDecayedCallCount.set(totalDecayedCount);
       totalRawCallCount.set(totalRawCount);
 
+      LOG.debug("After decaying the stored counts, totalDecayedCount: {}, " +
+          "totalRawCallCount: {}.", totalDecayedCount, totalRawCount);
       // Now refresh the cache of scheduling decisions
       recomputeScheduleCache();
 
@@ -426,7 +437,7 @@ public class DecayRpcScheduler implements RpcScheduler,
       updateAverageResponseTime(true);
     } catch (Exception ex) {
       LOG.error("decayCurrentCounts exception: " +
-          ExceptionUtils.getFullStackTrace(ex));
+          ExceptionUtils.getStackTrace(ex));
       throw ex;
     }
   }
@@ -618,6 +629,8 @@ public class DecayRpcScheduler implements RpcScheduler,
         } else {
           responseTimeAvgInLastWindow.set(i, averageResponseTime);
         }
+      } else {
+        responseTimeAvgInLastWindow.set(i, 0);
       }
       responseTimeCountInLastWindow.set(i, responseTimeCount);
       if (LOG.isDebugEnabled()) {
@@ -675,21 +688,26 @@ public class DecayRpcScheduler implements RpcScheduler,
     private long[] callCountInLastWindowDefault;
     private ObjectName decayRpcSchedulerInfoBeanName;
 
-    private MetricsProxy(String namespace, int numLevels) {
+    private MetricsProxy(String namespace, int numLevels,
+        DecayRpcScheduler drs) {
       averageResponseTimeDefault = new double[numLevels];
       callCountInLastWindowDefault = new long[numLevels];
+      setDelegate(drs);
       decayRpcSchedulerInfoBeanName =
           MBeans.register(namespace, "DecayRpcScheduler", this);
       this.registerMetrics2Source(namespace);
     }
 
     public static synchronized MetricsProxy getInstance(String namespace,
-        int numLevels) {
+        int numLevels, DecayRpcScheduler drs) {
       MetricsProxy mp = INSTANCES.get(namespace);
       if (mp == null) {
         // We must create one
-        mp = new MetricsProxy(namespace, numLevels);
+        mp = new MetricsProxy(namespace, numLevels, drs);
         INSTANCES.put(namespace, mp);
+      } else  if (drs != mp.delegate.get()){
+        // in case of delegate is reclaimed, we should set it again
+        mp.setDelegate(drs);
       }
       return mp;
     }
@@ -907,8 +925,7 @@ public class DecayRpcScheduler implements RpcScheduler,
       return "{}";
     } else {
       try {
-        ObjectMapper om = new ObjectMapper();
-        return om.writeValueAsString(decisions);
+        return WRITER.writeValueAsString(decisions);
       } catch (Exception e) {
         return "Error: " + e.getMessage();
       }
@@ -917,8 +934,7 @@ public class DecayRpcScheduler implements RpcScheduler,
 
   public String getCallVolumeSummary() {
     try {
-      ObjectMapper om = new ObjectMapper();
-      return om.writeValueAsString(getDecayedCallCounts());
+      return WRITER.writeValueAsString(getDecayedCallCounts());
     } catch (Exception e) {
       return "Error: " + e.getMessage();
     }

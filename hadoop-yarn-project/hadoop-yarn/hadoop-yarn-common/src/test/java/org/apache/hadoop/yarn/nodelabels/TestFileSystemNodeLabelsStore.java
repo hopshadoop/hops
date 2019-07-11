@@ -96,7 +96,7 @@ public class TestFileSystemNodeLabelsStore extends NodeLabelTestBase {
     if (mgr.store instanceof FileSystemNodeLabelsStore) {
       FileSystemNodeLabelsStore fsStore =
           ((FileSystemNodeLabelsStore) mgr.store);
-      fsStore.fs.delete(fsStore.fsWorkingPath, true);
+      fsStore.getFs().delete(fsStore.getFsWorkingPath(), true);
     }
     mgr.stop();
   }
@@ -342,25 +342,25 @@ public class TestFileSystemNodeLabelsStore extends NodeLabelTestBase {
   public void testRootMkdirOnInitStore() throws Exception {
     final FileSystem mockFs = Mockito.mock(FileSystem.class);
     FileSystemNodeLabelsStore mockStore = new FileSystemNodeLabelsStore() {
-      void setFileSystem(Configuration conf) throws IOException {
-        fs = mockFs;
+      public void initFileSystem(Configuration config) throws IOException {
+        setFs(mockFs);
       }
     };
-    mockStore.setNodeLabelsManager(mgr);
-    mockStore.fs = mockFs;
-    verifyMkdirsCount(mockStore, true, 0);
-    verifyMkdirsCount(mockStore, false, 1);
+
+    mockStore.setFs(mockFs);
     verifyMkdirsCount(mockStore, true, 1);
     verifyMkdirsCount(mockStore, false, 2);
+    verifyMkdirsCount(mockStore, true, 3);
+    verifyMkdirsCount(mockStore, false, 4);
   }
 
   private void verifyMkdirsCount(FileSystemNodeLabelsStore store,
                                  boolean existsRetVal, int expectedNumOfCalls)
       throws Exception {
-    Mockito.when(store.fs.exists(Mockito.any(
+    Mockito.when(store.getFs().exists(Mockito.any(
         Path.class))).thenReturn(existsRetVal);
-    store.init(conf);
-    Mockito.verify(store.fs,Mockito.times(
+    store.init(conf, mgr);
+    Mockito.verify(store.getFs(), Mockito.times(
         expectedNumOfCalls)).mkdirs(Mockito.any(Path
         .class));
   }

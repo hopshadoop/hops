@@ -24,9 +24,6 @@ import static org.mockito.Mockito.spy;
 
 import java.util.ArrayList;
 
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -34,6 +31,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
+import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
@@ -46,7 +44,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.util.ControlledClock;
-import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -62,16 +59,12 @@ public class TestNodesListManager {
   public void testNodeUsableEvent() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
+    final Dispatcher dispatcher = getDispatcher();
     YarnConfiguration conf = new YarnConfiguration();
-
-    RMStorageFactory.setConfiguration(conf);
-    YarnAPIStorageFactory.setConfiguration(conf);
-    DBUtility.InitializeDB();
-
     MockRM rm = new MockRM(conf) {
       @Override
       protected Dispatcher createDispatcher() {
-        return getDispatcher();
+        return dispatcher;
       }
     };
     rm.start();
@@ -93,7 +86,7 @@ public class TestNodesListManager {
     am.registerAppAttempt();
     am.unregisterAppAttempt();
     nm1.nodeHeartbeat(attempt.getAppAttemptId(), 1, ContainerState.COMPLETE);
-    am.waitForState(RMAppAttemptState.FINISHED);
+    rm.waitForState(am.getApplicationAttemptId(), RMAppAttemptState.FINISHED);
 
     // Create submitted App
     RMApp subrmApp = rm.submitApp(200);
@@ -143,7 +136,7 @@ public class TestNodesListManager {
   public void testCachedResolver() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
-    ControlledClock clock = new ControlledClock(new SystemClock());
+    ControlledClock clock = new ControlledClock();
     clock.setTime(0);
     final int CACHE_EXPIRY_INTERVAL_SECS = 30;
     NodesListManager.CachedResolver resolver =
@@ -246,7 +239,7 @@ public class TestNodesListManager {
     Dispatcher dispatcher = new DrainDispatcher() {
       @SuppressWarnings({ "rawtypes", "unchecked" })
       @Override
-      public EventHandler getEventHandler() {
+      public EventHandler<Event> getEventHandler() {
 
         class EventArgMatcher extends ArgumentMatcher<AbstractEvent> {
           @Override

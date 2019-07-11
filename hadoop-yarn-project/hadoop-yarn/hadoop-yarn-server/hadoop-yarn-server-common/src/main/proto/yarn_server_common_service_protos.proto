@@ -22,12 +22,44 @@ option java_generic_services = true;
 option java_generate_equals_and_hash = true;
 package hadoop.yarn;
 
+import "Security.proto";
 import "yarn_protos.proto";
 import "yarn_server_common_protos.proto";
 import "yarn_service_protos.proto";
 
+message RemoteNodeProto {
+  optional NodeIdProto node_id = 1;
+  optional string http_address = 2;
+  optional string rack_name = 3;
+  optional string node_partition = 4;
+}
+
+message RegisterDistributedSchedulingAMResponseProto {
+  optional RegisterApplicationMasterResponseProto register_response = 1;
+  optional ResourceProto max_container_resource = 2;
+  optional ResourceProto min_container_resource = 3;
+  optional ResourceProto incr_container_resource = 4;
+  optional int32 container_token_expiry_interval = 5;
+  optional int64 container_id_start = 6;
+  repeated RemoteNodeProto nodes_for_scheduling = 7;
+}
+
+message DistributedSchedulingAllocateResponseProto {
+  optional AllocateResponseProto allocate_response = 1;
+  repeated RemoteNodeProto nodes_for_scheduling = 2;
+}
+
+message DistributedSchedulingAllocateRequestProto {
+  optional AllocateRequestProto allocate_request = 1;
+  repeated ContainerProto allocated_containers = 2;
+}
+
 message NodeLabelsProto {
   repeated NodeLabelProto nodeLabels = 1;
+}
+
+message NodeAttributesProto {
+  repeated NodeAttributeProto nodeAttributes = 1;
 }
 
 message RegisterNodeManagerRequestProto {
@@ -38,6 +70,8 @@ message RegisterNodeManagerRequestProto {
   repeated NMContainerStatusProto container_statuses = 6;
   repeated RunningApplicationsProto runningApplications = 7;
   optional NodeLabelsProto nodeLabels = 8;
+  optional ResourceProto physicalResource = 9;
+  repeated LogAggregationReportProto log_aggregation_reports_for_apps = 10;
 }
 
 message RegisterNodeManagerResponseProto {
@@ -64,7 +98,9 @@ message NodeHeartbeatRequestProto {
   optional MasterKeyProto last_known_nm_token_master_key = 3;
   optional NodeLabelsProto nodeLabels = 4;
   repeated LogAggregationReportProto log_aggregation_reports_for_apps = 5;
-  repeated ApplicationIdProto updatedApplicationsWithNewCryptoMaterial = 6;
+  repeated AppCollectorDataProto registering_collectors = 6;
+  optional NodeAttributesProto nodeAttributes = 7;
+  repeated ApplicationIdProto updatedApplicationsWithNewCryptoMaterial = 8;
 }
 
 message LogAggregationReportProto {
@@ -85,16 +121,25 @@ message NodeHeartbeatResponseProto {
   repeated ContainerIdProto containers_to_be_removed_from_nm = 9;
   repeated SystemCredentialsForAppsProto system_credentials_for_apps = 10;
   optional bool areNodeLabelsAcceptedByRM = 11 [default = false];
+  // to be deprecated in favour of containers_to_update
   repeated ContainerProto containers_to_decrease = 12;
   repeated SignalContainerRequestProto containers_to_signal = 13;
   optional ResourceProto resource = 14;
-  optional bool nextheartbeat = 15;
-  repeated UpdatedCryptoForAppsProto updated_crypto_for_apps = 16;
+  optional ContainerQueuingLimitProto container_queuing_limit = 15;
+  repeated AppCollectorDataProto app_collectors = 16;
+  // to be used in place of containers_to_decrease
+  repeated ContainerProto containers_to_update = 17;
+  repeated UpdatedCryptoForAppsProto updated_crypto_for_apps = 18;
 }
 
 message RunningApplicationsProto {
   required ApplicationIdProto app_id = 1;
   required UpdatedCryptoForAppProto security_material_version = 2;
+}
+
+message ContainerQueuingLimitProto {
+  optional int32 max_queue_length = 1;
+  optional int32 max_queue_wait_time_in_ms = 2;
 }
 
 message SystemCredentialsForAppsProto {
@@ -117,6 +162,38 @@ message UpdatedCryptoForAppProto {
   optional int64 jwt_expiration = 7;
 }
 
+////////////////////////////////////////////////////////////////////////
+////// From collector_nodemanager_protocol ////////////////////////////
+////////////////////////////////////////////////////////////////////////
+message AppCollectorDataProto {
+  optional ApplicationIdProto app_id = 1;
+  optional string app_collector_addr = 2;
+  optional int64 rm_identifier = 3 [default = -1];
+  optional int64 version = 4 [default = -1];
+  optional hadoop.common.TokenProto app_collector_token = 5;
+}
+
+//////////////////////////////////////////////////////
+/////// collector_nodemanager_protocol //////////////
+//////////////////////////////////////////////////////
+message ReportNewCollectorInfoRequestProto {
+  repeated AppCollectorDataProto app_collectors = 1;
+}
+
+message ReportNewCollectorInfoResponseProto {
+}
+
+message GetTimelineCollectorContextRequestProto {
+  optional ApplicationIdProto appId = 1;
+}
+
+message GetTimelineCollectorContextResponseProto {
+  optional string user_id = 1;
+  optional string flow_name = 2;
+  optional string flow_version = 3;
+  optional int64 flow_run_id = 4;
+}
+
 message NMContainerStatusProto {
   optional ContainerIdProto container_id = 1;
   optional ContainerStateProto container_state = 2;
@@ -127,6 +204,9 @@ message NMContainerStatusProto {
   optional int64 creation_time = 7;
   optional string nodeLabelExpression = 8;
   optional int32 version = 9;
+  optional ExecutionTypeProto executionType = 10 [default = GUARANTEED];
+  optional int64 allocation_request_id = 11 [default = -1];
+  repeated string allocation_tags = 12;
 }
 
 message SCMUploaderNotifyRequestProto {

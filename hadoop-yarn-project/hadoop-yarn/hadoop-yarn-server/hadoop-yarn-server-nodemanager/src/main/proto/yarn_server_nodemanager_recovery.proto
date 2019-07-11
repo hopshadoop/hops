@@ -30,14 +30,15 @@ message ContainerManagerApplicationProto {
   optional bytes credentials = 3;
   repeated ApplicationACLMapProto acls = 4;
   optional LogAggregationContextProto log_aggregation_context = 5;
-  optional string userFolder = 6;
-  optional bytes key_store = 7;
-  optional string key_store_password = 8;
-  optional bytes trust_store = 9;
-  optional string trust_store_password = 10;
-  optional int32 crypto_version = 11;
-  optional string jwt = 12;
-  optional int64 jwt_expiration = 13;
+  optional int64 appLogAggregationInitedTime = 6 [ default = -1 ];
+  optional FlowContextProto flowContext = 7;
+  optional bytes key_store = 8;
+  optional string key_store_password = 9;
+  optional bytes trust_store = 10;
+  optional string trust_store_password = 11;
+  optional int32 crypto_version = 12;
+  optional string jwt = 13;
+  optional int64 jwt_expiration = 14;
 }
 
 message DeletionServiceDeleteTaskProto {
@@ -47,6 +48,8 @@ message DeletionServiceDeleteTaskProto {
   optional int64 deletionTime = 4;
   repeated string basedirs = 5;
   repeated int32 successorIds = 6;
+  optional string taskType = 7;
+  optional string dockerContainerId = 8;
 }
 
 message LocalizedResourceProto {
@@ -58,5 +61,10 @@ message LocalizedResourceProto {
 message LogDeleterProto {
   optional string user = 1;
   optional int64 deletionTime = 2;
-  optional string userFolder = 3;
+}
+
+message FlowContextProto {
+  optional string flowName = 1;
+  optional string flowVersion = 2;
+  optional int64 flowRunId = 3;
 }

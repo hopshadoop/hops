@@ -17,27 +17,44 @@
  */
 package org.apache.hadoop.util;
 
+import static org.apache.hadoop.util.RunJar.MATCH_ANY;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Random;
+import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 
-import junit.framework.TestCase;
-
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-public class TestRunJar extends TestCase {
+public class TestRunJar {
+  private static final String FOOBAR_TXT = "foobar.txt";
+  private static final String FOOBAZ_TXT = "foobaz.txt";
+  private static final int BUFF_SIZE = 2048;
   private File TEST_ROOT_DIR;
 
   private static final String TEST_JAR_NAME="test-runjar.jar";
@@ -45,9 +62,8 @@ public class TestRunJar extends TestCase {
   private static final long MOCKED_NOW = 1_460_389_972_000L;
   private static final long MOCKED_NOW_PLUS_TWO_SEC = MOCKED_NOW + 2_000;
 
-  @Override
   @Before
-  protected void setUp() throws Exception {
+  public void setUp() throws Exception {
     TEST_ROOT_DIR = GenericTestUtils.getTestDir(getClass().getSimpleName());
     if (!TEST_ROOT_DIR.exists()) {
       TEST_ROOT_DIR.mkdirs();
@@ -56,9 +72,8 @@ public class TestRunJar extends TestCase {
     makeTestJar();
   }
 
-  @Override
   @After
-  protected void tearDown() {
+  public void tearDown() {
     FileUtil.fullyDelete(TEST_ROOT_DIR);
   }
 
@@ -70,11 +85,11 @@ public class TestRunJar extends TestCase {
     File jarFile = new File(TEST_ROOT_DIR, TEST_JAR_NAME);
     JarOutputStream jstream =
         new JarOutputStream(new FileOutputStream(jarFile));
-    ZipEntry zipEntry1 = new ZipEntry("foobar.txt");
+    ZipEntry zipEntry1 = new ZipEntry(FOOBAR_TXT);
     zipEntry1.setTime(MOCKED_NOW);
     jstream.putNextEntry(zipEntry1);
     jstream.closeEntry();
-    ZipEntry zipEntry2 = new ZipEntry("foobaz.txt");
+    ZipEntry zipEntry2 = new ZipEntry(FOOBAZ_TXT);
     zipEntry2.setTime(MOCKED_NOW_PLUS_TWO_SEC);
     jstream.putNextEntry(zipEntry2);
     jstream.closeEntry();
@@ -86,50 +101,100 @@ public class TestRunJar extends TestCase {
    */
   @Test
   public void testUnJar() throws Exception {
-    File unjarDir = new File(TEST_ROOT_DIR, "unjar-all");
-    assertFalse("unjar dir shouldn't exist at test start",
-                new File(unjarDir, "foobar.txt").exists());
+    File unjarDir = getUnjarDir("unjar-all");
 
     // Unjar everything
     RunJar.unJar(new File(TEST_ROOT_DIR, TEST_JAR_NAME),
-                 unjarDir);
+                 unjarDir, MATCH_ANY);
     assertTrue("foobar unpacked",
-               new File(unjarDir, "foobar.txt").exists());
+               new File(unjarDir, TestRunJar.FOOBAR_TXT).exists());
     assertTrue("foobaz unpacked",
-               new File(unjarDir, "foobaz.txt").exists());
-
+               new File(unjarDir, FOOBAZ_TXT).exists());
   }
 
   /**
    * Test unjarring a specific regex
    */
+  @Test
   public void testUnJarWithPattern() throws Exception {
-    File unjarDir = new File(TEST_ROOT_DIR, "unjar-pattern");
-    assertFalse("unjar dir shouldn't exist at test start",
-                new File(unjarDir, "foobar.txt").exists());
+    File unjarDir = getUnjarDir("unjar-pattern");
 
     // Unjar only a regex
     RunJar.unJar(new File(TEST_ROOT_DIR, TEST_JAR_NAME),
                  unjarDir,
                  Pattern.compile(".*baz.*"));
     assertFalse("foobar not unpacked",
-                new File(unjarDir, "foobar.txt").exists());
+                new File(unjarDir, TestRunJar.FOOBAR_TXT).exists());
     assertTrue("foobaz unpacked",
-               new File(unjarDir, "foobaz.txt").exists());
-
+               new File(unjarDir, FOOBAZ_TXT).exists());
   }
 
+  private File generateBigJar(File dir) throws Exception {
+    File file = new File(dir, "job.jar");
+    try(JarOutputStream stream = new JarOutputStream(
+        new FileOutputStream(file))) {
+      Random r = new Random(100);
+      for (int i = 0; i < 10; ++i) {
+        JarEntry entry = new JarEntry(
+            ((i % 2 == 0) ? "dir/" : "") + "f" + Integer.toString(i));
+        stream.putNextEntry(entry);
+        for (int j=0; j < 756; ++j) {
+          stream.write(r.nextInt() & 0xFF);
+        }
+        stream.closeEntry();
+      }
+      stream.close();
+    }
+    return file;
+  }
+
+  /**
+   * Test unjarring a big file. This checks appending the remainder of the file
+   * to the tee output stream in RunJar.unJarAndSave.
+   */
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testBigJar() throws Exception {
+    Random r = new Random(System.currentTimeMillis());
+    File dir = new File(TEST_ROOT_DIR, Long.toHexString(r.nextLong()));
+    Assert.assertTrue(dir.mkdirs());
+    File input = generateBigJar(dir);
+    File output = new File(dir, "job2.jar");
+    try {
+      try (InputStream is = new FileInputStream(input)) {
+        RunJar.unJarAndSave(is, dir, "job2.jar", Pattern.compile(".*"));
+      }
+      Assert.assertEquals(input.length(), output.length());
+      for (int i = 0; i < 10; ++i) {
+        File subdir = new File(dir, ((i % 2 == 0) ? "dir/" : ""));
+        File f = new File(subdir, "f" + Integer.toString(i));
+        Assert.assertEquals(756, f.length());
+      }
+    } finally {
+      // Clean up
+      FileSystem fs = LocalFileSystem.getLocal(new Configuration());
+      fs.delete(new Path(dir.getAbsolutePath()), true);
+    }
+  }
+
+  @Test
   public void testUnJarDoesNotLooseLastModify() throws Exception {
-    File unjarDir = new File(TEST_ROOT_DIR, "unjar-lastmod");
-    assertFalse("unjar dir shouldn't exist at test start",
-            new File(unjarDir, "foobar.txt").exists());
+    File unjarDir = getUnjarDir("unjar-lastmod");
 
     // Unjar everything
     RunJar.unJar(new File(TEST_ROOT_DIR, TEST_JAR_NAME),
-            unjarDir);
+            unjarDir, MATCH_ANY);
 
-    assertEquals("Last modify time was lost during unJar", MOCKED_NOW, new File(unjarDir, "foobar.txt").lastModified());
-    assertEquals("Last modify time was lost during unJar", MOCKED_NOW_PLUS_TWO_SEC, new File(unjarDir, "foobaz.txt").lastModified());
+    String failureMessage = "Last modify time was lost during unJar";
+    assertEquals(failureMessage, MOCKED_NOW, new File(unjarDir, TestRunJar.FOOBAR_TXT).lastModified());
+    assertEquals(failureMessage, MOCKED_NOW_PLUS_TWO_SEC, new File(unjarDir, FOOBAZ_TXT).lastModified());
+  }
+
+  private File getUnjarDir(String dirName) {
+    File unjarDir = new File(TEST_ROOT_DIR, dirName);
+    assertFalse("unjar dir shouldn't exist at test start",
+                new File(unjarDir, TestRunJar.FOOBAR_TXT).exists());
+    return unjarDir;
   }
 
   /**
@@ -152,7 +217,8 @@ public class TestRunJar extends TestCase {
     when(runJar.getSystemClasses()).thenReturn(systemClasses);
 
     // create the test jar
-    File testJar = makeClassLoaderTestJar(mainCls, thirdCls);
+    File testJar = JarFinder.makeClassLoaderTestJar(this.getClass(),
+        TEST_ROOT_DIR, TEST_JAR_2_NAME, BUFF_SIZE, mainCls, thirdCls);
     // form the args
     String[] args = new String[3];
     args[0] = testJar.getAbsolutePath();
@@ -161,29 +227,74 @@ public class TestRunJar extends TestCase {
     // run RunJar
     runJar.run(args);
     // it should not throw an exception
+    verify(runJar, times(1)).unJar(any(File.class), any(File.class));
   }
 
-  private File makeClassLoaderTestJar(String... clsNames) throws IOException {
-    File jarFile = new File(TEST_ROOT_DIR, TEST_JAR_2_NAME);
+  @Test
+  public void testClientClassLoaderSkipUnjar() throws Throwable {
+    RunJar runJar = spy(new RunJar());
+    // enable the client classloader
+    when(runJar.useClientClassLoader()).thenReturn(true);
+    // set the system classes and blacklist the test main class and the test
+    // third class so they can be loaded by the application classloader
+    String mainCls = ClassLoaderCheckMain.class.getName();
+    String thirdCls = ClassLoaderCheckThird.class.getName();
+    String systemClasses = "-" + mainCls + "," +
+        "-" + thirdCls + "," +
+        ApplicationClassLoader.SYSTEM_CLASSES_DEFAULT;
+    when(runJar.getSystemClasses()).thenReturn(systemClasses);
+
+    // create the test jar
+    File testJar = JarFinder.makeClassLoaderTestJar(this.getClass(),
+        TEST_ROOT_DIR, TEST_JAR_2_NAME, BUFF_SIZE, mainCls, thirdCls);
+    // form the args
+    String[] args = new String[3];
+    args[0] = testJar.getAbsolutePath();
+    args[1] = mainCls;
+    when(runJar.skipUnjar()).thenReturn(true);
+    // run RunJar
+    runJar.run(args);
+    // it should not throw an exception
+    verify(runJar, times(0)).unJar(any(File.class), any(File.class));
+  }
+
+  @Test
+  public void testUnJar2() throws IOException {
+    // make a simple zip
+    File jarFile = new File(TEST_ROOT_DIR, TEST_JAR_NAME);
     JarOutputStream jstream =
         new JarOutputStream(new FileOutputStream(jarFile));
-    for (String clsName: clsNames) {
-      String name = clsName.replace('.', '/') + ".class";
-      InputStream entryInputStream = this.getClass().getResourceAsStream(
-          "/" + name);
-      ZipEntry entry = new ZipEntry(name);
-      jstream.putNextEntry(entry);
-      BufferedInputStream bufInputStream = new BufferedInputStream(
-          entryInputStream, 2048);
-      int count;
-      byte[] data = new byte[2048];
-      while ((count = bufInputStream.read(data, 0, 2048)) != -1) {
-        jstream.write(data, 0, count);
-      }
-      jstream.closeEntry();
-    }
+    JarEntry je = new JarEntry("META-INF/MANIFEST.MF");
+    byte[] data = "Manifest-Version: 1.0\nCreated-By: 1.8.0_1 (Manual)"
+        .getBytes(StandardCharsets.UTF_8);
+    je.setSize(data.length);
+    jstream.putNextEntry(je);
+    jstream.write(data);
+    jstream.closeEntry();
+    je = new JarEntry("../outside.path");
+    data = "any data here".getBytes(StandardCharsets.UTF_8);
+    je.setSize(data.length);
+    jstream.putNextEntry(je);
+    jstream.write(data);
+    jstream.closeEntry();
     jstream.close();
 
-    return jarFile;
+    File unjarDir = getUnjarDir("unjar-path");
+
+    // Unjar everything
+    try {
+      RunJar.unJar(jarFile, unjarDir, MATCH_ANY);
+      fail("unJar should throw IOException.");
+    } catch (IOException e) {
+      GenericTestUtils.assertExceptionContains(
+          "would create file outside of", e);
+    }
+    try {
+      RunJar.unJar(new FileInputStream(jarFile), unjarDir, MATCH_ANY);
+      fail("unJar should throw IOException.");
+    } catch (IOException e) {
+      GenericTestUtils.assertExceptionContains(
+          "would create file outside of", e);
+    }
   }
 }

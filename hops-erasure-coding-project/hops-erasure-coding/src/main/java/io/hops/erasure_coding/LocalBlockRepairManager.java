@@ -15,7 +15,7 @@
  */
 package io.hops.erasure_coding;
 
-import org.apache.commons.lang.NotImplementedException;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -67,16 +67,16 @@ public class LocalBlockRepairManager extends BlockRepairManager {
 
   @Override
   public List<Report> computeReports() {
-    throw new NotImplementedException();
+    throw new NotImplementedException("not implemented");
   }
 
   @Override
   public void cancelAll() {
-    throw new NotImplementedException();
+    throw new NotImplementedException("not implemented");
   }
 
   @Override
   public void cancel(String toCancel) {
-    throw new NotImplementedException();
+    throw new NotImplementedException("not implemented");
   }
 }

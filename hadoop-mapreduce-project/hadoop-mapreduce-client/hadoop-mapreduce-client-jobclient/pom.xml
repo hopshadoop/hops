@@ -19,12 +19,11 @@
   <parent>
     <artifactId>hadoop-mapreduce-client</artifactId>
     <groupId>io.hops</groupId>
-    <version>2.8.2.9-SNAPSHOT</version>
+    <version>3.2.0.0-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>io.hops</groupId>
   <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-  <version>2.8.2.9-SNAPSHOT</version>
+  <version>3.2.0.0-SNAPSHOT</version>
   <name>Apache Hadoop MapReduce JobClient</name>
 
   <properties>
@@ -39,10 +38,6 @@
     <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hadoop-mapreduce-client-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.hops</groupId>
-      <artifactId>hadoop-mapreduce-client-shuffle</artifactId>
     </dependency>
     <dependency>
       <groupId>io.hops</groupId>
@@ -100,6 +95,12 @@
       <type>test-jar</type>
     </dependency>
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-yarn-server-timelineservice</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
       <groupId>org.hsqldb</groupId>
       <artifactId>hsqldb</artifactId>
       <scope>test</scope>
@@ -132,16 +133,6 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.rat</groupId>
-        <artifactId>apache-rat-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>src/test/java/org/apache/hadoop/cli/data60bytes</exclude>
-            <exclude>src/test/resources/job_1329348432655_0001-10.jhist</exclude>
-          </excludes>
-        </configuration>
-      </plugin>
-      <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <executions>
           <execution>
@@ -152,17 +143,15 @@
               <excludes>
                 <exclude>**/hdfs-site.xml</exclude>
               </excludes>
+              <archive>
+                <manifest>
+                  <mainClass>org.apache.hadoop.test.MapredTestDriver</mainClass>
+                </manifest>
+              </archive>
             </configuration>
             <phase>test-compile</phase>
           </execution>
         </executions>
-        <configuration>       
-         <archive>
-          <manifest>
-           <mainClass>org.apache.hadoop.test.MapredTestDriver</mainClass>
-         </manifest>
-         </archive>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -175,6 +164,16 @@
             <!-- workaround for JobConf#setJarByClass -->
             <additionalClasspathElement>${project.build.directory}/${project.artifactId}-${project.version}-tests.jar</additionalClasspathElement>
           </additionalClasspathElements>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>src/test/java/org/apache/hadoop/cli/data60bytes</exclude>
+            <exclude>src/test/resources/job_1329348432655_0001-10.jhist</exclude>
+          </excludes>
         </configuration>
       </plugin>
     </plugins>

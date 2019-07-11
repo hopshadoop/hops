@@ -41,14 +41,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ApplicationSubmissionContextInfo;
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.sun.jersey.api.client.ClientResponse.Status;
-import io.hops.util.DBUtility;
-import io.hops.util.RMStorageFactory;
-import io.hops.util.YarnAPIStorageFactory;
 
 public class TestRMWebServicesHttpStaticUserPermissions {
 
@@ -107,13 +105,10 @@ public class TestRMWebServicesHttpStaticUserPermissions {
     rmconf.setBoolean(YarnConfiguration.YARN_ACL_ENABLE, true);
     rmconf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
       "kerberos");
-    rmconf.set("yarn.resourcemanager.principal", spnegoPrincipal);
-    rmconf.set("yarn.resourcemanager.keytab",
+    rmconf.set(YarnConfiguration.RM_PRINCIPAL, spnegoPrincipal);
+    rmconf.set(YarnConfiguration.RM_KEYTAB,
         spnegoKeytabFile.getAbsolutePath());
     rmconf.setBoolean("mockrm.webapp.enabled", true);
-    RMStorageFactory.setConfiguration(rmconf);
-    YarnAPIStorageFactory.setConfiguration(rmconf);
-    DBUtility.InitializeDB();
     UserGroupInformation.setConfiguration(rmconf);
     rm = new MockRM(rmconf);
     rm.start();
@@ -185,15 +180,20 @@ public class TestRMWebServicesHttpStaticUserPermissions {
         assertEquals(Status.FORBIDDEN.getStatusCode(), conn.getResponseCode());
         InputStream errorStream = conn.getErrorStream();
         String error = "";
-        BufferedReader reader =
-            new BufferedReader(new InputStreamReader(errorStream, "UTF8"));
+        BufferedReader reader = new BufferedReader(
+            new InputStreamReader(errorStream, "UTF8"));
         for (String line; (line = reader.readLine()) != null;) {
           error += line;
         }
         reader.close();
         errorStream.close();
+        JSONObject errResponse = new JSONObject(error);
+        JSONObject remoteException = errResponse
+            .getJSONObject("RemoteException");
         assertEquals(
-          "The default static user cannot carry out this operation.", error);
+            "java.lang.Exception: The default static user cannot carry out "
+            + "this operation.",
+            remoteException.getString("message"));
       }
       conn.disconnect();
     }

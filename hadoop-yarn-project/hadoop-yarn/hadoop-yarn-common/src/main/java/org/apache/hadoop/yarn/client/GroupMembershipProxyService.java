@@ -158,7 +158,7 @@ public class GroupMembershipProxyService implements Closeable {
                     try {
                       GroupMembership proxy = oldProxies.get(rmAddress);
                       if (proxy == null) {
-                        proxy = RMProxy.getProxy(conf, protocol, rmAddress);
+                        proxy = RMProxy.createRMProxy(conf, protocol, rmAddress);
                         oldProxies.put(rmAddress, proxy);
                       }
                       return (LiveRMsResponse) proxy.getLiveRMList();

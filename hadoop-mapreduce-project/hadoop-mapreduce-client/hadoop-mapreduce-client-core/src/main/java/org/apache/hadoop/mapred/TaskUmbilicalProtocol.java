@@ -24,6 +24,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.mapred.JvmTask;
+import org.apache.hadoop.mapreduce.checkpoint.CheckpointID;
+import org.apache.hadoop.mapreduce.checkpoint.FSCheckpointID;
+import org.apache.hadoop.mapreduce.checkpoint.TaskCheckpointID;
 import org.apache.hadoop.mapreduce.security.token.JobTokenSelector;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -64,9 +67,11 @@ public interface TaskUmbilicalProtocol extends VersionedProtocol {
    * Version 17 Modified TaskID to be aware of the new TaskTypes
    * Version 18 Added numRequiredSlots to TaskStatus for MAPREDUCE-516
    * Version 19 Added fatalError for child to communicate fatal errors to TT
+   * Version 20 Added methods to manage checkpoints
+   * Version 21 Added fastFail parameter to fatalError
    * */
 
-  public static final long versionID = 19L;
+  public static final long versionID = 21L;
   
   /**
    * Called when a child task process starts, to get its task.
@@ -78,7 +83,8 @@ public interface TaskUmbilicalProtocol extends VersionedProtocol {
   JvmTask getTask(JvmContext context) throws IOException;
   
   /**
-   * Report child's progress to parent.
+   * Report child's progress to parent. Also invoked to report still alive (used
+   * to be in ping). It reports an AMFeedback used to propagate preemption requests.
    * 
    * @param taskId task-id of the child
    * @param taskStatus status of the child
@@ -86,7 +92,7 @@ public interface TaskUmbilicalProtocol extends VersionedProtocol {
    * @throws InterruptedException
    * @return True if the task is known
    */
-  boolean statusUpdate(TaskAttemptID taskId, TaskStatus taskStatus) 
+  AMFeedback statusUpdate(TaskAttemptID taskId, TaskStatus taskStatus) 
   throws IOException, InterruptedException;
   
   /** Report error messages back to parent.  Calls should be sparing, since all
@@ -104,11 +110,6 @@ public interface TaskUmbilicalProtocol extends VersionedProtocol {
    */
   void reportNextRecordRange(TaskAttemptID taskid, SortedRanges.Range range) 
     throws IOException;
-
-  /** Periodically called by child to check if parent is still alive. 
-   * @return True if the task is known
-   */
-  boolean ping(TaskAttemptID taskid) throws IOException;
 
   /** Report that the task is successfully completed.  Failure is assumed if
    * the task process exits without calling this.
@@ -140,8 +141,13 @@ public interface TaskUmbilicalProtocol extends VersionedProtocol {
   /** Report that the task encounted a local filesystem error.*/
   void fsError(TaskAttemptID taskId, String message) throws IOException;
 
-  /** Report that the task encounted a fatal error.*/
-  void fatalError(TaskAttemptID taskId, String message) throws IOException;
+  /**
+   * Report that the task encounted a fatal error.
+   * @param taskId task's id
+   * @param message fail message
+   * @param fastFail flag to enable fast fail for task
+   */
+  void fatalError(TaskAttemptID taskId, String message, boolean fastFail) throws IOException;
   
   /** Called by a reduce task to get the map output locations for finished maps.
    * Returns an update centered around the map-task-completion-events. 
@@ -160,5 +166,33 @@ public interface TaskUmbilicalProtocol extends VersionedProtocol {
                                                        int maxLocs,
                                                        TaskAttemptID id) 
   throws IOException;
+
+  /**
+   * Report to the AM that the task has been succesfully preempted.
+   *
+   * @param taskId task's id
+   * @param taskStatus status of the child
+   * @throws IOException
+   */
+  void preempted(TaskAttemptID taskId, TaskStatus taskStatus)
+      throws IOException, InterruptedException;
+
+  /**
+   * Return the latest CheckpointID for the given TaskID. This provides
+   * the task with a way to locate the checkpointed data and restart from
+   * that point in the computation.
+   *
+   * @param taskID task's id
+   * @return the most recent checkpoint (if any) for this task
+   */
+  TaskCheckpointID getCheckpointID(TaskID taskID);
+
+  /**
+   * Send a CheckpointID for a given TaskID to be stored in the AM,
+   * to later restart a task from this checkpoint.
+   * @param tid
+   * @param cid
+   */
+  void setCheckpointID(TaskID tid, TaskCheckpointID cid);
 
 }

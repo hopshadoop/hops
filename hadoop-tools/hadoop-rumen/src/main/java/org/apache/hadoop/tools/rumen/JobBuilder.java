@@ -26,8 +26,8 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.mapred.TaskStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -69,7 +69,7 @@ public class JobBuilder {
   private static final long BYTES_IN_MEG =
       StringUtils.TraditionalBinaryPrefix.string2long("1m");
 
-  static final private Log LOG = LogFactory.getLog(JobBuilder.class);
+  static final private Logger LOG = LoggerFactory.getLogger(JobBuilder.class);
   
   private String jobID;
 
@@ -473,9 +473,12 @@ public class JobBuilder {
     task.setTaskStatus(getPre21Value(event.getTaskStatus()));
     TaskFailed t = (TaskFailed)(event.getDatum());
     task.putDiagnosticInfo(t.error.toString());
-    task.putFailedDueToAttemptId(t.failedDueToAttempt.toString());
+    // killed task wouldn't have failed attempt.
+    if (t.getFailedDueToAttempt() != null) {
+      task.putFailedDueToAttemptId(t.getFailedDueToAttempt().toString());
+    }
     org.apache.hadoop.mapreduce.jobhistory.JhCounters counters =
-        ((TaskFailed) event.getDatum()).counters;
+        ((TaskFailed) event.getDatum()).getCounters();
     task.incorporateCounters(
         counters == null ? EMPTY_COUNTERS : counters);
   }
@@ -500,7 +503,7 @@ public class JobBuilder {
 
     attempt.setFinishTime(event.getFinishTime());
     org.apache.hadoop.mapreduce.jobhistory.JhCounters counters =
-        ((TaskAttemptUnsuccessfulCompletion) event.getDatum()).counters;
+        ((TaskAttemptUnsuccessfulCompletion) event.getDatum()).getCounters();
     attempt.incorporateCounters(
         counters == null ? EMPTY_COUNTERS : counters);
     attempt.arraySetClockSplits(event.getClockSplits());
@@ -509,7 +512,7 @@ public class JobBuilder {
     attempt.arraySetPhysMemKbytes(event.getPhysMemKbytes());
     TaskAttemptUnsuccessfulCompletion t =
         (TaskAttemptUnsuccessfulCompletion) (event.getDatum());
-    attempt.putDiagnosticInfo(t.error.toString());
+    attempt.putDiagnosticInfo(t.getError().toString());
   }
 
   private void processTaskAttemptStartedEvent(TaskAttemptStartedEvent event) {

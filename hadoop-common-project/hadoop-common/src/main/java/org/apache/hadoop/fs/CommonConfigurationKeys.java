@@ -22,7 +22,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.io.erasurecode.rawcoder.RSRawErasureCoderFactory;
-import org.apache.hadoop.io.erasurecode.rawcoder.RSRawErasureCoderFactoryLegacy;
 import org.apache.hadoop.io.erasurecode.rawcoder.XORRawErasureCoderFactory;
 
 /** 
@@ -144,6 +143,22 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final int IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT =
       256 * 1024;
 
+  /** ZStandard compression level. */
+  public static final String IO_COMPRESSION_CODEC_ZSTD_LEVEL_KEY =
+      "io.compression.codec.zstd.level";
+
+  /** Default value for IO_COMPRESSION_CODEC_ZSTD_LEVEL_KEY. */
+  public static final int IO_COMPRESSION_CODEC_ZSTD_LEVEL_DEFAULT = 3;
+
+  /** ZStandard buffer size. */
+  public static final String IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY =
+      "io.compression.codec.zstd.buffersize";
+
+  /** ZStandard buffer size a value of 0 means use the recommended zstd
+   * buffer size that the library recommends. */
+  public static final int
+      IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT = 0;
+
   /** Internal buffer size for Lz4 compressor/decompressors */
   public static final String IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY =
       "io.compression.codec.lz4.buffersize";
@@ -159,6 +174,8 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   /** Default value for IO_COMPRESSION_CODEC_USELZ4HC_KEY */
   public static final boolean IO_COMPRESSION_CODEC_LZ4_USELZ4HC_DEFAULT =
       false;
+
+
 
   /**
    * Service Authorization
@@ -190,6 +207,9 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String
       HADOOP_SECURITY_SERVICE_AUTHORIZATION_DATANODE_LIFELINE =
           "security.datanode.lifeline.protocol.acl";
+  public static final String
+      HADOOP_SECURITY_SERVICE_AUTHORIZATION_RECONFIGURATION =
+      "security.reconfiguration.protocol.acl";
   public static final String 
   SECURITY_HA_SERVICE_PROTOCOL_ACL = "security.ha.service.protocol.acl";
   public static final String 
@@ -206,6 +226,8 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   SECURITY_NAMENODE_PROTOCOL_ACL = "security.namenode.protocol.acl";
   public static final String SECURITY_QJOURNAL_SERVICE_PROTOCOL_ACL =
       "security.qjournal.service.protocol.acl";
+  public static final String SECURITY_INTERQJOURNAL_SERVICE_PROTOCOL_ACL =
+      "security.interqjournal.service.protocol.acl";
   public static final String HADOOP_SECURITY_TOKEN_SERVICE_USE_IP =
       "hadoop.security.token.service.use_ip";
   public static final boolean HADOOP_SECURITY_TOKEN_SERVICE_USE_IP_DEFAULT =
@@ -321,6 +343,10 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String  IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY = "ipc.client.fallback-to-simple-auth-allowed";
   public static final boolean IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT = false;
 
+  public static final String  IPC_CLIENT_BIND_WILDCARD_ADDR_KEY = "ipc.client"
+      + ".bind.wildcard.addr";
+  public static final boolean IPC_CLIENT_BIND_WILDCARD_ADDR_DEFAULT = false;
+
   public static final String IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_KEY =
     "ipc.client.connect.max.retries.on.sasl";
   public static final int    IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_DEFAULT = 5;
@@ -348,10 +374,31 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
 
   // HDFS client HTrace configuration.
   public static final String  FS_CLIENT_HTRACE_PREFIX = "fs.client.htrace.";
+
+  // Global ZooKeeper configuration keys
+  public static final String ZK_PREFIX = "hadoop.zk.";
+  /** ACL for the ZooKeeper ensemble. */
+  public static final String ZK_ACL = ZK_PREFIX + "acl";
+  public static final String ZK_ACL_DEFAULT = "world:anyone:rwcda";
+  /** Authentication for the ZooKeeper ensemble. */
+  public static final String ZK_AUTH = ZK_PREFIX + "auth";
+
+  /** Address of the ZooKeeper ensemble. */
+  public static final String ZK_ADDRESS = ZK_PREFIX + "address";
+  /** Maximum number of retries for a ZooKeeper operation. */
+  public static final String ZK_NUM_RETRIES = ZK_PREFIX + "num-retries";
+  public static final int    ZK_NUM_RETRIES_DEFAULT = 1000;
+  /** Timeout for a ZooKeeper operation in ZooKeeper in milliseconds. */
+  public static final String ZK_TIMEOUT_MS = ZK_PREFIX + "timeout-ms";
+  public static final int    ZK_TIMEOUT_MS_DEFAULT = 10000;
+  /** How often to retry a ZooKeeper operation  in milliseconds. */
+  public static final String ZK_RETRY_INTERVAL_MS =
+      ZK_PREFIX + "retry-interval-ms";
+  public static final int    ZK_RETRY_INTERVAL_MS_DEFAULT = 1000;
   
     public static final String DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY =
       "dfs.leader.check.interval";
-  public static final int DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT = 2 * 1000; // 1 second
+  public static final int DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT = 2 * 1000; // 2 second
   
   public static final String DFS_LEADER_MISSED_HB_THRESHOLD_KEY =
       "dfs.leader.missed.hb";
@@ -367,12 +414,6 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "io.erasurecode.codec.rs-default.rawcoder";
   public static final String IO_ERASURECODE_CODEC_RS_DEFAULT_RAWCODER_DEFAULT =
       RSRawErasureCoderFactory.class.getCanonicalName();
-  
-   /** Raw coder factory for the RS legacy codec. */
-  public static final String IO_ERASURECODE_CODEC_RS_LEGACY_RAWCODER_KEY =
-      "io.erasurecode.codec.rs-legacy.rawcoder";
-  public static final String IO_ERASURECODE_CODEC_RS_LEGACY_RAWCODER_DEFAULT =
-      RSRawErasureCoderFactoryLegacy.class.getCanonicalName();
   
    /** Raw coder factory for the XOR codec. */
   public static final String IO_ERASURECODE_CODEC_XOR_RAWCODER_KEY =

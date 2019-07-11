@@ -20,8 +20,8 @@ package org.apache.hadoop.hdfs.tools;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.WordUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.WordUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**

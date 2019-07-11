@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 
+import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
@@ -132,6 +133,12 @@ public class NullRMStateStore extends RMStateStore {
   }
 
   @Override
+  public synchronized void removeApplicationAttemptInternal(
+      ApplicationAttemptId attemptId) throws Exception {
+    // Do nothing
+  }
+
+  @Override
   public void checkVersion() throws Exception {
     // Do nothing
   }
@@ -166,6 +173,11 @@ public class NullRMStateStore extends RMStateStore {
 
   @Override
   public void removeApplication(ApplicationId removeAppId) throws Exception {
+    // Do nothing
+  }
+  
+  @Override
+  public void fence() throws IOException {
     // Do nothing
   }
 }

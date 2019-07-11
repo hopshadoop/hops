@@ -24,11 +24,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -37,7 +36,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.net.ServerSocketUtil;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.Shell;
@@ -77,6 +78,10 @@ import org.apache.hadoop.yarn.server.nodemanager.amrmproxy.AMRMProxyService;
 import org.apache.hadoop.yarn.server.nodemanager.amrmproxy.DefaultRequestInterceptor;
 import org.apache.hadoop.yarn.server.nodemanager.amrmproxy.RequestInterceptor;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitor;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor.ContainersMonitorImpl;
+
+
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceTrackerService;
@@ -89,6 +94,7 @@ import org.apache.hadoop.yarn.server.timeline.MemoryTimelineStore;
 import org.apache.hadoop.yarn.server.timeline.TimelineStore;
 import org.apache.hadoop.yarn.server.timeline.recovery.MemoryTimelineStateStore;
 import org.apache.hadoop.yarn.server.timeline.recovery.TimelineStateStore;
+import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
@@ -96,14 +102,19 @@ import com.google.common.annotations.VisibleForTesting;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.yarn.server.resourcemanager.resource.TestResourceProfiles.TEST_CONF_RESET_RESOURCE_TYPES;
 
 /**
  * <p>
- * Embedded Yarn minicluster for testcases that need to interact with a cluster.
+ * Embedded YARN minicluster for testcases that need to interact with a cluster.
  * </p>
  * <p>
  * In a real cluster, resource request matching is done using the hostname, and
- * by default Yarn minicluster works in the exact same way as a real cluster.
+ * by default YARN minicluster works in the exact same way as a real cluster.
  * </p>
  * <p>
  * If a testcase needs to use multiple nodes and exercise resource request
@@ -120,7 +131,8 @@ import io.hops.util.YarnAPIStorageFactory;
 @InterfaceStability.Evolving
 public class MiniYARNCluster extends CompositeService {
 
-  private static final Log LOG = LogFactory.getLog(MiniYARNCluster.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MiniYARNCluster.class);
 
   // temp fix until metrics system can auto-detect itself running in unit test:
   static {
@@ -251,11 +263,26 @@ public class MiniYARNCluster extends CompositeService {
     useFixedPorts = conf.getBoolean(
         YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS,
         YarnConfiguration.DEFAULT_YARN_MINICLUSTER_FIXED_PORTS);
+
+    if (!useFixedPorts) {
+      String hostname = MiniYARNCluster.getHostname();
+      conf.set(YarnConfiguration.TIMELINE_SERVICE_ADDRESS, hostname + ":0");
+
+      conf.set(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS,
+          hostname + ":" + ServerSocketUtil.getPort(9188, 10));
+    }
+
     useRpc = conf.getBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC,
         YarnConfiguration.DEFAULT_YARN_MINICLUSTER_USE_RPC);
-    failoverTimeout = conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
-        YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS);
+    failoverTimeout = conf.getInt(CommonConfigurationKeys.DFS_LEADER_MISSED_HB_THRESHOLD_KEY,
+        CommonConfigurationKeys.DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT) * conf.getInt(
+            CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
+            CommonConfigurationKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT) * 2;
 
+    if (conf.getBoolean(TEST_CONF_RESET_RESOURCE_TYPES, true)) {
+      ResourceUtils.resetResourceTypes(conf);
+    }
+    
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     if(formatDB){
@@ -400,7 +427,7 @@ public class MiniYARNCluster extends CompositeService {
   }
 
   /**
-   * In a HA cluster, go through all the RMs and find the Active RM. In a
+   * In an HA cluster, go through all the RMs and find the Active RM. In a
    * non-HA cluster, return the index of the only RM.
    *
    * @return index of the active RM or -1 if none of them turn active
@@ -501,6 +528,7 @@ public class MiniYARNCluster extends CompositeService {
             HAServiceProtocol.RequestSource.REQUEST_BY_USER_FORCED));
       }
       Configuration conf = resourceManagers[index].getConfig();
+      LOG.info("Starting resourcemanager " + index);
       LOG.info("MiniYARN ResourceManager address: " +
           conf.get(YarnConfiguration.RM_ADDRESS));
       LOG.info("MiniYARN ResourceManager web address: " + WebAppUtils
@@ -569,17 +597,24 @@ public class MiniYARNCluster extends CompositeService {
           MiniYARNCluster.getHostname() + ":0");
       config.set(YarnConfiguration.NM_LOCALIZER_ADDRESS,
           MiniYARNCluster.getHostname() + ":0");
+      config.set(YarnConfiguration.NM_COLLECTOR_SERVICE_ADDRESS,
+          MiniYARNCluster.getHostname() + ":" +
+              ServerSocketUtil.getPort(
+                  YarnConfiguration.DEFAULT_NM_COLLECTOR_SERVICE_PORT, 10));
       WebAppUtils
           .setNMWebAppHostNameAndPort(config,
               MiniYARNCluster.getHostname(), 0);
 
+      config.setBoolean(
+          YarnConfiguration.NM_ENABLE_HARDWARE_CAPABILITY_DETECTION, false);
       // Disable resource checks by default
       if (!config.getBoolean(
           YarnConfiguration.YARN_MINICLUSTER_CONTROL_RESOURCE_MONITORING,
           YarnConfiguration.
               DEFAULT_YARN_MINICLUSTER_CONTROL_RESOURCE_MONITORING)) {
-        config.setBoolean(YarnConfiguration.NM_PMEM_CHECK_ENABLED, false);
-        config.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, false);
+        config.setBoolean(
+            YarnConfiguration.NM_CONTAINER_MONITOR_ENABLED, false);
+        config.setLong(YarnConfiguration.NM_RESOURCE_MON_INTERVAL_MS, 0);
       }
 
       LOG.info("Starting NM: " + index);
@@ -641,9 +676,8 @@ public class MiniYARNCluster extends CompositeService {
       if(nodeStatus == null) {
         return currentStatus;
       } else {
-        // Increment response ID, the RMNodeStatusEvent will not get recorded
-        // for a duplicate heartbeat
-        nodeStatus.setResponseId(nodeStatus.getResponseId() + 1);
+        // Use the same responseId for the custom node status
+        nodeStatus.setResponseId(currentStatus.getResponseId());
         return nodeStatus;
       }
     }
@@ -745,8 +779,15 @@ public class MiniYARNCluster extends CompositeService {
         ContainerExecutor exec, DeletionService del,
         NodeStatusUpdater nodeStatusUpdater, ApplicationACLsManager aclsManager,
         LocalDirsHandlerService dirsHandler) {
-      return new CustomContainerManagerImpl(context, exec, del,
-          nodeStatusUpdater, metrics, dirsHandler);
+      if (getConfig().getInt(
+          YarnConfiguration.NM_OPPORTUNISTIC_CONTAINERS_MAX_QUEUE_LENGTH, 0)
+          > 0) {
+        return new CustomQueueingContainerManagerImpl(context, exec, del,
+            nodeStatusUpdater, metrics, dirsHandler);
+      } else {
+        return new CustomContainerManagerImpl(context, exec, del,
+            nodeStatusUpdater, metrics, dirsHandler);
+      }
     }
   }
 
@@ -798,12 +839,6 @@ public class MiniYARNCluster extends CompositeService {
       }
       conf.setClass(YarnConfiguration.TIMELINE_SERVICE_STATE_STORE_CLASS,
           MemoryTimelineStateStore.class, TimelineStateStore.class);
-      if (!useFixedPorts) {
-        String hostname = MiniYARNCluster.getHostname();
-        conf.set(YarnConfiguration.TIMELINE_SERVICE_ADDRESS, hostname + ":0");
-        conf.set(YarnConfiguration.TIMELINE_SERVICE_WEBAPP_ADDRESS, hostname
-            + ":0");
-      }
       appHistoryServer.init(conf);
       super.serviceInit(conf);
     }
@@ -863,7 +898,9 @@ public class MiniYARNCluster extends CompositeService {
     protected void createAMRMProxyService(Configuration conf) {
       this.amrmProxyEnabled =
           conf.getBoolean(YarnConfiguration.AMRM_PROXY_ENABLED,
-              YarnConfiguration.DEFAULT_AMRM_PROXY_ENABLED);
+              YarnConfiguration.DEFAULT_AMRM_PROXY_ENABLED) ||
+              conf.getBoolean(YarnConfiguration.DIST_SCHEDULING_ENABLED,
+                  YarnConfiguration.DEFAULT_DIST_SCHEDULING_ENABLED);
 
       if (this.amrmProxyEnabled) {
         LOG.info("CustomAMRMProxyService is enabled. "
@@ -879,6 +916,64 @@ public class MiniYARNCluster extends CompositeService {
     }
   }
 
+  private class CustomQueueingContainerManagerImpl extends
+      ContainerManagerImpl {
+
+    public CustomQueueingContainerManagerImpl(Context context,
+        ContainerExecutor exec, DeletionService del, NodeStatusUpdater
+        nodeStatusUpdater, NodeManagerMetrics metrics,
+        LocalDirsHandlerService dirsHandler) {
+      super(context, exec, del, nodeStatusUpdater, metrics, dirsHandler);
+    }
+
+    @Override
+    protected void createAMRMProxyService(Configuration conf) {
+      this.amrmProxyEnabled =
+          conf.getBoolean(YarnConfiguration.AMRM_PROXY_ENABLED,
+              YarnConfiguration.DEFAULT_AMRM_PROXY_ENABLED) ||
+              conf.getBoolean(YarnConfiguration.DIST_SCHEDULING_ENABLED,
+                  YarnConfiguration.DEFAULT_DIST_SCHEDULING_ENABLED);
+
+      if (this.amrmProxyEnabled) {
+        LOG.info("CustomAMRMProxyService is enabled. "
+            + "All the AM->RM requests will be intercepted by the proxy");
+        AMRMProxyService amrmProxyService =
+            useRpc ? new AMRMProxyService(getContext(), dispatcher)
+                : new ShortCircuitedAMRMProxy(getContext(), dispatcher);
+        this.setAMRMProxyService(amrmProxyService);
+        addService(this.getAMRMProxyService());
+      } else {
+        LOG.info("CustomAMRMProxyService is disabled");
+      }
+    }
+
+    @Override
+    protected ContainersMonitor createContainersMonitor(ContainerExecutor
+        exec) {
+      return new ContainersMonitorImpl(exec, dispatcher, this.context) {
+        @Override
+        public float getVmemRatio() {
+          return 2.0f;
+        }
+
+        @Override
+        public long getVmemAllocatedForContainers() {
+          return 16 * 1024L * 1024L * 1024L;
+        }
+
+        @Override
+        public long getPmemAllocatedForContainers() {
+          return 8 * 1024L * 1024L * 1024L;
+        }
+
+        @Override
+        public long getVCoresAllocatedForContainers() {
+          return 10;
+        }
+      };
+    }
+  }
+
   private class ShortCircuitedAMRMProxy extends AMRMProxyService {
 
     public ShortCircuitedAMRMProxy(Context context,
@@ -889,11 +984,18 @@ public class MiniYARNCluster extends CompositeService {
     @Override
     protected void initializePipeline(ApplicationAttemptId applicationAttemptId,
         String user, Token<AMRMTokenIdentifier> amrmToken,
-        Token<AMRMTokenIdentifier> localToken) {
+        Token<AMRMTokenIdentifier> localToken,
+        Map<String, byte[]> recoveredDataMap, boolean isRecovery,
+        Credentials credentials) {
       super.initializePipeline(applicationAttemptId, user, amrmToken,
-          localToken);
+          localToken, recoveredDataMap, isRecovery, credentials);
       RequestInterceptor rt = getPipelines()
           .get(applicationAttemptId.getApplicationId()).getRootInterceptor();
+      // The DefaultRequestInterceptor will generally be the last
+      // interceptor
+      while (rt.getNextInterceptor() != null) {
+        rt = rt.getNextInterceptor();
+      }
       if (rt instanceof DefaultRequestInterceptor) {
         ((DefaultRequestInterceptor) rt)
             .setRMClient(getResourceManager().getApplicationMasterService());

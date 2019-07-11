@@ -608,7 +608,8 @@ public class NameNode implements NameNodeStatusMXBean {
     tokenServiceName = NetUtils.getHostPortString(rpcServer.getRpcAddress());
     httpServer.setNameNodeAddress(getNameNodeAddress());
 
-    pauseMonitor = new JvmPauseMonitor(conf);
+    pauseMonitor = new JvmPauseMonitor();
+    pauseMonitor.init(conf);
     pauseMonitor.start();
 
     metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
@@ -888,13 +889,17 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   /**
-   * @return NameNode HTTP address, used by the Web UI, image transfer, and
-   * HTTP-based file system clients like Hftp and WebHDFS
+   * @return NameNode HTTP address, used by the Web UI, image transfer,
+   *    and HTTP-based file system clients like WebHDFS
    */
   public InetSocketAddress getHttpAddress() {
     return httpServer.getHttpAddress();
   }
-  
+
+  /**
+   * @return NameNode HTTPS address, used by the Web UI, image transfer,
+   *    and HTTP-based file system clients like WebHDFS
+   */
   public InetSocketAddress getHttpsAddress() {
     return httpServer.getHttpsAddress();
   }

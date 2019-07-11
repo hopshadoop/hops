@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.fs.swift.http;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -29,11 +29,12 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 /**
- * Variant of Hadoop Netutils exception wrapping with URI awareness and
+ * Variant of Hadoop NetUtils exception wrapping with URI awareness and
  * available in branch-1 too.
  */
 public class ExceptionDiags {
-  private static final Log LOG = LogFactory.getLog(ExceptionDiags.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ExceptionDiags.class);
 
   /** text to point users elsewhere: {@value} */
   private static final String FOR_MORE_DETAILS_SEE

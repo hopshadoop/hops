@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.mapreduce;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -28,8 +30,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A utility to manage job submission files.
@@ -37,14 +39,15 @@ import org.apache.commons.logging.LogFactory;
 @InterfaceAudience.Private
 public class JobSubmissionFiles {
 
-  private final static Log LOG = LogFactory.getLog(JobSubmissionFiles.class);
+  private final static Logger LOG =
+      LoggerFactory.getLogger(JobSubmissionFiles.class);
 
   // job submission directory is private!
   final public static FsPermission JOB_DIR_PERMISSION =
-    FsPermission.createImmutable((short) 0700); // rwx--------
+      FsPermission.createImmutable((short) 0700); // rwx------
   //job files are world-wide readable and owner writable
   final public static FsPermission JOB_FILE_PERMISSION = 
-    FsPermission.createImmutable((short) 0644); // rw-r--r--
+      FsPermission.createImmutable((short) 0644); // rw-r--r--
   
   public static Path getJobSplitFile(Path jobSubmissionDir) {
     return new Path(jobSubmissionDir, "job.split");
@@ -104,36 +107,60 @@ public class JobSubmissionFiles {
    * @param cluster
    * @param conf
    */
-  public static Path getStagingDir(Cluster cluster, Configuration conf) 
-  throws IOException,InterruptedException {
+  public static Path getStagingDir(Cluster cluster, Configuration conf)
+      throws IOException, InterruptedException {
+    UserGroupInformation user = UserGroupInformation.getLoginUser();
+    return getStagingDir(cluster, conf, user);
+  }
+
+  /**
+   * Initializes the staging directory and returns the path. It also
+   * keeps track of all necessary ownership and permissions.
+   * It is kept for unit testing.
+   *
+   * @param cluster  Information about the map/reduce cluster
+   * @param conf     Configuration object
+   * @param realUser UserGroupInformation of login user
+   * @return staging dir path object
+   * @throws IOException          when ownership of staging area directory does
+   *                              not match the login user or current user.
+   * @throws InterruptedException when getting the staging area directory path
+   */
+  @VisibleForTesting
+  public static Path getStagingDir(Cluster cluster, Configuration conf,
+      UserGroupInformation realUser) throws IOException, InterruptedException {
     Path stagingArea = cluster.getStagingAreaDir();
     FileSystem fs = stagingArea.getFileSystem(conf);
-    String realUser;
-    String currentUser;
-    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
-    realUser = ugi.getShortUserName();
-    currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (fs.exists(stagingArea)) {
+    UserGroupInformation currentUser = realUser.getCurrentUser();
+    try {
       FileStatus fsStatus = fs.getFileStatus(stagingArea);
-      String owner = fsStatus.getOwner();
-      if (!(owner.equals(currentUser) || owner.equals(realUser))) {
-         throw new IOException("The ownership on the staging directory " +
-                      stagingArea + " is not as expected. " +
-                      "It is owned by " + owner + ". The directory must " +
-                      "be owned by the submitter " + currentUser + " or " +
-                      "by " + realUser);
+      String fileOwner = fsStatus.getOwner();
+      if (!(fileOwner.equals(currentUser.getShortUserName()) || fileOwner
+          .equalsIgnoreCase(currentUser.getUserName()) || fileOwner
+          .equals(realUser.getShortUserName()) || fileOwner
+          .equalsIgnoreCase(realUser.getUserName()))) {
+        String errorMessage = "The ownership on the staging directory " +
+            stagingArea + " is not as expected. " +
+            "It is owned by " + fileOwner + ". The directory must " +
+            "be owned by the submitter " + currentUser.getShortUserName()
+            + " or " + currentUser.getUserName();
+        if (!realUser.getUserName().equals(currentUser.getUserName())) {
+          throw new IOException(
+              errorMessage + " or " + realUser.getShortUserName() + " or "
+                  + realUser.getUserName());
+        } else {
+          throw new IOException(errorMessage);
+        }
       }
       if (!fsStatus.getPermission().equals(JOB_DIR_PERMISSION)) {
         LOG.info("Permissions on staging directory " + stagingArea + " are " +
-          "incorrect: " + fsStatus.getPermission() + ". Fixing permissions " +
-          "to correct value " + JOB_DIR_PERMISSION);
+            "incorrect: " + fsStatus.getPermission() + ". Fixing permissions " +
+            "to correct value " + JOB_DIR_PERMISSION);
         fs.setPermission(stagingArea, JOB_DIR_PERMISSION);
       }
-    } else {
-      fs.mkdirs(stagingArea, 
-          new FsPermission(JOB_DIR_PERMISSION));
+    } catch (FileNotFoundException e) {
+      fs.mkdirs(stagingArea, new FsPermission(JOB_DIR_PERMISSION));
     }
     return stagingArea;
   }
-  
 }

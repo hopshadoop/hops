@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.fs;
 
-import java.io.*;
 import java.io.DataOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
@@ -31,21 +30,20 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class FSDataOutputStream extends DataOutputStream
-    implements Syncable, CanSetDropBehind {
+    implements Syncable, CanSetDropBehind, StreamCapabilities {
   private final OutputStream wrappedStream;
 
   private static class PositionCache extends FilterOutputStream {
-    private FileSystem.Statistics statistics;
-    long position;
+    private final FileSystem.Statistics statistics;
+    private long position;
 
-    public PositionCache(OutputStream out, 
-                         FileSystem.Statistics stats,
-                         long pos) throws IOException {
+    PositionCache(OutputStream out, FileSystem.Statistics stats, long pos) {
       super(out);
       statistics = stats;
       position = pos;
     }
 
+    @Override
     public void write(int b) throws IOException {
       out.write(b);
       position++;
@@ -54,6 +52,7 @@ public class FSDataOutputStream extends DataOutputStream
       }
     }
     
+    @Override
     public void write(byte b[], int off, int len) throws IOException {
       out.write(b, off, len);
       position += len;                            // update position
@@ -62,10 +61,11 @@ public class FSDataOutputStream extends DataOutputStream
       }
     }
       
-    public long getPos() throws IOException {
+    long getPos() {
       return position;                            // return cached position
     }
-    
+
+    @Override
     public void close() throws IOException {
       // ensure close works even if a null reference was passed in
       if (out != null) {
@@ -74,18 +74,12 @@ public class FSDataOutputStream extends DataOutputStream
     }
   }
 
-  @Deprecated
-  public FSDataOutputStream(OutputStream out) throws IOException {
-    this(out, null);
-  }
-
-  public FSDataOutputStream(OutputStream out, FileSystem.Statistics stats)
-    throws IOException {
+  public FSDataOutputStream(OutputStream out, FileSystem.Statistics stats) {
     this(out, stats, 0);
   }
 
   public FSDataOutputStream(OutputStream out, FileSystem.Statistics stats,
-                            long startPosition) throws IOException {
+                            long startPosition) {
     super(new PositionCache(out, stats, startPosition));
     wrappedStream = out;
   }
@@ -95,15 +89,25 @@ public class FSDataOutputStream extends DataOutputStream
    *
    * @return the current position in the output stream
    */
-  public long getPos() throws IOException {
+  public long getPos() {
     return ((PositionCache)out).getPos();
   }
 
   /**
    * Close the underlying output stream.
    */
+  @Override
   public void close() throws IOException {
     out.close(); // This invokes PositionCache.close()
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "FSDataOutputStream{");
+    sb.append("wrappedStream=").append(wrappedStream);
+    sb.append('}');
+    return sb.toString();
   }
 
   /**
@@ -116,14 +120,14 @@ public class FSDataOutputStream extends DataOutputStream
     return wrappedStream;
   }
 
-  @Override  // Syncable
-  @Deprecated
-  public void sync() throws IOException {
-    if (wrappedStream instanceof Syncable) {
-      ((Syncable)wrappedStream).sync();
+  @Override
+  public boolean hasCapability(String capability) {
+    if (wrappedStream instanceof StreamCapabilities) {
+      return ((StreamCapabilities) wrappedStream).hasCapability(capability);
     }
+    return false;
   }
-  
+
   @Override  // Syncable
   public void hflush() throws IOException {
     if (wrappedStream instanceof Syncable) {

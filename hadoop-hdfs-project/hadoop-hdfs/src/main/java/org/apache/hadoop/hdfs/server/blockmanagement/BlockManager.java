@@ -235,7 +235,8 @@ public class BlockManager {
    * notified of all block deletions that might have been pending
    * when the failover happened.
    */
-  private final Set<Block> postponedMisreplicatedBlocks = Sets.newConcurrentHashSet();
+  private final Set<Block> postponedMisreplicatedBlocks = Collections.newSetFromMap(
+      new ConcurrentHashMap<Block, Boolean>());
 
   /**
    * Maps a StorageID to the set of blocks that are "extra" for this

@@ -416,4 +416,121 @@ public class TestChRootedFileSystem {
     @Override
     public void initialize(URI name, Configuration conf) throws IOException {}
   }
+
+  @Test(timeout = 30000)
+  public void testCreateSnapshot() throws Exception {
+    Path snapRootPath = new Path("/snapPath");
+    Path chRootedSnapRootPath = new Path("/a/b/snapPath");
+
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.createSnapshot(snapRootPath, "snap1");
+    verify(mockFs).createSnapshot(chRootedSnapRootPath, "snap1");
+  }
+
+  @Test(timeout = 30000)
+  public void testDeleteSnapshot() throws Exception {
+    Path snapRootPath = new Path("/snapPath");
+    Path chRootedSnapRootPath = new Path("/a/b/snapPath");
+
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.deleteSnapshot(snapRootPath, "snap1");
+    verify(mockFs).deleteSnapshot(chRootedSnapRootPath, "snap1");
+  }
+
+  @Test(timeout = 30000)
+  public void testRenameSnapshot() throws Exception {
+    Path snapRootPath = new Path("/snapPath");
+    Path chRootedSnapRootPath = new Path("/a/b/snapPath");
+
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.renameSnapshot(snapRootPath, "snapOldName", "snapNewName");
+    verify(mockFs).renameSnapshot(chRootedSnapRootPath, "snapOldName",
+        "snapNewName");
+  }
+
+  @Test(timeout = 30000)
+  public void testSetStoragePolicy() throws Exception {
+    Path storagePolicyPath = new Path("/storagePolicy");
+    Path chRootedStoragePolicyPath = new Path("/a/b/storagePolicy");
+
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.setStoragePolicy(storagePolicyPath, "HOT");
+    verify(mockFs).setStoragePolicy(chRootedStoragePolicyPath, "HOT");
+  }
+
+  @Test(timeout = 30000)
+  public void testUnsetStoragePolicy() throws Exception {
+    Path storagePolicyPath = new Path("/storagePolicy");
+    Path chRootedStoragePolicyPath = new Path("/a/b/storagePolicy");
+
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.unsetStoragePolicy(storagePolicyPath);
+    verify(mockFs).unsetStoragePolicy(chRootedStoragePolicyPath);
+  }
+
+  @Test(timeout = 30000)
+  public void testGetStoragePolicy() throws Exception {
+    Path storagePolicyPath = new Path("/storagePolicy");
+    Path chRootedStoragePolicyPath = new Path("/a/b/storagePolicy");
+
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.getStoragePolicy(storagePolicyPath);
+    verify(mockFs).getStoragePolicy(chRootedStoragePolicyPath);
+  }
+
+  @Test(timeout = 30000)
+  public void testGetAllStoragePolicy() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
+
+    URI chrootUri = URI.create("mockfs://foo/a/b");
+    ChRootedFileSystem chrootFs = new ChRootedFileSystem(chrootUri, conf);
+    FileSystem mockFs = ((FilterFileSystem) chrootFs.getRawFileSystem())
+        .getRawFileSystem();
+
+    chrootFs.getAllStoragePolicies();
+    verify(mockFs).getAllStoragePolicies();
+  }
 }

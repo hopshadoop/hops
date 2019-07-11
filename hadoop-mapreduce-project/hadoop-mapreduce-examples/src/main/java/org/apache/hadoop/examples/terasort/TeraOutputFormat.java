@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.examples.terasort;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -35,11 +36,15 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.security.TokenCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An output format that writes the key and value appended together.
  */
 public class TeraOutputFormat extends FileOutputFormat<Text,Text> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TeraOutputFormat.class);
   private OutputCommitter committer = null;
 
   /**
@@ -74,10 +79,22 @@ public class TeraOutputFormat extends FileOutputFormat<Text,Text> {
       out.write(key.getBytes(), 0, key.getLength());
       out.write(value.getBytes(), 0, value.getLength());
     }
-    
+
     public void close(TaskAttemptContext context) throws IOException {
       if (finalSync) {
-        out.sync();
+        try {
+          out.hsync();
+        } catch (UnsupportedOperationException e) {
+          /*
+           * Currently, hsync operation on striping file with erasure code
+           * policy is not supported yet. So this is a workaround to make
+           * teragen and terasort to support directory with striping files. In
+           * future, if the hsync operation is supported on striping file, this
+           * workaround should be removed.
+           */
+          LOG.info("Operation hsync is not supported so far on path with " +
+                  "erasure code policy set");
+        }
       }
       out.close();
     }
@@ -100,7 +117,7 @@ public class TeraOutputFormat extends FileOutputFormat<Text,Text> {
 
     final FileSystem fs = outDir.getFileSystem(jobConf);
 
-    if (fs.exists(outDir)) {
+    try {
       // existing output dir is considered empty iff its only content is the
       // partition file.
       //
@@ -116,6 +133,7 @@ public class TeraOutputFormat extends FileOutputFormat<Text,Text> {
         throw new FileAlreadyExistsException("Output directory " + outDir
             + " already exists");
       }
+    } catch (FileNotFoundException ignored) {
     }
   }
 
@@ -135,5 +153,4 @@ public class TeraOutputFormat extends FileOutputFormat<Text,Text> {
     }
     return committer;
   }
-
 }

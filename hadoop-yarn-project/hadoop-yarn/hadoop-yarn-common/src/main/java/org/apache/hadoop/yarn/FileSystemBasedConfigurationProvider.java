@@ -51,7 +51,8 @@ public class FileSystemBasedConfigurationProvider
           "Illegal argument! The parameter should not be null or empty");
     }
     Path filePath;
-    if (YarnConfiguration.RM_CONFIGURATION_FILES.contains(name)) {
+    if (YarnConfiguration.RM_CONFIGURATION_FILES.contains(name) ||
+        YarnConfiguration.NM_CONFIGURATION_FILES.contains(name)) {
       filePath = new Path(this.configDir, name);
       if (!fs.exists(filePath)) {
         LOG.info(filePath + " not found");
@@ -74,9 +75,7 @@ public class FileSystemBasedConfigurationProvider
         new Path(bootstrapConf.get(YarnConfiguration.FS_BASED_RM_CONF_STORE,
             YarnConfiguration.DEFAULT_FS_BASED_RM_CONF_STORE));
     fs = configDir.getFileSystem(bootstrapConf);
-    if (!fs.exists(configDir)) {
-      fs.mkdirs(configDir);
-    }
+    fs.mkdirs(configDir);
   }
 
   @Override

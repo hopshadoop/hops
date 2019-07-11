@@ -48,11 +48,10 @@ macro(hadoop_add_compiler_flags FLAGS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}")
 endmacro()
 
-# Add flags to all the CMake linker variables
+# Add flags to all the CMake linker variables.
 macro(hadoop_add_linker_flags FLAGS)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${FLAGS}")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${FLAGS}")
-    set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} ${FLAGS}")
 endmacro()
 
 # Compile a library with both shared and static variants.
@@ -118,19 +117,24 @@ macro(hadoop_set_find_shared_library_without_version)
     endif()
 endmacro()
 
-#
-# Configuration.
-#
 
-# Initialise the shared gcc/g++ flags if they aren't already defined.
-if(NOT DEFINED GCC_SHARED_FLAGS)
-    set(GCC_SHARED_FLAGS "-g -O2 -Wall -pthread -D_FILE_OFFSET_BITS=64")
+# set the shared compiler flags
+# support for GNU C/C++, add other compilers as necessary
+
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU" OR
+    CMAKE_C_COMPILER_ID STREQUAL "Clang" OR
+    CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
+  if(NOT DEFINED GCC_SHARED_FLAGS)
+    find_package(Threads REQUIRED)
+    if(CMAKE_USE_PTHREADS_INIT)
+      set(GCC_SHARED_FLAGS "-g -O2 -Wall -pthread -D_FILE_OFFSET_BITS=64")
+    else()
+      set(GCC_SHARED_FLAGS "-g -O2 -Wall -D_FILE_OFFSET_BITS=64")
+    endif()
+  endif()
 endif()
 
-# Add in support other compilers here, if necessary,
-# the assumption is that GCC or a GCC-compatible compiler is being used.
-
-# Set the shared GCC-compatible compiler and linker flags.
+# Set the shared linker flags.
 hadoop_add_compiler_flags("${GCC_SHARED_FLAGS}")
 hadoop_add_linker_flags("${LINKER_SHARED_FLAGS}")
 
@@ -188,7 +192,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 #
 elseif(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
     # Solaris flags. 64-bit compilation is mandatory, and is checked earlier.
-    hadoop_add_compiler_flags("-m64 -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS -D_XOPEN_SOURCE=500")
+    hadoop_add_compiler_flags("-m64 -D_POSIX_C_SOURCE=200112L -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS")
+    set(CMAKE_C_FLAGS "-std=gnu99 ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-std=gnu++98 ${CMAKE_CXX_FLAGS}")
     hadoop_add_linker_flags("-m64")
 
     # CMAKE_SYSTEM_PROCESSOR is set to the output of 'uname -p', which on Solaris is
@@ -199,7 +205,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
         set(CMAKE_SYSTEM_PROCESSOR "amd64")
         set(CMAKE_LIBRARY_ARCHITECTURE "amd64")
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "sparc")
-        set(CMAKE_SYSTEM_PROCESSOR STREQUAL "sparcv9")
+        set(CMAKE_SYSTEM_PROCESSOR "sparcv9")
         set(CMAKE_LIBRARY_ARCHITECTURE "sparcv9")
     else()
         message(FATAL_ERROR "Unrecognised CMAKE_SYSTEM_PROCESSOR ${CMAKE_SYSTEM_PROCESSOR}")

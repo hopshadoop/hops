@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,83 +13,52 @@
 #  limitations under the License.
 #
 
-# resolve links - $0 may be a softlink
-PRG="${0}"
+MYNAME="${0##*/}"
 
-while [ -h "${PRG}" ]; do
-  ls=`ls -ld "${PRG}"`
-  link=`expr "$ls" : '.*-> \(.*\)$'`
-  if expr "$link" : '/.*' > /dev/null; then
-    PRG="$link"
-  else
-    PRG=`dirname "${PRG}"`/"$link"
-  fi
-done
-
-function hadoop_escape() {
-      # Escape special chars for the later sed which saves the text as xml attribute
-      local ret
-      ret=$(sed 's/[\/&]/\\&/g' <<< "$1" | sed 's/&/\&amp;/g' | sed 's/"/\\\&quot;/g' \
-          | sed "s/'/\\\\\&apos;/g" | sed 's/</\\\&lt;/g' | sed 's/>/\\\&gt;/g')
-      echo "$ret"
+## @description  Print usage
+## @audience     private
+## @stability    stable
+## @replaceable  no
+function print_usage
+{
+  cat <<EOF
+Usage: ${MYNAME} run|start|status|stop
+commands:
+  run     Run KMS, the Key Management Server
+  start   Start KMS as a daemon
+  status  Return the status of the KMS daemon
+  stop    Stop the KMS daemon
+EOF
 }
 
-BASEDIR=`dirname ${PRG}`
-BASEDIR=`cd ${BASEDIR}/..;pwd`
+echo "WARNING: ${MYNAME} is deprecated," \
+  "please use 'hadoop [--daemon start|status|stop] kms'." >&2
 
-KMS_SILENT=${KMS_SILENT:-true}
+if [[ $# = 0 ]]; then
+  print_usage
+  exit
+fi
 
-HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-${BASEDIR}/libexec}"
-source ${HADOOP_LIBEXEC_DIR}/kms-config.sh
+case $1 in
+  run)
+    args=("kms")
+  ;;
+  start|stop|status)
+    args=("--daemon" "$1" "kms")
+  ;;
+  *)
+    echo "Unknown sub-command \"$1\"."
+    print_usage
+    exit 1
+  ;;
+esac
 
-
-if [ "x$JAVA_LIBRARY_PATH" = "x" ]; then
-  JAVA_LIBRARY_PATH="${HADOOP_LIBEXEC_DIR}/../lib/native/"
+# Locate bin
+if [[ -n "${HADOOP_HOME}" ]]; then
+  bin="${HADOOP_HOME}/bin"
 else
-  JAVA_LIBRARY_PATH="${HADOOP_LIBEXEC_DIR}/../lib/native/:${JAVA_LIBRARY_PATH}"
+  sbin=$(cd -P -- "$(dirname -- "$0")" >/dev/null && pwd -P)
+  bin=$(cd -P -- "${sbin}/../bin" >/dev/null && pwd -P)
 fi
 
-# The Java System property 'kms.http.port' it is not used by Kms,
-# it is used in Tomcat's server.xml configuration file
-#
-
-# Mask the trustStorePassword
-KMS_SSL_TRUSTSTORE_PASS=`echo $CATALINA_OPTS | grep -o 'trustStorePassword=[^ ]*' | awk -F'=' '{print $2}'`
-CATALINA_OPTS_DISP=`echo ${CATALINA_OPTS} | sed -e 's/trustStorePassword=[^ ]*/trustStorePassword=***/'`
-print "Using   CATALINA_OPTS:       ${CATALINA_OPTS_DISP}"
-
-catalina_opts="-Dproc_kms"
-catalina_opts="${catalina_opts} -Dkms.home.dir=${KMS_HOME}";
-catalina_opts="${catalina_opts} -Dkms.config.dir=${KMS_CONFIG}";
-catalina_opts="${catalina_opts} -Dkms.log.dir=${KMS_LOG}";
-catalina_opts="${catalina_opts} -Dkms.temp.dir=${KMS_TEMP}";
-catalina_opts="${catalina_opts} -Dkms.admin.port=${KMS_ADMIN_PORT}";
-catalina_opts="${catalina_opts} -Dkms.http.port=${KMS_HTTP_PORT}";
-catalina_opts="${catalina_opts} -Dkms.max.threads=${KMS_MAX_THREADS}";
-catalina_opts="${catalina_opts} -Dkms.max.http.header.size=${KMS_MAX_HTTP_HEADER_SIZE}";
-catalina_opts="${catalina_opts} -Dkms.ssl.keystore.file=${KMS_SSL_KEYSTORE_FILE}";
-catalina_opts="${catalina_opts} -Djava.library.path=${JAVA_LIBRARY_PATH}";
-
-print "Adding to CATALINA_OPTS:     ${catalina_opts}"
-print "Found KMS_SSL_KEYSTORE_PASS:     `echo ${KMS_SSL_KEYSTORE_PASS} | sed 's/./*/g'`"
-
-export CATALINA_OPTS="${CATALINA_OPTS} ${catalina_opts}"
-
-# A bug in catalina.sh script does not use CATALINA_OPTS for stopping the server
-#
-if [ "${1}" = "stop" ]; then
-  export JAVA_OPTS=${CATALINA_OPTS}
-fi
-
-# If ssl, the populate the passwords into ssl-server.xml before starting tomcat
-if [ ! "${KMS_SSL_KEYSTORE_PASS}" = "" ] || [ ! "${KMS_SSL_TRUSTSTORE_PASS}" = "" ]; then
-  # Set a KEYSTORE_PASS if not already set
-  KMS_SSL_KEYSTORE_PASS=${KMS_SSL_KEYSTORE_PASS:-password}
-  KMS_SSL_KEYSTORE_PASS_ESCAPED=$(hadoop_escape "$KMS_SSL_KEYSTORE_PASS")
-  KMS_SSL_TRUSTSTORE_PASS_ESCAPED=$(hadoop_escape "$KMS_SSL_TRUSTSTORE_PASS")
-  cat ${CATALINA_BASE}/conf/ssl-server.xml.conf \
-    | sed 's/"_kms_ssl_keystore_pass_"/'"\"${KMS_SSL_KEYSTORE_PASS_ESCAPED}\""'/g' \
-    | sed 's/"_kms_ssl_truststore_pass_"/'"\"${KMS_SSL_TRUSTSTORE_PASS_ESCAPED}\""'/g' > ${CATALINA_BASE}/conf/ssl-server.xml
-fi 
-
-exec ${KMS_CATALINA_HOME}/bin/catalina.sh "$@"
+exec "${bin}/hadoop" "${args[@]}"

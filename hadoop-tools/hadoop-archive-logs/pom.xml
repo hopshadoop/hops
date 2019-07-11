@@ -20,12 +20,11 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>2.8.2.9-SNAPSHOT</version>
+    <version>3.2.0.0-SNAPSHOT</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
-  <groupId>io.hops</groupId>
   <artifactId>hadoop-archive-logs</artifactId>
-  <version>2.8.2.9-SNAPSHOT</version>
+  <version>3.2.0.0-SNAPSHOT</version>
   <description>Apache Hadoop Archive Logs</description>
   <name>Apache Hadoop Archive Logs</name>
   <packaging>jar</packaging>
@@ -60,6 +59,11 @@
       <artifactId>hadoop-hdfs</artifactId>
       <scope>test</scope>
       <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-hdfs-client</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.hops</groupId>
@@ -172,6 +176,23 @@
          </archive>
         </configuration>
        </plugin>
+       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>deplist</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>list</goal>
+            </goals>
+            <configuration>
+              <!-- referenced by a built-in command -->
+              <outputFile>${project.basedir}/target/hadoop-tools-deps/${project.artifactId}.tools-builtin.txt</outputFile>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>findbugs-maven-plugin</artifactId>

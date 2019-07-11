@@ -137,7 +137,7 @@ import org.apache.hadoop.util.ToolRunner;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class JobClient extends CLI {
+public class JobClient extends CLI implements AutoCloseable {
 
   @InterfaceAudience.Private
   public static final String MAPREDUCE_CLIENT_RETRY_POLICY_ENABLED_KEY =
@@ -152,7 +152,7 @@ public class JobClient extends CLI {
   public static final String MAPREDUCE_CLIENT_RETRY_POLICY_SPEC_DEFAULT =
       "10000,6,60000,10"; // t1,n1,t2,n2,...
 
-  public static enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
+  public enum TaskStatusFilter { NONE, KILLED, FAILED, SUCCEEDED, ALL }
   private TaskStatusFilter taskOutputFilter = TaskStatusFilter.FAILED; 
   
   private int maxRetry = MRJobConfig.DEFAULT_MR_CLIENT_JOB_MAX_RETRIES;
@@ -499,6 +499,7 @@ public class JobClient extends CLI {
   /**
    * Close the <code>JobClient</code>.
    */
+  @Override
   public synchronized void close() throws IOException {
     cluster.close();
   }
@@ -731,6 +732,8 @@ public class JobClient extends CLI {
    * @param type the type of the task (map/reduce/setup/cleanup)
    * @param state the state of the task 
    * (pending/running/completed/failed/killed)
+   * @throws IOException when there is an error communicating with the master
+   * @throws IllegalArgumentException if an invalid type/state is passed
    */
   public void displayTasks(final JobID jobId, String type, String state) 
   throws IOException {

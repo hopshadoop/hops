@@ -173,6 +173,7 @@ enum StorageTypeProto {
   ARCHIVE = 4;
   RAM_DISK = 5;
   DB = 6;
+  PROVIDED = 7;
 }
 
 ///**

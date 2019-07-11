@@ -1,3 +1,4 @@
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,11 +19,6 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.Credentials;
@@ -31,6 +27,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -40,14 +37,20 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ResourceMappings;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceSet;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MockContainer implements Container {
 
   private ContainerId id;
   private ContainerState state;
   private String user;
-  private String userFolder;
   private ContainerLaunchContext launchContext;
   private final Map<Path, List<String>> resource =
       new HashMap<Path, List<String>>();
@@ -56,10 +59,9 @@ public class MockContainer implements Container {
 
   public MockContainer(ApplicationAttemptId appAttemptId,
       Dispatcher dispatcher, Configuration conf, String user,
-      ApplicationId appId, int uniqId, String userFolder) throws IOException{
+      ApplicationId appId, int uniqId) throws IOException{
 
     this.user = user;
-    this.userFolder = userFolder;
     this.recordFactory = RecordFactoryProvider.getRecordFactory(conf);
     this.id = BuilderUtils.newContainerId(recordFactory, appId, appAttemptId,
         uniqId);
@@ -81,11 +83,6 @@ public class MockContainer implements Container {
   @Override
   public String getUser() {
     return user;
-  }
-  
-  @Override
-  public String getUserFolder() {
-    return userFolder;
   }
 
   @Override
@@ -125,6 +122,11 @@ public class MockContainer implements Container {
   }
 
   @Override
+  public ResourceSet getResourceSet() {
+    return null;
+  }
+
+  @Override
   public void handle(ContainerEvent event) {
   }
 
@@ -139,7 +141,7 @@ public class MockContainer implements Container {
   }
 
   @Override
-  public void setResource(Resource targetResource) {
+  public void setContainerTokenIdentifier(ContainerTokenIdentifier token) {
   }
 
   @Override
@@ -153,7 +155,107 @@ public class MockContainer implements Container {
   }
 
   @Override
+  public boolean isRetryContextSet() {
+    return false;
+  }
+
+  @Override
+  public boolean shouldRetry(int errorCode) {
+    return false;
+  }
+
+  @Override
+  public String getWorkDir() {
+    return null;
+  }
+
+  @Override
+  public void setWorkDir(String workDir) {
+  }
+
+  @Override
+  public String getLogDir() {
+    return null;
+  }
+
+  @Override
+  public void setLogDir(String logDir) {
+  }
+
+  @Override
+  public Priority getPriority() {
+    return Priority.UNDEFINED;
+  }
+
+  @Override
+  public void setIpAndHost(String[] ipAndHost) {
+
+  }
+
+  @Override
+  public boolean isRunning() {
+    return false;
+  }
+
+  @Override
+  public void setIsReInitializing(boolean isReInitializing) {
+
+  }
+
+  @Override
+  public boolean isReInitializing() {
+    return false;
+  }
+
+  @Override
+  public boolean canRollback() {
+    return false;
+  }
+
+  @Override
+  public void commitUpgrade() {
+
+  }
+
+  @Override
+  public boolean isMarkedForKilling() {
+    return false;
+  }
+
+  @Override
+  public void sendLaunchEvent() {
+
+  }
+
+  @Override
+  public void sendKillEvent(int exitStatus, String description) {
+
+  }
+
+  @Override
   public boolean isRecovering() {
+    return false;
+  }
+
+  public long getContainerStartTime() {
+    return 0;
+  }
+
+  @Override
+  public long getContainerLaunchTime() {
+    return 0;
+  }
+
+  @Override
+  public ResourceMappings getResourceMappings() {
+    return null;
+  }
+
+  @Override
+  public void sendPauseEvent(String description) {
+
+  }
+  @Override public boolean isContainerInFinalStates() {
     return false;
   }
 }

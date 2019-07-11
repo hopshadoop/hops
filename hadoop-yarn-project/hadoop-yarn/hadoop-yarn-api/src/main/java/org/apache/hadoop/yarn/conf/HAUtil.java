@@ -18,22 +18,24 @@
 
 package org.apache.hadoop.yarn.conf;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.net.InetSocketAddress;
+import java.util.Collection;
+
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
-import java.net.InetSocketAddress;
-import java.util.Collection;
+import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Private
 public class HAUtil {
-  private static Log LOG = LogFactory.getLog(HAUtil.class);
+  private static Logger LOG = LoggerFactory.getLogger(HAUtil.class);
 
+  @VisibleForTesting
   public static final String BAD_CONFIG_MESSAGE_PREFIX =
     "Invalid configuration! ";
 
@@ -41,6 +43,29 @@ public class HAUtil {
 
   private static void throwBadConfigurationException(String msg) {
     throw new YarnRuntimeException(BAD_CONFIG_MESSAGE_PREFIX + msg);
+  }
+
+  /**
+   * Returns true if Federation is configured.
+   *
+   * @param conf Configuration
+   * @return true if federation is configured in the configuration; else false.
+   */
+  public static boolean isFederationEnabled(Configuration conf) {
+    return conf.getBoolean(YarnConfiguration.FEDERATION_ENABLED,
+        YarnConfiguration.DEFAULT_FEDERATION_ENABLED);
+  }
+
+  /**
+   * Returns true if RM failover is enabled in a Federation setting.
+   *
+   * @param conf Configuration
+   * @return if RM failover is enabled in conjunction with Federation in the
+   *         configuration; else false.
+   */
+  public static boolean isFederationFailoverEnabled(Configuration conf) {
+    return conf.getBoolean(YarnConfiguration.FEDERATION_FAILOVER_ENABLED,
+        YarnConfiguration.DEFAULT_FEDERATION_FAILOVER_ENABLED);
   }
 
   /**
@@ -57,24 +82,6 @@ public class HAUtil {
   public static boolean isAutomaticFailoverEnabled(Configuration conf) {
     return conf.getBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED,
         YarnConfiguration.DEFAULT_AUTO_FAILOVER_ENABLED);
-  }
-
-  // TODO: Parameterize the class of the configured HA proxy
-  public static boolean isHopsRMFailoverProxy(Configuration conf) {
-    return conf.get(YarnConfiguration.LEADER_CLIENT_FAILOVER_PROXY_PROVIDER,
-            YarnConfiguration.DEFAULT_LEADER_CLIENT_FAILOVER_PROXY_PROVIDER)
-            .equals("org.apache.hadoop.yarn.client.ConfiguredLeaderFailoverHAProxyProvider");
-  }
-
-  public static boolean isAutomaticFailoverEnabledAndEmbedded(
-      Configuration conf) {
-    return isAutomaticFailoverEnabled(conf) &&
-        isAutomaticFailoverEmbedded(conf);
-  }
-
-  public static boolean isAutomaticFailoverEmbedded(Configuration conf) {
-    return conf.getBoolean(YarnConfiguration.AUTO_FAILOVER_EMBEDDED,
-        YarnConfiguration.DEFAULT_AUTO_FAILOVER_EMBEDDED);
   }
 
   /**
@@ -124,7 +131,7 @@ public class HAUtil {
       msg.append("Can not find valid RM_HA_ID. None of ");
       for (String id : conf
           .getTrimmedStringCollection(YarnConfiguration.RM_HA_IDS)) {
-        msg.append(addSuffix(YarnConfiguration.RM_ADDRESS, id) + " ");
+        msg.append(addSuffix(YarnConfiguration.RM_ADDRESS, id)).append(" ");
       }
       msg.append(" are matching" +
           " the local address OR " + YarnConfiguration.RM_HA_ID + " is not" +
@@ -212,10 +219,10 @@ public class HAUtil {
     }
     return currentRMId;
   }
-  
+
   @VisibleForTesting
   static String getNeedToSetValueMessage(String confKey) {
-    return confKey + " needs to be set in a HA configuration.";
+    return confKey + " needs to be set in an HA configuration.";
   }
 
   @VisibleForTesting
@@ -230,7 +237,7 @@ public class HAUtil {
                                                         String rmId) {
     return YarnConfiguration.RM_HA_IDS + "("
       + ids +  ") need to contain " + YarnConfiguration.RM_HA_ID + "("
-      + rmId + ") in a HA configuration.";
+      + rmId + ") in an HA configuration.";
   }
 
   @VisibleForTesting
@@ -252,54 +259,28 @@ public class HAUtil {
     }
   }
 
-  @InterfaceAudience.Private
-  @VisibleForTesting
-  static String getConfKeyForRMInstance(String prefix, Configuration conf, String RMId) {
-    if (!YarnConfiguration.getServiceAddressConfKeys(conf).contains(prefix)) {
-      return prefix;
-    } else {
-      checkAndSetRMRPCAddress(prefix, RMId, conf);
-      return addSuffix(prefix, RMId);
-    }
-  }
-
-  public static String getConfValueForRMInstance(String prefix,
-                                                 Configuration conf, String host) {
-    String confKey = getConfKeyForRMInstance(prefix, conf, host);
-    String retVal = conf.getTrimmed(confKey);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("getConfValueForRMInstance: prefix = " + prefix +
-          "; confKey being looked up = " + confKey +
-          "; value being set to = " + retVal);
-    }
-    return retVal;
-  }
-
   public static String getConfValueForRMInstance(String prefix,
                                                  Configuration conf) {
     String confKey = getConfKeyForRMInstance(prefix, conf);
     String retVal = conf.getTrimmed(confKey);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("getConfValueForRMInstance: prefix = " + prefix +
-          "; confKey being looked up = " + confKey +
-          "; value being set to = " + retVal);
+      LOG.trace("getConfValueForRMInstance: prefix = {};" +
+          " confKey being looked up = {};" +
+          " value being set to = {}", prefix, confKey, retVal);
     }
     return retVal;
   }
-  
-  public static String getConfValueForRMInstance(
-      String prefix, String defaultValue, Configuration conf, String host) {
-    String value = getConfValueForRMInstance(prefix, conf, host);
-    return (value == null) ? defaultValue : value;
-  }
-  
+
   public static String getConfValueForRMInstance(
       String prefix, String defaultValue, Configuration conf) {
     String value = getConfValueForRMInstance(prefix, conf);
     return (value == null) ? defaultValue : value;
   }
 
-  /** Add non empty and non null suffix to a key */
+  /**
+   * Add non empty and non null suffix to a key.
+   * @return the suffixed key
+   */
   public static String addSuffix(String key, String suffix) {
     if (suffix == null || suffix.isEmpty()) {
       return key;

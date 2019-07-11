@@ -21,9 +21,9 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileged;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -46,7 +46,8 @@ import java.util.Map;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class PrivilegedOperationExecutor {
-  private static final Log LOG = LogFactory.getLog(PrivilegedOperationExecutor
+  private static final Logger LOG =
+       LoggerFactory.getLogger(PrivilegedOperationExecutor
       .class);
   private volatile static PrivilegedOperationExecutor instance;
 
@@ -157,13 +158,15 @@ public class PrivilegedOperationExecutor {
       }
     } catch (ExitCodeException e) {
       if (operation.isFailureLoggingEnabled()) {
-
         StringBuilder logBuilder = new StringBuilder("Shell execution returned "
             + "exit code: ")
             .append(exec.getExitCode())
-            .append(". Privileged Execution Operation Output: ")
-            .append(System.lineSeparator()).append(exec.getOutput());
-
+            .append(". Privileged Execution Operation Stderr: ")
+            .append(System.lineSeparator())
+            .append(e.getMessage())
+            .append(System.lineSeparator())
+            .append("Stdout: " + exec.getOutput())
+            .append(System.lineSeparator());
         logBuilder.append("Full command array for failed execution: ")
             .append(System.lineSeparator());
         logBuilder.append(Arrays.toString(fullCommandArray));
@@ -201,7 +204,7 @@ public class PrivilegedOperationExecutor {
   public String executePrivilegedOperation(PrivilegedOperation operation,
       boolean grabOutput) throws PrivilegedOperationException {
     return executePrivilegedOperation(null, operation, null, null, grabOutput,
-        true);
+        false);
   }
 
   //Utility functions for squashing together operations in supported ways

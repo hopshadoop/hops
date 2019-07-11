@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,7 +85,6 @@ public class TestNodeManagerShutdown {
   static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
   static final String user = "nobody";
-  static final String userFolder = "nobodysFolder";
   private FileContext localFS;
   private ContainerId cId;
   private NodeManager nm;
@@ -243,7 +243,7 @@ public class TestNodeManagerShutdown {
     StartContainerRequest scRequest =
         StartContainerRequest.newInstance(containerLaunchContext,
           TestContainerManager.createContainerToken(cId, 0,
-            nodeId, user, nm.getNMContext().getContainerTokenSecretManager(), userFolder));
+            nodeId, user, nm.getNMContext().getContainerTokenSecretManager()));
     List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
     list.add(scRequest);
     StartContainersRequest allRequests =
@@ -256,7 +256,8 @@ public class TestNodeManagerShutdown {
         GetContainerStatusesRequest.newInstance(containerIds);
     ContainerStatus containerStatus =
         containerManager.getContainerStatuses(request).getContainerStatuses().get(0);
-    Assert.assertEquals(ContainerState.RUNNING, containerStatus.getState());
+    Assert.assertTrue(EnumSet.of(ContainerState.RUNNING)
+            .contains(containerStatus.getState()));
   }
   
   public static ContainerId createContainerId() {

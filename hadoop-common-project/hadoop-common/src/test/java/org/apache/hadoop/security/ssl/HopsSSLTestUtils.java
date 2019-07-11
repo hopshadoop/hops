@@ -102,7 +102,7 @@ public class HopsSSLTestUtils {
         conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY,
                 "org.apache.hadoop.net.HopsSSLSocketFactory");
         conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
-        conf.set(SSLFactory.SSL_ENABLED_PROTOCOLS, "TLSv1.2,TLSv1.1");
+        conf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1");
         conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
         String user = UserGroupInformation.getCurrentUser().getUserName();
         conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user, "*");

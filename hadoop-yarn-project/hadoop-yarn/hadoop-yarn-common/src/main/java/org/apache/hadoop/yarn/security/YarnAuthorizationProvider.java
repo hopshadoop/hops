@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.security;
 
-import java.util.Map;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -29,6 +27,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
 
 /**
  * An implementation of the interface will provide authorization related
@@ -54,10 +55,24 @@ public abstract class YarnAuthorizationProvider {
             (YarnAuthorizationProvider) ReflectionUtils.newInstance(
               authorizerClass, conf);
         authorizer.init(conf);
-        LOG.info(authorizerClass.getName() + " is instiantiated.");
+        LOG.info(authorizerClass.getName() + " is instantiated.");
       }
     }
     return authorizer;
+  }
+
+  /**
+   * Destroy the {@link YarnAuthorizationProvider} instance.
+   * This method is called only in Tests.
+   */
+  @VisibleForTesting
+  public static void destroy() {
+    synchronized (YarnAuthorizationProvider.class) {
+      if (authorizer != null) {
+        LOG.debug(authorizer.getClass().getName() + " is destroyed.");
+        authorizer = null;
+      }
+    }
   }
 
   /**
@@ -69,30 +84,22 @@ public abstract class YarnAuthorizationProvider {
   /**
    * Check if user has the permission to access the target object.
    * 
-   * @param accessType
-   *          The type of accessing method.
-   * @param target
-   *          The target object being accessed, e.g. app/queue
-   * @param user
-   *          User who access the target
+   * @param accessRequest
+   *          the request object which contains all the access context info.
    * @return true if user can access the object, otherwise false.
    */
-  public abstract boolean checkPermission(AccessType accessType,
-      PrivilegedEntity target, UserGroupInformation user);
+
+  public abstract boolean checkPermission(AccessRequest accessRequest);
 
   /**
-   * Set ACLs for the target object. AccessControlList class encapsulate the
-   * users and groups who can access the target.
+   * Set permissions for the target object.
    *
-   * @param target
-   *          The target object.
-   * @param acls
-   *          A map from access method to a list of users and/or groups who has
-   *          permission to do the access.
+   * @param permissions
+   *        A list of permissions on the target object.
    * @param ugi User who sets the permissions.
    */
-  public abstract void setPermission(PrivilegedEntity target,
-      Map<AccessType, AccessControlList> acls, UserGroupInformation ugi);
+  public abstract void setPermission(List<Permission> permissions,
+      UserGroupInformation ugi);
 
   /**
    * Set a list of users/groups who have admin access

@@ -178,7 +178,7 @@ public class TestNetworkTopologyWithNodeGroup {
       assertTrue(frequency.get(key) > 0 || key == dataNodes[0]);
     }
   }
-  
+
   @Test
   public void testNodeGroup() throws Exception {
     String res = cluster.getNodeGroup("");

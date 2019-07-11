@@ -29,10 +29,12 @@ import org.apache.hadoop.fs.local.LocalConfigKeys;
 import org.apache.hadoop.ha.SshFenceByTcpPort;
 import org.apache.hadoop.ha.ZKFailoverController;
 import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.io.erasurecode.CodecUtil;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.security.CompositeGroupsMapping;
 import org.apache.hadoop.security.HttpCrossOriginFilterInitializer;
 import org.apache.hadoop.security.LdapGroupsMapping;
+import org.apache.hadoop.security.RuleBasedLdapGroupsMapping;
 import org.apache.hadoop.security.http.CrossOriginFilter;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
@@ -49,6 +51,7 @@ import org.apache.hadoop.security.ssl.SSLFactory;
  * {@link org.apache.hadoop.security.LdapGroupsMapping}
  * {@link org.apache.hadoop.security.http.CrossOriginFilter}
  * {@link org.apache.hadoop.security.ssl.SSLFactory}
+ * {@link org.apache.hadoop.io.erasurecode.rawcoder.CoderUtil}
  * <p></p>
  * against core-site.xml for missing properties.  Currently only
  * throws an error if the class is missing a property.
@@ -71,7 +74,9 @@ public class TestCommonConfigurationFields extends TestConfigurationFieldsBase {
         LdapGroupsMapping.class,
         ZKFailoverController.class,
         SSLFactory.class,
-        CompositeGroupsMapping.class
+        CompositeGroupsMapping.class,
+        CodecUtil.class,
+        RuleBasedLdapGroupsMapping.class
         };
 
     // Initialize used variables
@@ -86,27 +91,48 @@ public class TestCommonConfigurationFields extends TestConfigurationFieldsBase {
     // Lots of properties not in the above classes
     xmlPropsToSkipCompare.add("fs.ftp.password.localhost");
     xmlPropsToSkipCompare.add("fs.ftp.user.localhost");
-    xmlPropsToSkipCompare.add("fs.s3.block.size");
+    xmlPropsToSkipCompare.add("fs.ftp.data.connection.mode");
+    xmlPropsToSkipCompare.add("fs.ftp.transfer.mode");
     xmlPropsToSkipCompare.add("hadoop.tmp.dir");
     xmlPropsToSkipCompare.add("nfs3.mountd.port");
     xmlPropsToSkipCompare.add("nfs3.server.port");
-    xmlPropsToSkipCompare.add("test.fs.s3.name");
-    xmlPropsToSkipCompare.add("test.fs.s3n.name");
+    xmlPropsToSkipCompare.add("fs.viewfs.rename.strategy");
 
-    // S3/S3A properties are in a different subtree.
-    // - org.apache.hadoop.fs.s3.S3FileSystemConfigKeys
-    // - org.apache.hadoop.fs.s3native.S3NativeFileSystemConfigKeys
-    xmlPrefixToSkipCompare.add("fs.s3.");
+    // S3A properties are in a different subtree.
     xmlPrefixToSkipCompare.add("fs.s3a.");
-    xmlPrefixToSkipCompare.add("fs.s3n.");
-    xmlPrefixToSkipCompare.add("s3.");
-    xmlPrefixToSkipCompare.add("s3native.");
+
+    // O3 properties are in a different subtree.
+    xmlPrefixToSkipCompare.add("fs.o3.");
+
+    //ftp properties are in a different subtree.
+    // - org.apache.hadoop.fs.ftp.FTPFileSystem.
+    xmlPrefixToSkipCompare.add("fs.ftp.impl");
+
+    // WASB properties are in a different subtree.
+    // - org.apache.hadoop.fs.azure.NativeAzureFileSystem
+    xmlPrefixToSkipCompare.add("fs.wasb.impl");
+    xmlPrefixToSkipCompare.add("fs.wasbs.impl");
+    xmlPrefixToSkipCompare.add("fs.azure.");
+    xmlPrefixToSkipCompare.add("fs.abfs.impl");
+    xmlPrefixToSkipCompare.add("fs.abfss.impl");
+
 
     // ADL properties are in a different subtree
     // - org.apache.hadoop.hdfs.web.ADLConfKeys
     xmlPrefixToSkipCompare.add("adl.");
     xmlPrefixToSkipCompare.add("fs.adl.");
     xmlPropsToSkipCompare.add("fs.AbstractFileSystem.adl.impl");
+
+    // Azure properties are in a different class
+    // - org.apache.hadoop.fs.azure.AzureNativeFileSystemStore
+    // - org.apache.hadoop.fs.azure.SASKeyGeneratorImpl
+    xmlPropsToSkipCompare.add("fs.azure.sas.expiry.period");
+    xmlPropsToSkipCompare.add("fs.azure.local.sas.key.mode");
+    xmlPropsToSkipCompare.add("fs.azure.secure.mode");
+    xmlPropsToSkipCompare.add("fs.azure.authorization");
+    xmlPropsToSkipCompare.add("fs.azure.authorization.caching.enable");
+    xmlPropsToSkipCompare.add("fs.azure.saskey.usecontainersaskeyforallaccess");
+    xmlPropsToSkipCompare.add("fs.azure.user.agent.prefix");
 
     // Deprecated properties.  These should eventually be removed from the
     // class.

@@ -32,8 +32,6 @@ import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -43,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.SequenceFile;
@@ -74,6 +73,8 @@ import org.apache.hadoop.util.QuickSort;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** A Map task. */
 @InterfaceAudience.LimitedPrivate({"MapReduce"})
@@ -84,10 +85,15 @@ public class MapTask extends Task {
    */
   public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = 24;
 
+  // The minimum permissions needed for a shuffle output file.
+  private static final FsPermission SHUFFLE_OUTPUT_PERM =
+      new FsPermission((short)0640);
+
   private TaskSplitIndex splitMetaInfo = new TaskSplitIndex();
   private final static int APPROX_HEADER_LENGTH = 150;
 
-  private static final Log LOG = LogFactory.getLog(MapTask.class.getName());
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MapTask.class.getName());
 
   private Progress mapPhase;
   private Progress sortPhase;
@@ -411,8 +417,14 @@ public class MapTask extends Task {
         LOG.warn(msg, e);
       }
     }
-    throw new IOException("Initialization of all the collectors failed. " +
-      "Error in last collector was :" + lastException.getMessage(), lastException);
+
+    if (lastException != null) {
+      throw new IOException("Initialization of all the collectors failed. " +
+          "Error in last collector was:" + lastException.toString(),
+          lastException);
+    } else {
+      throw new IOException("Initialization of all the collectors failed.");
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -967,7 +979,8 @@ public class MapTask extends Task {
       //sanity checks
       final float spillper =
         job.getFloat(JobContext.MAP_SORT_SPILL_PERCENT, (float)0.8);
-      final int sortmb = job.getInt(JobContext.IO_SORT_MB, 100);
+      final int sortmb = job.getInt(MRJobConfig.IO_SORT_MB,
+          MRJobConfig.DEFAULT_IO_SORT_MB);
       indexCacheMemoryLimit = job.getInt(JobContext.INDEX_CACHE_MEMORY_LIMIT,
                                          INDEX_CACHE_MEMORY_LIMIT_DEFAULT);
       if (spillper > (float)1.0 || spillper <= (float)0.0) {
@@ -978,8 +991,9 @@ public class MapTask extends Task {
         throw new IOException(
             "Invalid \"" + JobContext.IO_SORT_MB + "\": " + sortmb);
       }
-      sorter = ReflectionUtils.newInstance(job.getClass("map.sort.class",
-            QuickSort.class, IndexedSorter.class), job);
+      sorter = ReflectionUtils.newInstance(job.getClass(
+                   MRJobConfig.MAP_SORT_CLASS, QuickSort.class,
+                   IndexedSorter.class), job);
       // buffers and accounting
       int maxMemUsage = sortmb << 20;
       maxMemUsage -= maxMemUsage % METASIZE;
@@ -1513,6 +1527,13 @@ public class MapTask extends Task {
       mergeParts();
       Path outputPath = mapOutputFile.getOutputFile();
       fileOutputByteCounter.increment(rfs.getFileStatus(outputPath).getLen());
+      // If necessary, make outputs permissive enough for shuffling.
+      if (!SHUFFLE_OUTPUT_PERM.equals(
+          SHUFFLE_OUTPUT_PERM.applyUMask(FsPermission.getUMask(job)))) {
+        Path indexPath = mapOutputFile.getOutputIndexFile();
+        rfs.setPermission(outputPath, SHUFFLE_OUTPUT_PERM);
+        rfs.setPermission(indexPath, SHUFFLE_OUTPUT_PERM);
+      }
     }
 
     public void close() { }
@@ -1559,7 +1580,8 @@ public class MapTask extends Task {
         if (lspillException instanceof Error) {
           final String logMsg = "Task " + getTaskID() + " failed : " +
             StringUtils.stringifyException(lspillException);
-          mapTask.reportFatalError(getTaskID(), lspillException, logMsg);
+          mapTask.reportFatalError(getTaskID(), lspillException, logMsg,
+              false);
         }
         throw new IOException("Spill failed", lspillException);
       }
@@ -1587,6 +1609,7 @@ public class MapTask extends Task {
       final long size = distanceTo(bufstart, bufend, bufvoid) +
                   partitions * APPROX_HEADER_LENGTH;
       FSDataOutputStream out = null;
+      FSDataOutputStream partitionOut = null;
       try {
         // create spill file
         final SpillRecord spillRec = new SpillRecord(partitions);
@@ -1607,7 +1630,7 @@ public class MapTask extends Task {
           IFile.Writer<K, V> writer = null;
           try {
             long segmentStart = out.getPos();
-            FSDataOutputStream partitionOut = CryptoUtils.wrapIfNecessary(job, out);
+            partitionOut = CryptoUtils.wrapIfNecessary(job, out, false);
             writer = new Writer<K, V>(job, partitionOut, keyClass, valClass, codec,
                                       spilledRecordsCounter);
             if (combinerRunner == null) {
@@ -1642,6 +1665,10 @@ public class MapTask extends Task {
 
             // close the writer
             writer.close();
+            if (partitionOut != out) {
+              partitionOut.close();
+              partitionOut = null;
+            }
 
             // record offsets
             rec.startOffset = segmentStart;
@@ -1670,6 +1697,9 @@ public class MapTask extends Task {
         ++numSpills;
       } finally {
         if (out != null) out.close();
+        if (partitionOut != null) {
+          partitionOut.close();
+        }
       }
     }
 
@@ -1682,6 +1712,7 @@ public class MapTask extends Task {
                                    int partition) throws IOException {
       long size = kvbuffer.length + partitions * APPROX_HEADER_LENGTH;
       FSDataOutputStream out = null;
+      FSDataOutputStream partitionOut = null;
       try {
         // create spill file
         final SpillRecord spillRec = new SpillRecord(partitions);
@@ -1696,7 +1727,7 @@ public class MapTask extends Task {
           try {
             long segmentStart = out.getPos();
             // Create a new codec, don't care!
-            FSDataOutputStream partitionOut = CryptoUtils.wrapIfNecessary(job, out);
+            partitionOut = CryptoUtils.wrapIfNecessary(job, out, false);
             writer = new IFile.Writer<K,V>(job, partitionOut, keyClass, valClass, codec,
                                             spilledRecordsCounter);
 
@@ -1708,6 +1739,10 @@ public class MapTask extends Task {
               mapOutputByteCounter.increment(out.getPos() - recordStart);
             }
             writer.close();
+            if (partitionOut != out) {
+              partitionOut.close();
+              partitionOut = null;
+            }
 
             // record offsets
             rec.startOffset = segmentStart;
@@ -1735,6 +1770,9 @@ public class MapTask extends Task {
         ++numSpills;
       } finally {
         if (out != null) out.close();
+        if (partitionOut != null) {
+          partitionOut.close();
+        }
       }
     }
 
@@ -1846,6 +1884,7 @@ public class MapTask extends Task {
 
       //The output stream for the final single output file
       FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
+      FSDataOutputStream finalPartitionOut = null;
 
       if (numSpills == 0) {
         //create dummy files
@@ -1854,10 +1893,15 @@ public class MapTask extends Task {
         try {
           for (int i = 0; i < partitions; i++) {
             long segmentStart = finalOut.getPos();
-            FSDataOutputStream finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut);
+            finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut,
+                false);
             Writer<K, V> writer =
               new Writer<K, V>(job, finalPartitionOut, keyClass, valClass, codec, null);
             writer.close();
+            if (finalPartitionOut != finalOut) {
+              finalPartitionOut.close();
+              finalPartitionOut = null;
+            }
             rec.startOffset = segmentStart;
             rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
             rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
@@ -1866,6 +1910,9 @@ public class MapTask extends Task {
           sr.writeToFile(finalIndexFile, job);
         } finally {
           finalOut.close();
+          if (finalPartitionOut != null) {
+            finalPartitionOut.close();
+          }
         }
         sortPhase.complete();
         return;
@@ -1894,7 +1941,8 @@ public class MapTask extends Task {
             }
           }
 
-          int mergeFactor = job.getInt(JobContext.IO_SORT_FACTOR, 100);
+          int mergeFactor = job.getInt(MRJobConfig.IO_SORT_FACTOR,
+              MRJobConfig.DEFAULT_IO_SORT_FACTOR);
           // sort the segments only if there are intermediate merges
           boolean sortSegments = segmentList.size() > mergeFactor;
           //merge
@@ -1909,7 +1957,7 @@ public class MapTask extends Task {
 
           //write merged output to disk
           long segmentStart = finalOut.getPos();
-          FSDataOutputStream finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut);
+          finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut, false);
           Writer<K, V> writer =
               new Writer<K, V>(job, finalPartitionOut, keyClass, valClass, codec,
                                spilledRecordsCounter);
@@ -1922,6 +1970,10 @@ public class MapTask extends Task {
 
           //close
           writer.close();
+          if (finalPartitionOut != finalOut) {
+            finalPartitionOut.close();
+            finalPartitionOut = null;
+          }
 
           sortPhase.startNextPhase();
           
@@ -1933,6 +1985,9 @@ public class MapTask extends Task {
         }
         spillRec.writeToFile(finalIndexFile, job);
         finalOut.close();
+        if (finalPartitionOut != null) {
+          finalPartitionOut.close();
+        }
         for(int i = 0; i < numSpills; i++) {
           rfs.delete(filename[i],true);
         }

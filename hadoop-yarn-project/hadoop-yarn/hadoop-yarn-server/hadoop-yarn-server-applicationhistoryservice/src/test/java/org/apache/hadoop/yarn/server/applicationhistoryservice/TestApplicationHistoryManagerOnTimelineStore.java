@@ -80,9 +80,11 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     store = createStore(SCALE);
     TimelineEntities entities = new TimelineEntities();
     entities.addEntity(createApplicationTimelineEntity(
-        ApplicationId.newInstance(0, SCALE + 1), true, true, false, false));
+        ApplicationId.newInstance(0, SCALE + 1), true, true, false, false,
+        YarnApplicationState.FINISHED));
     entities.addEntity(createApplicationTimelineEntity(
-        ApplicationId.newInstance(0, SCALE + 2), true, false, true, false));
+        ApplicationId.newInstance(0, SCALE + 2), true, false, true, false,
+        YarnApplicationState.FINISHED));
     store.put(entities);
   }
 
@@ -140,13 +142,18 @@ public class TestApplicationHistoryManagerOnTimelineStore {
       ApplicationId appId = ApplicationId.newInstance(0, i);
       if (i == 2) {
         entities.addEntity(createApplicationTimelineEntity(
-            appId, true, false, false, true));
+            appId, true, false, false, true, YarnApplicationState.FINISHED));
       } else if (i == 3) {
         entities.addEntity(createApplicationTimelineEntity(
-            appId, false, false, false, false, true));
+            appId, false, false, false, false, YarnApplicationState.FINISHED,
+            true, false));
+      } else if (i == SCALE + 1) {
+        entities.addEntity(createApplicationTimelineEntity(
+            appId, false, false, false, false, YarnApplicationState.FINISHED,
+            false, true));
       } else {
         entities.addEntity(createApplicationTimelineEntity(
-            appId, false, false, false, false));
+            appId, false, false, false, false, YarnApplicationState.FINISHED));
       }
       store.put(entities);
       for (int j = 1; j <= scale; ++j) {
@@ -163,6 +170,16 @@ public class TestApplicationHistoryManagerOnTimelineStore {
         }
       }
     }
+    TimelineEntities entities = new TimelineEntities();
+    ApplicationId appId = ApplicationId.newInstance(1234, 1);
+    ApplicationAttemptId appAttemptId =
+        ApplicationAttemptId.newInstance(appId, 1);
+    ContainerId containerId = ContainerId.newContainerId(appAttemptId, 1);
+    entities.addEntity(createApplicationTimelineEntity(
+        appId, true, false, false, false, YarnApplicationState.RUNNING));
+    entities.addEntity(createAppAttemptTimelineEntity(appAttemptId));
+    entities.addEntity(createContainerEntity(containerId));
+    store.put(entities);
   }
 
   @Test
@@ -236,24 +253,17 @@ public class TestApplicationHistoryManagerOnTimelineStore {
           applicationResourceUsageReport.getMemorySeconds());
       Assert
           .assertEquals(345, applicationResourceUsageReport.getVcoreSeconds());
-      Assert
-          .assertEquals(345, applicationResourceUsageReport.getGPUSeconds());
       long expectedPreemptMemSecs = 456;
       long expectedPreemptVcoreSecs = 789;
-      long expectedPreemptGPUSecs = 789;
       if (i == 3) {
         expectedPreemptMemSecs = 0;
         expectedPreemptVcoreSecs = 0;
-        expectedPreemptGPUSecs = 0;
       }
       Assert.assertEquals(expectedPreemptMemSecs,
           applicationResourceUsageReport.getPreemptedMemorySeconds());
       Assert
           .assertEquals(expectedPreemptVcoreSecs, applicationResourceUsageReport
               .getPreemptedVcoreSeconds());
-      Assert
-          .assertEquals(expectedPreemptGPUSecs, applicationResourceUsageReport
-              .getPreemptedGPUSeconds());
       Assert.assertEquals(FinalApplicationStatus.UNDEFINED,
           app.getFinalApplicationStatus());
       Assert.assertEquals(YarnApplicationState.FINISHED,
@@ -356,7 +366,7 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     Assert.assertNotNull(container);
     Assert.assertEquals(Integer.MAX_VALUE + 1L, container.getCreationTime());
     Assert.assertEquals(Integer.MAX_VALUE + 2L, container.getFinishTime());
-    Assert.assertEquals(Resource.newInstance(-1, -1, -1),
+    Assert.assertEquals(Resource.newInstance(-1, -1),
         container.getAllocatedResource());
     Assert.assertEquals(NodeId.newInstance("test host", 100),
         container.getAssignedNode());
@@ -376,7 +386,7 @@ public class TestApplicationHistoryManagerOnTimelineStore {
         historyManager.getApplications(Long.MAX_VALUE, 0L, Long.MAX_VALUE)
           .values();
     Assert.assertNotNull(apps);
-    Assert.assertEquals(SCALE + 1, apps.size());
+    Assert.assertEquals(SCALE + 2, apps.size());
     ApplicationId ignoredAppId = ApplicationId.newInstance(0, SCALE + 2);
     for (ApplicationReport app : apps) {
       Assert.assertNotEquals(ignoredAppId, app.getApplicationId());
@@ -488,15 +498,17 @@ public class TestApplicationHistoryManagerOnTimelineStore {
 
   private static TimelineEntity createApplicationTimelineEntity(
       ApplicationId appId, boolean emptyACLs, boolean noAttemptId,
-      boolean wrongAppId, boolean enableUpdateEvent) {
+      boolean wrongAppId, boolean enableUpdateEvent,
+      YarnApplicationState state) {
     return createApplicationTimelineEntity(appId, emptyACLs, noAttemptId,
-        wrongAppId, enableUpdateEvent, false);
+        wrongAppId, enableUpdateEvent, state, false, false);
   }
 
   private static TimelineEntity createApplicationTimelineEntity(
       ApplicationId appId, boolean emptyACLs, boolean noAttemptId,
       boolean wrongAppId, boolean enableUpdateEvent,
-      boolean missingPreemptMetrics) {
+      YarnApplicationState state, boolean missingPreemptMetrics,
+      boolean missingQueue) {
     TimelineEntity entity = new TimelineEntity();
     entity.setEntityType(ApplicationMetricsConstants.ENTITY_TYPE);
     if (wrongAppId) {
@@ -512,7 +524,10 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     entityInfo.put(ApplicationMetricsConstants.TYPE_ENTITY_INFO,
         "test app type");
     entityInfo.put(ApplicationMetricsConstants.USER_ENTITY_INFO, "user1");
-    entityInfo.put(ApplicationMetricsConstants.QUEUE_ENTITY_INFO, "test queue");
+    if (!missingQueue) {
+      entityInfo.put(ApplicationMetricsConstants.QUEUE_ENTITY_INFO,
+          "test queue");
+    }
     entityInfo.put(
         ApplicationMetricsConstants.UNMANAGED_APPLICATION_ENTITY_INFO, "false");
     entityInfo.put(ApplicationMetricsConstants.APPLICATION_PRIORITY_INFO,
@@ -521,11 +536,9 @@ public class TestApplicationHistoryManagerOnTimelineStore {
         Integer.MAX_VALUE + 1L);
     entityInfo.put(ApplicationMetricsConstants.APP_MEM_METRICS, 123);
     entityInfo.put(ApplicationMetricsConstants.APP_CPU_METRICS, 345);
-    entityInfo.put(ApplicationMetricsConstants.APP_GPU_METRICS,345);
     if (!missingPreemptMetrics) {
       entityInfo.put(ApplicationMetricsConstants.APP_MEM_PREEMPT_METRICS, 456);
       entityInfo.put(ApplicationMetricsConstants.APP_CPU_PREEMPT_METRICS, 789);
-      entityInfo.put(ApplicationMetricsConstants.APP_GPU_PREEMPT_METRICS, 789);
     }
     if (emptyACLs) {
       entityInfo.put(ApplicationMetricsConstants.APP_VIEW_ACLS_ENTITY_INFO, "");
@@ -552,7 +565,7 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     eventInfo.put(ApplicationMetricsConstants.FINAL_STATUS_EVENT_INFO,
         FinalApplicationStatus.UNDEFINED.toString());
     eventInfo.put(ApplicationMetricsConstants.STATE_EVENT_INFO,
-        YarnApplicationState.FINISHED.toString());
+        state.toString());
     if (!noAttemptId) {
       eventInfo.put(ApplicationMetricsConstants.LATEST_APP_ATTEMPT_EVENT_INFO,
           ApplicationAttemptId.newInstance(appId, 1));
@@ -615,13 +628,13 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     tEvent.setEventType(AppAttemptMetricsConstants.REGISTERED_EVENT_TYPE);
     tEvent.setTimestamp(Integer.MAX_VALUE + 1L);
     Map<String, Object> eventInfo = new HashMap<String, Object>();
-    eventInfo.put(AppAttemptMetricsConstants.TRACKING_URL_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.TRACKING_URL_INFO,
         "test tracking url");
-    eventInfo.put(AppAttemptMetricsConstants.ORIGINAL_TRACKING_URL_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.ORIGINAL_TRACKING_URL_INFO,
         "test original tracking url");
-    eventInfo.put(AppAttemptMetricsConstants.HOST_EVENT_INFO, "test host");
-    eventInfo.put(AppAttemptMetricsConstants.RPC_PORT_EVENT_INFO, 100);
-    eventInfo.put(AppAttemptMetricsConstants.MASTER_CONTAINER_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.HOST_INFO, "test host");
+    eventInfo.put(AppAttemptMetricsConstants.RPC_PORT_INFO, 100);
+    eventInfo.put(AppAttemptMetricsConstants.MASTER_CONTAINER_INFO,
         ContainerId.newContainerId(appAttemptId, 1));
     tEvent.setEventInfo(eventInfo);
     entity.addEvent(tEvent);
@@ -629,15 +642,15 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     tEvent.setEventType(AppAttemptMetricsConstants.FINISHED_EVENT_TYPE);
     tEvent.setTimestamp(Integer.MAX_VALUE + 2L);
     eventInfo = new HashMap<String, Object>();
-    eventInfo.put(AppAttemptMetricsConstants.TRACKING_URL_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.TRACKING_URL_INFO,
         "test tracking url");
-    eventInfo.put(AppAttemptMetricsConstants.ORIGINAL_TRACKING_URL_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.ORIGINAL_TRACKING_URL_INFO,
         "test original tracking url");
-    eventInfo.put(AppAttemptMetricsConstants.DIAGNOSTICS_INFO_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.DIAGNOSTICS_INFO,
         "test diagnostics info");
-    eventInfo.put(AppAttemptMetricsConstants.FINAL_STATUS_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.FINAL_STATUS_INFO,
         FinalApplicationStatus.UNDEFINED.toString());
-    eventInfo.put(AppAttemptMetricsConstants.STATE_EVENT_INFO,
+    eventInfo.put(AppAttemptMetricsConstants.STATE_INFO,
         YarnApplicationAttemptState.FINISHED.toString());
     tEvent.setEventInfo(eventInfo);
     entity.addEvent(tEvent);
@@ -654,14 +667,15 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     entity.addPrimaryFilter(
         TimelineStore.SystemFilter.ENTITY_OWNER.toString(), "yarn");
     Map<String, Object> entityInfo = new HashMap<String, Object>();
-    entityInfo.put(ContainerMetricsConstants.ALLOCATED_MEMORY_ENTITY_INFO, -1);
-    entityInfo.put(ContainerMetricsConstants.ALLOCATED_VCORE_ENTITY_INFO, -1);
-    entityInfo.put(ContainerMetricsConstants.ALLOCATED_GPU_ENTITY_INFO, -1);
-    entityInfo.put(ContainerMetricsConstants.ALLOCATED_HOST_ENTITY_INFO,
+    entityInfo.put(ContainerMetricsConstants.ALLOCATED_MEMORY_INFO, -1);
+    entityInfo.put(ContainerMetricsConstants.ALLOCATED_VCORE_INFO, -1);
+    entityInfo.put(ContainerMetricsConstants.ALLOCATED_HOST_INFO,
         "test host");
-    entityInfo.put(ContainerMetricsConstants.ALLOCATED_PORT_ENTITY_INFO, 100);
+    entityInfo.put(ContainerMetricsConstants.ALLOCATED_PORT_INFO, 100);
     entityInfo
-        .put(ContainerMetricsConstants.ALLOCATED_PRIORITY_ENTITY_INFO, -1);
+        .put(ContainerMetricsConstants.ALLOCATED_PRIORITY_INFO, -1);
+    entityInfo.put(ContainerMetricsConstants
+        .ALLOCATED_HOST_HTTP_ADDRESS_INFO, "http://test:1234");
     entity.setOtherInfo(entityInfo);
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setEventType(ContainerMetricsConstants.CREATED_EVENT_TYPE);
@@ -672,10 +686,10 @@ public class TestApplicationHistoryManagerOnTimelineStore {
     tEvent.setEventType(ContainerMetricsConstants.FINISHED_EVENT_TYPE);
     tEvent.setTimestamp(Integer.MAX_VALUE + 2L);
     Map<String, Object> eventInfo = new HashMap<String, Object>();
-    eventInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO_EVENT_INFO,
+    eventInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO,
         "test diagnostics info");
-    eventInfo.put(ContainerMetricsConstants.EXIT_STATUS_EVENT_INFO, -1);
-    eventInfo.put(ContainerMetricsConstants.STATE_EVENT_INFO,
+    eventInfo.put(ContainerMetricsConstants.EXIT_STATUS_INFO, -1);
+    eventInfo.put(ContainerMetricsConstants.STATE_INFO,
         ContainerState.COMPLETE.toString());
     tEvent.setEventInfo(eventInfo);
     entity.addEvent(tEvent);

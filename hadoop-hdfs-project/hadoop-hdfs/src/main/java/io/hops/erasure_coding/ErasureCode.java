@@ -18,6 +18,7 @@
 
 package io.hops.erasure_coding;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -132,7 +133,7 @@ public abstract class ErasureCode {
    * This method would be overridden in the subclass,
    * so that the subclass will have its own encodeBulk behavior.
    */
-  public void encodeBulk(byte[][] inputs, byte[][] outputs) {
+  public void encodeBulk(byte[][] inputs, byte[][] outputs) throws IOException {
     final int stripeSize = stripeSize();
     final int paritySize = paritySize();
     assert (stripeSize == inputs.length);
@@ -159,7 +160,7 @@ public abstract class ErasureCode {
    * so that the subclass will have its own decodeBulk behavior.
    */
   public void decodeBulk(byte[][] readBufs, byte[][] writeBufs,
-      int[] erasedLocations, int[] locationsToRead, int[] locationsNotToRead) {
+      int[] erasedLocations, int[] locationsToRead, int[] locationsNotToRead) throws IOException {
     int[] tmpInput = new int[readBufs.length];
     int[] tmpOutput = new int[erasedLocations.length];
 

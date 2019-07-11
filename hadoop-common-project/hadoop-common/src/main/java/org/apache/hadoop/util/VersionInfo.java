@@ -22,11 +22,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class returns build information about Hadoop components.
@@ -34,7 +34,7 @@ import org.apache.hadoop.io.IOUtils;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class VersionInfo {
-  private static final Log LOG = LogFactory.getLog(VersionInfo.class);
+  private static final Logger LOG = LoggerFactory.getLogger(VersionInfo.class);
 
   private Properties info;
 
@@ -43,14 +43,11 @@ public class VersionInfo {
     String versionInfoFile = component + "-version-info.properties";
     InputStream is = null;
     try {
-      is = Thread.currentThread().getContextClassLoader()
-        .getResourceAsStream(versionInfoFile);
-      if (is == null) {
-        throw new IOException("Resource not found");
-      }
+      is = ThreadUtil.getResourceAsStream(VersionInfo.class.getClassLoader(),
+          versionInfoFile);
       info.load(is);
     } catch (IOException ex) {
-      LogFactory.getLog(getClass()).warn("Could not read '" +
+      LoggerFactory.getLogger(getClass()).warn("Could not read '" +
           versionInfoFile + "', " + ex.toString(), ex);
     } finally {
       IOUtils.closeStream(is);
@@ -173,7 +170,8 @@ public class VersionInfo {
   public static void main(String[] args) {
     LOG.debug("version: "+ getVersion());
     System.out.println("Hadoop " + getVersion());
-    System.out.println("Subversion " + getUrl() + " -r " + getRevision());
+    System.out.println("Source code repository " + getUrl() + " -r " +
+        getRevision());
     System.out.println("Compiled by " + getUser() + " on " + getDate());
     System.out.println("Compiled with protoc " + getProtocVersion());
     System.out.println("From source with checksum " + getSrcChecksum());

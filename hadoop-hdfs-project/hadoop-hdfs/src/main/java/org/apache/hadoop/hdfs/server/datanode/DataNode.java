@@ -123,10 +123,7 @@ import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResources;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsVolumeImpl;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics;
-import org.apache.hadoop.hdfs.server.namenode.FileChecksumServlets;
-import org.apache.hadoop.hdfs.server.namenode.StreamFile;
 import org.apache.hadoop.hdfs.server.datanode.web.DatanodeHttpServer;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
@@ -166,7 +163,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.tracing.SpanReceiverInfo;
 import org.apache.hadoop.tracing.TraceAdminProtocol;
-import org.mortbay.util.ajax.JSON;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -211,7 +207,7 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpServer3;
+import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.tracing.TraceUtils;
@@ -219,6 +215,7 @@ import org.apache.hadoop.tracing.TracerConfigurationManager;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.htrace.core.Tracer;
+import org.eclipse.jetty.util.ajax.JSON;
 
 /**
  * *******************************************************
@@ -312,7 +309,7 @@ public class DataNode extends ReconfigurableBase
   private volatile boolean heartbeatsDisabledForTests = false;
   private DataStorage storage = null;
 
-  private HttpServer3 infoServer = null;
+  private HttpServer2 infoServer = null;
   private DatanodeHttpServer httpServer = null;
   private int infoPort;
   private int infoSecurePort;
@@ -796,19 +793,15 @@ public class DataNode extends ReconfigurableBase
   private void startInfoServer(Configuration conf)
     throws IOException {
     Configuration confForInfoServer = new Configuration(conf);
-    confForInfoServer.setInt(HttpServer3.HTTP_MAX_THREADS, 10);
-    HttpServer3.Builder builder = new HttpServer3.Builder()
+    confForInfoServer.setInt(HttpServer2.HTTP_MAX_THREADS_KEY, 10);
+    HttpServer2.Builder builder = new HttpServer2.Builder()
       .setName("datanode")
       .setConf(conf).setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")))
       .addEndpoint(URI.create("http://localhost:0"))
       .setFindPort(true);
 
     this.infoServer = builder.build();
-    
-    this.infoServer.addInternalServlet(null, "/streamFile/*", StreamFile.class);
-    this.infoServer.addInternalServlet(null, "/getFileChecksum/*",
-        FileChecksumServlets.GetServlet.class);
-    
+
     this.infoServer.setAttribute("datanode", this);
     this.infoServer.setAttribute(JspHelper.CURRENT_CONF, conf);
     this.infoServer.addServlet(null, "/blockScannerReport",
@@ -1218,7 +1211,8 @@ public class DataNode extends ReconfigurableBase
     registerMXBean();
     initDataXceiver(conf);
     startInfoServer(conf);
-    pauseMonitor = new JvmPauseMonitor(conf);
+    pauseMonitor = new JvmPauseMonitor();
+    pauseMonitor.init(conf);
     pauseMonitor.start();
   
     // BlockPoolTokenSecretManager is required to create ipc server.
