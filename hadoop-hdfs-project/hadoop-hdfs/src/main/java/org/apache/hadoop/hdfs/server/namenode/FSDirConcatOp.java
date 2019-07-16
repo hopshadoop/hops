@@ -44,7 +44,7 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
 import org.apache.hadoop.ipc.RetryCacheDistributed;
@@ -154,7 +154,7 @@ class FSDirConcatOp {
   private static INodeFile[] verifySrcFiles(FSDirectory fsd, String[] srcs,
       INodesInPath targetIIP, FSPermissionChecker pc) throws IOException {
     // to make sure no two files are the same
-    Set<INodeFile> si = new HashSet<>();
+    Set<INodeFile> si = new LinkedHashSet<>();
     final INodeFile targetINode = targetIIP.getLastINode().asFile();
     final INodeDirectory targetParent = targetINode.getParent();
     // now check the srcs
