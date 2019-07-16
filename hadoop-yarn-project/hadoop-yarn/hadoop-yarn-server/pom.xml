@@ -44,7 +44,7 @@
     <module>hadoop-yarn-server-timeline-pluginstorage</module>
     <module>hadoop-yarn-server-timelineservice</module>
     <module>hadoop-yarn-server-timelineservice-hbase</module>
-    <!--<module>hadoop-yarn-server-timelineservice-hbase-tests</module> //Hops: ignore until we can make the hbase test run with hopsfs and/or hbase2 or 3 are supported-->
+    <module>hadoop-yarn-server-timelineservice-hbase-tests</module>
     <module>hadoop-yarn-server-router</module>
   </modules>
 </project>

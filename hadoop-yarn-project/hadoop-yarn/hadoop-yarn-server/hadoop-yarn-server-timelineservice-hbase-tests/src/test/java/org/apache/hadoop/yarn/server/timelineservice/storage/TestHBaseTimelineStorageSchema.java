@@ -31,6 +31,7 @@ import org.junit.Test;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
@@ -47,8 +48,10 @@ public class TestHBaseTimelineStorageSchema {
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
-    util = new HBaseTestingUtility();
-    Configuration conf = util.getConfiguration();
+    Configuration conf = HBaseConfiguration.create();
+    conf.set("hbase.wal.provider", "filesystem");
+    util = new HBaseTestingUtility(conf);
+    conf = util.getConfiguration();
     conf.setInt("hfile.format.version", 3);
     util.startMiniCluster();
   }

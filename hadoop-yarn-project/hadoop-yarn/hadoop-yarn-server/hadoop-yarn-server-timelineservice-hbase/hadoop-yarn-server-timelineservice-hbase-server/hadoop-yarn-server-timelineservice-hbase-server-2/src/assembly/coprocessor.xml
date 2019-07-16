@@ -30,8 +30,8 @@
       <unpack>true</unpack>
       <scope>runtime</scope>
       <includes>
-        <include>org.apache.hadoop:hadoop-yarn-server-timelineservice-hbase-common</include>
-        <include>org.apache.hadoop:hadoop-yarn-server-timelineservice-hbase-server-2</include>
+        <include>io.hops:hadoop-yarn-server-timelineservice-hbase-common</include>
+        <include>io.hops:hadoop-yarn-server-timelineservice-hbase-server-2</include>
       </includes>
     </dependencySet>
   </dependencySets>

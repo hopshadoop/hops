@@ -47,6 +47,7 @@ import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.client.urlconnection.HttpURLConnectionFactory;
 import com.sun.jersey.client.urlconnection.URLConnectionClientHandler;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 
 /**
  * Test Base for TimelineReaderServer HBase tests.
@@ -57,8 +58,10 @@ public abstract class AbstractTimelineReaderHBaseTestBase {
   private static HBaseTestingUtility util;
 
   public static void setup() throws Exception {
-    util = new HBaseTestingUtility();
-    Configuration conf = util.getConfiguration();
+    Configuration conf = HBaseConfiguration.create();
+    conf.set("hbase.wal.provider", "filesystem");
+    util = new HBaseTestingUtility(conf);
+    conf = util.getConfiguration();
     conf.setInt("hfile.format.version", 3);
     util.startMiniCluster();
     DataGeneratorForTest.createSchema(util.getConfiguration());

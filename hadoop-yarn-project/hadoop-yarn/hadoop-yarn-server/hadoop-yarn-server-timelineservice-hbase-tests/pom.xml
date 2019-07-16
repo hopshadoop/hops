@@ -472,6 +472,12 @@
           <version>${hbase-compatible-hadoop.version}</version>
           <scope>test</scope>
         </dependency>
+        <dependency>
+          <groupId>io.hops</groupId>
+          <artifactId>hadoop-hdfs</artifactId>
+          <version>${hbase-compatible-hadoop.version}</version>
+          <scope>test</scope>
+        </dependency>
         <!-- 'mvn dependency:analyze' fails to detect use of this direct
              dependency -->
         <!-- This is needed by HBaseTestingUtility -->
