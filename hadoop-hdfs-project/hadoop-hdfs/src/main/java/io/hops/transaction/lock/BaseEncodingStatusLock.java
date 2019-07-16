@@ -53,7 +53,7 @@ abstract class BaseEncodingStatusLock extends Lock {
     EncodingStatusLock(TransactionLockTypes.LockType lockType,
                        String... targets) {
       super(lockType);
-      this.targets = targets;
+      this.targets = targets.clone();
       this.includeChildren = false;
     }
 
