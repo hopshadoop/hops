@@ -61,6 +61,8 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import java.util.Collection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.htrace.core.TraceScope;
 
 
@@ -80,7 +82,7 @@ import org.apache.htrace.core.TraceScope;
  ****************************************************************/
 @InterfaceAudience.Private
 public class DFSOutputStream extends FSOutputSummer
-    implements Syncable, CanSetDropBehind {
+    implements Syncable, CanSetDropBehind, StreamCapabilities {
 
   public static final Log LOG = LogFactory.getLog(DFSOutputStream.class);
   
@@ -490,6 +492,17 @@ public class DFSOutputStream extends FSOutputSummer
   @Deprecated
   public void sync() throws IOException {
     hflush();
+  }
+  
+  @Override
+  public boolean hasCapability(String capability) {
+    switch (StringUtils.toLowerCase(capability)) {
+    case StreamCapabilities.HSYNC:
+    case StreamCapabilities.HFLUSH:
+      return true;
+    default:
+      return false;
+    }
   }
   
   /**

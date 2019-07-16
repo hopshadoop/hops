@@ -34,6 +34,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
@@ -107,7 +108,9 @@ public class TestHBaseTimelineStorageEntities {
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
-    util = new HBaseTestingUtility();
+    Configuration conf = HBaseConfiguration.create();
+    conf.set("hbase.wal.provider", "filesystem");
+    util = new HBaseTestingUtility(conf);
     util.startMiniCluster();
     DataGeneratorForTest.createSchema(util.getConfiguration());
     DataGeneratorForTest.loadEntities(util, CURRENT_TIME);

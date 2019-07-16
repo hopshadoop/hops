@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
@@ -49,8 +50,10 @@ public class TestHBaseTimelineStorageDomain {
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
-    util = new HBaseTestingUtility();
-    Configuration conf = util.getConfiguration();
+    Configuration conf = HBaseConfiguration.create();
+    conf.set("hbase.wal.provider", "filesystem");
+    util = new HBaseTestingUtility(conf);
+    conf = util.getConfiguration();
     conf.setInt("hfile.format.version", 3);
     util.startMiniCluster();
     DataGeneratorForTest.createSchema(util.getConfiguration());

@@ -32,6 +32,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.TIMELINE_SERVICE_READER_STORAGE_MONITOR_INTERVAL_MS;
 import static org.apache.hadoop.yarn.server.timelineservice.storage.HBaseTimelineReaderImpl.DATA_TO_RETRIEVE;
@@ -189,6 +190,7 @@ public class TestTimelineReaderHBaseDown {
             + "HBaseTimelineReaderImpl");
     config.setInt("hfile.format.version", 3);
     config.setLong(TIMELINE_SERVICE_READER_STORAGE_MONITOR_INTERVAL_MS, 5000);
+    config.set("hbase.wal.provider", "filesystem");
   }
 
   private static TimelineReaderServer getTimelineReaderServer() {
