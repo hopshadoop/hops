@@ -342,8 +342,4 @@ public class MockNM {
   public void setResponseId(int id) {
     this.responseId = id;
   }
-  
-  public int getNextResponseId() {
-    return ++responseId;
-  }
 }

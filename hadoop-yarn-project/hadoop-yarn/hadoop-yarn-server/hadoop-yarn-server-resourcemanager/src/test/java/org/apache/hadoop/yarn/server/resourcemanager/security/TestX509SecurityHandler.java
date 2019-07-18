@@ -396,7 +396,8 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
         new HashMap<ApplicationAccessType, String>(), false, "default", 2, null,
         "MAPREDUCE", true, false);
     
-    nm.nodeHeartbeat(true);
+    NodeHeartbeatResponse response = nm.nodeHeartbeat(true);
+    int responseId = response.getResponseId();
     
     assertNotNull(application);
     byte[] keyStore = application.getKeyStore();
@@ -448,8 +449,8 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     updatedAppCrypto.add(application.getApplicationId());
   
     
-    nm.nodeHeartbeat(Collections.<ContainerStatus>emptyList(), Collections.<Container>emptyList(), true, nm
-        .getNextResponseId(), updatedAppCrypto);
+    nm.nodeHeartbeat(Collections.<ContainerStatus>emptyList(), Collections.<Container>emptyList(), true,
+        responseId, updatedAppCrypto);
     
     TimeUnit.MILLISECONDS.sleep(100);
     
