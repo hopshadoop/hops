@@ -249,6 +249,9 @@ public class RMContainerImpl implements RMContainer {
 
     if (container.getId() != null) {
       rmContext.getRMApplicationHistoryWriter().containerStarted(this);
+      if(rmContext.getQuotaService()!=null){
+        rmContext.getQuotaService().containerStarted(this);
+      }
     }
 
     if (this.container != null) {
@@ -273,6 +276,9 @@ public class RMContainerImpl implements RMContainer {
 
   public void setContainer(Container container) {
     this.container = container;
+    if (rmContext.getQuotaService() != null) {
+      rmContext.getQuotaService().containerUpdated(this, System.currentTimeMillis());
+    }
   }
 
   @Override
@@ -712,7 +718,10 @@ public class RMContainerImpl implements RMContainer {
 
       container.rmContext.getRMApplicationHistoryWriter().containerFinished(
         container);
-
+      if(container.rmContext.getQuotaService()!=null){
+        container.rmContext.getQuotaService().containerFinished(container);
+      }
+      
       boolean saveNonAMContainerMetaInfo =
           shouldPublishNonAMContainerEventstoATS(container.rmContext);
 
@@ -897,6 +906,9 @@ public class RMContainerImpl implements RMContainer {
 
     if (containerId != null) {
       rmContext.getRMApplicationHistoryWriter().containerStarted(this);
+      if(rmContext.getQuotaService()!=null){
+        rmContext.getQuotaService().containerStarted(this);
+      }
     }
   }
 }

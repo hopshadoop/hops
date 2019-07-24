@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import io.hops.util.GroupMembershipService;
+import io.hops.yarn.server.resourcemanager.quota.PriceMultiplicatorService;
+import io.hops.yarn.server.resourcemanager.quota.QuotaService;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -50,6 +52,8 @@ public class RMServiceContext {
   private ConfigurationProvider configurationProvider;
   private Configuration yarnConfiguration;
   private RMApplicationHistoryWriter rmApplicationHistoryWriter;
+  private QuotaService quotaService;
+  private PriceMultiplicatorService priceMultiplicatorService;
   private SystemMetricsPublisher systemMetricsPublisher;
   private GroupMembershipService groupMembershipService;
   private final Object haServiceStateLock = new Object();
@@ -126,6 +130,22 @@ public class RMServiceContext {
     this.rmApplicationHistoryWriter = applicationHistoryWriter;
   }
 
+  public QuotaService getQuotaService() {
+    return this.quotaService;
+  }
+
+  public void setQuotaService(QuotaService quotaService) {
+    this.quotaService = quotaService;
+  }
+  
+  public PriceMultiplicatorService getPriceMultiplicatorService(){
+    return this.priceMultiplicatorService;
+  }
+  
+  public void setPriceMultiplicatorService(PriceMultiplicatorService priceMultiplicatorService){
+    this.priceMultiplicatorService = priceMultiplicatorService;
+  }
+  
   public void setSystemMetricsPublisher(
       SystemMetricsPublisher metricsPublisher) {
     this.systemMetricsPublisher = metricsPublisher;

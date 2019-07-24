@@ -1497,4 +1497,9 @@ public abstract class AbstractYarnScheduler
   public void resetSchedulerMetrics() {
     // reset scheduler metrics
   }
+  
+  @Lock(Lock.NoLock.class)
+  public List<N> getAllNodes() {
+    return nodeTracker.getAllNodes();
+  }
 }

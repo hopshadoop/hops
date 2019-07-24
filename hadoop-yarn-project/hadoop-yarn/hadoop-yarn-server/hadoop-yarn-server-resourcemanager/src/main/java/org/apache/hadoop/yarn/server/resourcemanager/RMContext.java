@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import io.hops.util.GroupMembershipService;
+import io.hops.yarn.server.resourcemanager.quota.PriceMultiplicatorService;
+import io.hops.yarn.server.resourcemanager.quota.QuotaService;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentMap;
 
@@ -119,7 +121,15 @@ public interface RMContext extends ApplicationMasterServiceContext {
 
   void setRMApplicationHistoryWriter(
       RMApplicationHistoryWriter rmApplicationHistoryWriter);
+  
+  QuotaService getQuotaService();
 
+  void setQuotaService(QuotaService quotaService);
+
+  PriceMultiplicatorService getPriceMultiplicatorService();
+  
+  void setPriceMultiplicatorService(PriceMultiplicatorService priceMultiplicatiorService);
+  
   void setSystemMetricsPublisher(SystemMetricsPublisher systemMetricsPublisher);
 
   SystemMetricsPublisher getSystemMetricsPublisher();

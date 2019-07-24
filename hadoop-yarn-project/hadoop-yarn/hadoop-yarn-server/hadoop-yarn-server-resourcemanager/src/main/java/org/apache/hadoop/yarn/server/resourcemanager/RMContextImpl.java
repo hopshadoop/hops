@@ -68,6 +68,8 @@ import org.apache.hadoop.yarn.util.Clock;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.util.GroupMembershipService;
+import io.hops.yarn.server.resourcemanager.quota.PriceMultiplicatorService;
+import io.hops.yarn.server.resourcemanager.quota.QuotaService;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
 import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
@@ -252,6 +254,26 @@ public class RMContextImpl implements RMContext {
     serviceContext.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
   }
 
+  @Override
+  public QuotaService getQuotaService() {
+    return serviceContext.getQuotaService();
+  }
+
+  @Override
+  public void setQuotaService(QuotaService quotaService) {
+    serviceContext.setQuotaService(quotaService);
+  }
+  
+  @Override
+  public PriceMultiplicatorService getPriceMultiplicatorService(){
+    return serviceContext.getPriceMultiplicatorService();
+  }
+  
+  @Override
+  public void setPriceMultiplicatorService(PriceMultiplicatorService priceMultiplicatorService){
+    serviceContext.setPriceMultiplicatorService(priceMultiplicatorService);
+  }
+  
   @Override
   public SystemMetricsPublisher getSystemMetricsPublisher() {
     return serviceContext.getSystemMetricsPublisher();

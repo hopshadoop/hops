@@ -3954,6 +3954,46 @@ public class YarnConfiguration extends Configuration {
         DEFAULT_NM_NUMA_AWARENESS_ENABLED);
   }
 
+  /*
+   * Quota
+   */
+  public static final String QUOTA_PREFIX = RM_PREFIX + "quota.";
+  public static final String APPLICATION_QUOTA_ENABLED = QUOTA_PREFIX + "enabled";
+  public static final boolean DEFAULT_APPLICATION_QUOTA_ENABLED = false;
+  public static final String QUOTA_BASE_PRICE_PREFIX = QUOTA_PREFIX + "price.base.";
+  public static final String QUOTA_BASE_PRICE_GENERAL = QUOTA_BASE_PRICE_PREFIX + "general";
+  public static float DEFAULT_QUOTA_BASE_PRICE_GENERAL = 1;
+  public static final String QUOTA_BASE_PRICE_GPU = QUOTA_BASE_PRICE_PREFIX + "gpu";
+  public static float DEFAULT_QUOTA_BASE_PRICE_GPU = 1;
+  public static final String QUOTA_MIN_RUN_TIME = QUOTA_PREFIX + "min.runtime";
+  public static int DEFAULT_QUOTA_MIN_RUN_TIME = 10000;
+  public static final String QUOTA_SCHEDULING_PERIOD = QUOTA_PREFIX + "scheduling.period";
+  public static final long DEFAULT_QUOTA_SCHEDULING_PERIOD = 10000;
+  public static final String QUOTA_VARIABLE_PRICE_ENABLED = QUOTA_PREFIX + "variable.price.enabled";
+  public static boolean DEFAULT_QUOTA_VARIABLE_PRICE_ENABLED = false;
+  public static final String QUOTA_MULTIPLICATOR_THRESHOLD = QUOTA_PREFIX + "multiplicator.threshold.";
+  public static final String QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL = QUOTA_MULTIPLICATOR_THRESHOLD + "general";
+  public static float DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD_GENERAL = new Float(0.2);
+  public static final String QUOTA_MULTIPLICATOR_THRESHOLD_GPU = QUOTA_MULTIPLICATOR_THRESHOLD + "gpu";
+  public static float DEFAULT_QUOTA_MULTIPLICATOR_THRESHOLD_GPU = new Float(0.2);
+  public static final String QUOTA_INCREMENT_FACTOR = QUOTA_PREFIX + "multiplicator.increment.";
+  public static final String QUOTA_INCREMENT_FACTOR_GENERAL = QUOTA_INCREMENT_FACTOR + "general";
+  public static float DEFAULT_QUOTA_INCREMENT_FACTOR_GENERAL = 1;
+  public static final String QUOTA_INCREMENT_FACTOR_GPU = QUOTA_INCREMENT_FACTOR + "gpu";
+  public static float DEFAULT_QUOTA_INCREMENT_FACTOR_GPU = 2;
+  public static final String QUOTA_PRICE_MULTIPLICATOR_INTERVAL = QUOTA_PREFIX + "multiplicator.interval";
+  public static long DEFAULT_QUOTA_PRICE_MULTIPLICATOR_INTERVAL=10000;
+  public static final String QUOTA_MINIMUM_CHARGED_MB = QUOTA_PREFIX + "minimum.charged.mb";
+  public static int DEFAULT_QUOTA_MINIMUM_CHARGED_MB=1024;
+  public static final String QUOTA_MINIMUM_CHARGED_GPUS = QUOTA_PREFIX + "minimum.charged.gpu";
+  public static int DEFAULT_QUOTA_MINIMUM_CHARGED_GPUS=1;
+  
+  /** Number of worker threads that write the history data. */
+  public static final String RM_QUOTA_MULTI_THREADED_DISPATCHER_POOL_SIZE =
+      QUOTA_PREFIX + "multi-threaded-dispatcher.pool-size";
+  public static final int DEFAULT_RM_QUOTA_MULTI_THREADED_DISPATCHER_POOL_SIZE =
+      10;
+  
   /* For debugging. mp configurations to system output as XML format. */
   public static void main(String[] args) throws Exception {
     new YarnConfiguration(new Configuration()).writeXml(System.out);

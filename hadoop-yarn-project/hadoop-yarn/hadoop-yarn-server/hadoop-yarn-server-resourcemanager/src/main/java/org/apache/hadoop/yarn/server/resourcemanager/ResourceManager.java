@@ -24,6 +24,8 @@ import io.hops.util.DBUtility;
 import io.hops.util.GroupMembershipService;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
+import io.hops.yarn.server.resourcemanager.quota.PriceMultiplicatorService;
+import io.hops.yarn.server.resourcemanager.quota.QuotaService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -347,7 +349,7 @@ public class ResourceManager extends CompositeService
         createRMApplicationHistoryWriter();
     addService(rmApplicationHistoryWriter);
     rmContext.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-
+    
     // initialize the RM timeline collector first so that the system metrics
     // publisher can bind to it
     if (YarnConfiguration.timelineServiceV2Enabled(this.conf)) {
@@ -530,6 +532,14 @@ public class ResourceManager extends CompositeService
     return new RMApplicationHistoryWriter();
   }
 
+  protected QuotaService createQuotaService() {
+    return new QuotaService(rmContext);
+  }
+  
+  protected PriceMultiplicatorService createPriceMultiplicatorService(){
+    return new PriceMultiplicatorService(rmContext);
+  }
+  
   private RMTimelineCollectorManager createRMTimelineCollectorManager() {
     return new RMTimelineCollectorManager(this);
   }
@@ -825,6 +835,14 @@ public class ResourceManager extends CompositeService
         addIfService(systemServiceManager);
       }
 
+      QuotaService quotaService = createQuotaService();
+      addService(quotaService);
+      rmContext.setQuotaService(quotaService);
+
+      PriceMultiplicatorService priceMultiplicatorService = createPriceMultiplicatorService();
+      addService(priceMultiplicatorService);
+      rmContext.setPriceMultiplicatorService(priceMultiplicatorService);
+      
       super.serviceInit(conf);
     }
 
