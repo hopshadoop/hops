@@ -44,6 +44,7 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.ExecutionTypeRequest;
+import org.apache.hadoop.yarn.api.records.ResourceInformation;
 import org.apache.hadoop.yarn.api.records.ResourceSizing;
 import org.apache.hadoop.yarn.api.records.SchedulingRequest;
 import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
@@ -193,8 +194,20 @@ public class MockAM {
   
   public AllocateResponse allocate(
       String host, int memory, int numContainers,
+      List<ContainerId> releases, int numGPUs) throws Exception {
+    return allocate(host, memory, numContainers, releases, null, numGPUs);
+  }
+  
+  public AllocateResponse allocate(
+      String host, int memory, int numContainers,
       List<ContainerId> releases, String labelExpression) throws Exception {
     return allocate(host, memory, numContainers, 1, releases, labelExpression);
+  }
+  
+  public AllocateResponse allocate(
+      String host, int memory, int numContainers,
+      List<ContainerId> releases, String labelExpression, int numGPUs) throws Exception {
+    return allocate(host, memory, numContainers, 1, releases, labelExpression, numGPUs);
   }
   
   public AllocateResponse allocate(
@@ -203,6 +216,15 @@ public class MockAM {
     List<ResourceRequest> reqs =
         createReq(new String[] { host }, memory, priority, numContainers,
             labelExpression, -1);
+    return allocate(reqs, releases);
+  }
+  
+  public AllocateResponse allocate(
+      String host, int memory, int numContainers, int priority,
+      List<ContainerId> releases, String labelExpression, int numGPUs) throws Exception {
+    List<ResourceRequest> reqs =
+        createReq(new String[] { host }, memory, priority, numContainers,
+            labelExpression, -1, numGPUs);
     return allocate(reqs, releases);
   }
   
@@ -215,6 +237,12 @@ public class MockAM {
   public List<ResourceRequest> createReq(String[] hosts, int memory,
       int priority, int containers, String labelExpression,
       long allocationRequestId) throws Exception {
+    return createReq(hosts, memory, priority, containers, labelExpression, allocationRequestId, 0);
+  }
+  
+  public List<ResourceRequest> createReq(String[] hosts, int memory,
+      int priority, int containers, String labelExpression,
+      long allocationRequestId, int numGPUs) throws Exception {
     List<ResourceRequest> reqs = new ArrayList<ResourceRequest>();
     if (hosts != null) {
       for (String host : hosts) {
@@ -222,12 +250,12 @@ public class MockAM {
         if (!host.equals(ResourceRequest.ANY)) {
           ResourceRequest hostReq =
               createResourceReq(host, memory, priority, containers,
-                  labelExpression);
+                  labelExpression, numGPUs);
           hostReq.setAllocationRequestId(allocationRequestId);
           reqs.add(hostReq);
           ResourceRequest rackReq =
               createResourceReq("/default-rack", memory, priority, containers,
-                  labelExpression);
+                  labelExpression, numGPUs);
           rackReq.setAllocationRequestId(allocationRequestId);
           reqs.add(rackReq);
         }
@@ -251,10 +279,22 @@ public class MockAM {
     return createResourceReq(resource, memory, priority, containers,
         labelExpression, ExecutionTypeRequest.newInstance());
   }
+  
+  public ResourceRequest createResourceReq(String resource, int memory,
+      int priority, int containers, String labelExpression, int numGPUs) throws Exception {
+    return createResourceReq(resource, memory, priority, containers,
+        labelExpression, ExecutionTypeRequest.newInstance(), numGPUs);
+  }
 
   public ResourceRequest createResourceReq(String resource, int memory,
       int priority, int containers, String labelExpression,
       ExecutionTypeRequest executionTypeRequest) throws Exception {
+    return createResourceReq(resource, memory, priority, containers, labelExpression, executionTypeRequest, 0);
+  }
+  
+  public ResourceRequest createResourceReq(String resource, int memory,
+      int priority, int containers, String labelExpression,
+      ExecutionTypeRequest executionTypeRequest, int numGPUs) throws Exception {
     ResourceRequest req = Records.newRecord(ResourceRequest.class);
     req.setResourceName(resource);
     req.setNumContainers(containers);
@@ -263,6 +303,9 @@ public class MockAM {
     req.setPriority(pri);
     Resource capability = Records.newRecord(Resource.class);
     capability.setMemorySize(memory);
+    if (numGPUs > 0) {
+      capability.setResourceValue(ResourceInformation.GPU_URI, numGPUs);
+    }
     req.setCapability(capability);
     if (labelExpression != null) {
       req.setNodeLabelExpression(labelExpression);

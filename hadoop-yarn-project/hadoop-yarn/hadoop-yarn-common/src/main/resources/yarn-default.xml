@@ -3898,6 +3898,132 @@
   
   <property>
     <description>
+      is the quota system enabled.
+    </description>
+    <name>yarn.resourcemanager.quota.enabled</name>
+    <value>false</value>
+  </property>
+  
+  <property>
+    <description>
+      Number of qota used by second and unit of resource when the multiplicator is equal to 1 and the container is using
+      general resources (CPU and Mem).
+    </description>
+    <name>yarn.resourcemanager.quota.price.base.general</name>
+    <value>1</value>
+  </property>
+    
+  <property>
+    <description>
+      Number of qota used by seconds and unit of resource when the multiplicator is equal to 1 and
+      the container is using gpus.
+    </description>
+    <name>yarn.resourcemanager.quota.price.base.gpu</name>
+    <value>1</value>
+  </property>
+  
+  <property>
+    <description>
+      The minimum time in milliseconds a container will be charged for. If a container run
+      for a shorter time than this periode it will be charged as if it run for
+      this period. The goal is to avoid people wasting resources by running
+      very short containers that take more time to schedule than to run.
+    </description>
+    <name>yarn.resourcemanager.quota.min.runtime</name>
+    <value>10000</value>
+  </property>
+  
+  <property>
+    <description>
+      Unit of memory in Mb for the quota computation. If a container use less than one unit of memory
+      it will be billed for one unit of memory. If a container use more than one unit of memory it will
+      be billed proportionaly to it's useage (usage/unit)
+    </description>
+    <name>yarn.resourcemanager.quota.minimum.charged.mb</name>
+    <value>1024</value>
+  </property>
+  
+  <property>
+    <description>
+      Unit of GPU for the quota computation. If a container use GPUs but less than one unit GPU
+      it will be billed for one unit of GPU. If a container use more than one unit of GPU it will
+      be billed proportionaly to it's useage (usage/unit)
+    </description>
+    <name>yarn.resourcemanager.quota.minimum.charged.gpu</name>
+    <value>1</value>
+  </property>
+  
+  <property>
+    <description>
+      Period (in ms) with which the resource manager compute the quota for the running containers
+      The shorter the period the less info is lost and the more accurate the quota in case of failover.
+      But the shorter the period the more load is applied on the resourcemanager and the database.
+    </description>
+    <name>yarn.resourcemanager.quota.scheduling.period</name>
+    <value>10000</value>
+  </property>
+  
+  <property>
+    <description>
+      Enable or disable the variable pricing system
+    </description>
+    <name>yarn.resourcemanager.quota.variable.price.enabled</name>
+    <value>false</value>
+  </property>
+  
+  <property>
+    <description>
+      interval between to computation of the pricing for the quota system.
+      defined in ms.
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.interval</name>
+    <value>10000</value>
+  </property>
+  
+  <property>
+    <description>
+      The percentage of cluster utilisation above which we start increasing the amount of qota paid for
+      utilisation of general resouces (CPU, memory). As a float between 0 and 1
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.threshold.general</name>
+    <value>0.2</value>
+  </property>
+
+  <property>
+    <description>
+      The percentage of cluster utilisation above which we start increasing the amount of qota paid for
+      utilisation of GPU resouces. As a float between 0 and 1
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.threshold.gpu</name>
+    <value>0.2</value>
+  </property>
+  
+  <property>
+    <description>
+      factor by which to increase to cost of resource in regard to cluster utilisation for general resources.
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.increment.general</name>
+    <value>1</value>
+  </property>
+    
+  <property>
+    <description>
+      factor by which to increase to cost of resource in regard to cluster utilisation for gpu resources.
+    </description>
+    <name>yarn.resourcemanager.quota.multiplicator.increment.gpu</name>
+    <value>1</value>
+  </property>
+  
+  <property>
+    <description>
+    Thread pool size for QuotaService.
+    </description>
+    <name>yarn.resourcemanager.quota.multi-threaded-dispatcher.pool-size</name>
+    <value>10</value>
+  </property>
+  
+  <property>
+    <description>
       Fully-qualified name of the class used to perform X.509 certificate actions
     </description>
     <name>yarn.resourcemanager.rmappsecurity.actor-class</name>
