@@ -19,5 +19,4 @@ import io.hops.leader_election.node.ActiveNode;
 
 public interface ActiveRM extends ActiveNode {
 
-  public long getLoad();
 }

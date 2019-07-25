@@ -25,10 +25,6 @@ package hops.yarnGroupMembership;
 
 import "ActiveNode.proto";
 
-extend hadoop.common.ActiveNodeProto {
-  optional int64 load = 9;
-}
-
 service GroupMembershipService {
   rpc getLiveRMList (ActiveRMListRequestProto) returns (ActiveRMListResponseProto);
 }

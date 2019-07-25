@@ -75,15 +75,6 @@ public class GroupMembershipProxyService implements Closeable {
     }
   }
 
-  public ActiveNode getLeastLoadedRM() {
-    updateActiveNodeList();
-    if (anList == null) {
-      return null;
-    } else {
-      return anList.getLeastLoaded();
-    }
-  }
-
   private void updateActiveNodeList() {
     if (anList == null || anList.isEmpty()) {
       updateFromConfigFile();
