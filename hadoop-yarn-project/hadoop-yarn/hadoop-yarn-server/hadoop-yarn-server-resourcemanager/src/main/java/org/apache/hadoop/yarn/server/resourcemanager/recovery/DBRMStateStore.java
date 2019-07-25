@@ -30,7 +30,7 @@ import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
-import io.hops.metadata.yarn.entity.ReservationState;
+import io.hops.metadata.yarn.entity.rmstatestore.ReservationState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationToken;

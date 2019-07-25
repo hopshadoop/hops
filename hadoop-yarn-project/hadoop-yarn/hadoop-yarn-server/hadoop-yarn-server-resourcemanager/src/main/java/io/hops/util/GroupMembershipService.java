@@ -19,7 +19,6 @@ import io.hops.leaderElection.LeaderElection;
 import io.hops.leaderElection.YarnLeDescriptorFactory;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
-import io.hops.metadata.yarn.entity.Load;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -328,23 +327,10 @@ public class GroupMembershipService extends CompositeService
   
   private SortedActiveRMList getSortedActiveRMList() {
      List<ActiveNode> rmList = new ArrayList<ActiveNode>();
-    Map<String, Load> loads;
-    try {
-      loads = DBUtility.getAllLoads();
-    } catch (IOException ex) {
-      LOG.error(ex);
-      loads = new HashMap<String, Load>();
-    }
     SortedActiveNodeList nnList = groupMembership.getActiveNamenodes();
     for (ActiveNode node : nnList.getSortedActiveNodes()) {
-      if (loads.get(node.getHostname()) == null) {
-        rmList.add(new ActiveRMPBImpl(node.getId(), node.getHostname(), node.
-                getRpcServerIpAddress(), node.getRpcServerPort(), node.getHttpAddress(), 0));
-      } else {
-        rmList.add(new ActiveRMPBImpl(node.getId(), node.getHostname(), node.
-                getRpcServerIpAddress(), node.getRpcServerPort(), node.getHttpAddress(), loads.
-            get(node.getHostname()).getLoad()));
-      }
+      rmList.add(new ActiveRMPBImpl(node.getId(), node.getHostname(), node.
+          getRpcServerIpAddress(), node.getRpcServerPort(), node.getHttpAddress()));
     }
     return new SortedActiveRMList(rmList);
   }

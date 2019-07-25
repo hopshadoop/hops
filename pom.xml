@@ -736,13 +736,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <version>7.6.10</version>
           <classifier>natives-linux</classifier>
         </dependency>
-        <dependency>
-          <groupId>io.hops.streaming</groupId>
-          <artifactId>libhopsyarn</artifactId>
-          <version>${project.version}</version>
-          <type>${lib_ext}</type>
-          <scope>test</scope>
-        </dependency>
       </dependencies>
       <build>
         <plugins>
@@ -759,32 +752,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <configuration>
                   <nativesTargetDir>${session.executionRootDirectory}/target/lib</nativesTargetDir>
                   <separateDirs>false</separateDirs>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy-dependency</id>
-                <phase>compile</phase>
-                <goals>
-                  <goal>copy</goal>
-                </goals>
-                <configuration>
-                  <artifactItems>
-                    <artifactItem>
-                      <groupId>io.hops.streaming</groupId>
-                      <artifactId>libhopsyarn</artifactId>
-                      <version>${project.version}</version>
-                      <type>${lib_ext}</type>
-                      <overWrite>true</overWrite>
-                      <outputDirectory>target/native/target/usr/local/lib</outputDirectory>
-                    </artifactItem>
-                  </artifactItems>
-                  <stripVersion>true</stripVersion>
                 </configuration>
               </execution>
             </executions>

@@ -29,16 +29,9 @@ public class ActiveRMPBImpl extends ActiveNodePBImpl implements ActiveRM {
   }
 
   public ActiveRMPBImpl(long id, String hostname, String ipAddress, int port,
-      String httpAddress, long load) {
+      String httpAddress) {
     super(id, hostname, ipAddress, port, httpAddress,"",0);
     maybeInitBuilder();
-    builder.setExtension(GroupMembership.load, load);
-  }
-
-  @Override
-  public long getLoad() {
-    ActiveNodeProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getExtension(GroupMembership.load);
   }
 
   @Override
