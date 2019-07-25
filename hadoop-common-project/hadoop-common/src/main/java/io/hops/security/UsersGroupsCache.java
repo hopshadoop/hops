@@ -64,9 +64,11 @@ class UsersGroupsCache {
 
   private LoadingCache<Integer, String> idToUserCache;
   private LoadingCache<String, Integer> userToIdCache;
+  private LoadingCache<Integer, Integer> deletedUsersCache;
 
   private LoadingCache<Integer, String> idToGroupCache;
   private LoadingCache<String, Integer> groupToIdCache;
+  private LoadingCache<Integer, Integer> deletedGroupsCache;
 
   private static final String lockRowName = "#HopsSyncUser#";
   private static User lockUser;
@@ -109,6 +111,7 @@ class UsersGroupsCache {
         userToIdCache.put(user.getName(), userId);
         return user.getName();
       }
+      deletedUsersCache.put(userId, userId);
       throw new UserNotFoundException("User ID: " + userId + " not found.");
     }
   };
@@ -152,6 +155,7 @@ class UsersGroupsCache {
         groupToIdCache.put(group.getName(), groupId);
         return group.getName();
       }
+      deletedGroupsCache.put(groupId, groupId);
       throw new GroupNotFoundException("Group ID: " + groupId + " not found.");
     }
   };
@@ -186,6 +190,33 @@ class UsersGroupsCache {
     }
   };
 
+  private RemovalListener<Integer, Integer> deletedUsersRemoval
+          = new RemovalListener<Integer, Integer>() {
+    @Override
+    public void onRemoval(RemovalNotification<Integer, Integer> rn) {
+    }
+  };
+
+  private CacheLoader<Integer, Integer> deletedUsersLoader = new CacheLoader<Integer, Integer>() {
+    @Override
+    public Integer load(Integer groupId) throws Exception {
+      throw new UnsupportedOperationException("Deleted user can not be loaded from DB.");
+    }
+  };
+
+  private RemovalListener<Integer, Integer> deletedGroupRemoval
+          = new RemovalListener<Integer, Integer>() {
+    @Override
+    public void onRemoval(RemovalNotification<Integer, Integer> rn) {
+    }
+  };
+
+  private CacheLoader<Integer, Integer> deletedGroupLoader = new CacheLoader<Integer, Integer>() {
+    @Override
+    public Integer load(Integer groupId) throws Exception {
+      throw new UnsupportedOperationException("Deleted group can not be loaded from DB.");
+    }
+  };
   public UsersGroupsCache(UserDataAccess uda, UserGroupDataAccess ugda,
                           GroupDataAccess gda, int evectionTime, int lrumax) throws IOException {
 
@@ -222,7 +253,20 @@ class UsersGroupsCache {
             .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
             .removalListener(groupToIdsRemoval)
             .build(groupToIdsLoader);
+
+    deletedUsersCache = CacheBuilder.newBuilder()
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(deletedUsersRemoval)
+            .build(deletedUsersLoader);
+
+    deletedGroupsCache = CacheBuilder.newBuilder()
+            .maximumSize(lrumax)
+            .expireAfterWrite(evectionTime, TimeUnit.SECONDS)
+            .removalListener(deletedGroupRemoval)
+            .build(deletedGroupLoader);
   }
+
 
   public void createSyncRow() throws IOException {
     new LightWeightRequestHandler(UsersOperationsType.CREATE_LOCK_ROWS) {
@@ -300,6 +344,8 @@ class UsersGroupsCache {
     userToIdCache.invalidateAll();
     idToGroupCache.invalidateAll();
     groupToIdCache.invalidateAll();
+    deletedGroupsCache.invalidateAll();
+    deletedUsersCache.invalidateAll();
   }
 
   private User getUserFromDB(final String userName, final Integer userId)
@@ -638,7 +684,15 @@ class UsersGroupsCache {
     }
 
     try {
+
+      // case of deleted users
+      if(deletedUsersCache.getIfPresent(userId) != null){
+        throw new UserNotFoundException("User ID: " + userId + " not found.");
+      }
+
+      // get from DB
       return idToUserCache.get(userId);
+
     } catch (ExecutionException e) {
       if (e.getCause() instanceof IOException) {
         throw (IOException) e.getCause();
@@ -700,6 +754,12 @@ class UsersGroupsCache {
     }
 
     try {
+
+      // case of deleted groups
+      if(deletedGroupsCache.getIfPresent(groupId) != null){
+        throw new GroupNotFoundException("Group ID: " + groupId + " not found.");
+      }
+
       return idToGroupCache.get(groupId);
     } catch (ExecutionException e) {
       if (e.getCause() instanceof IOException) {
