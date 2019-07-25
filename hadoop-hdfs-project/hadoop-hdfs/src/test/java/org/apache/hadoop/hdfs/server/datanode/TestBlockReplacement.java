@@ -110,6 +110,7 @@ public class TestBlockReplacement {
     CONF.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY,
         DEFAULT_BLOCK_SIZE / 2);
     CONF.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 500);
+    CONF.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, REPLICATION_FACTOR);
     cluster = new MiniDFSCluster.Builder(CONF).numDataNodes(REPLICATION_FACTOR)
         .racks(INITIAL_RACKS).build();
 

@@ -1809,7 +1809,7 @@
   
   <property>
     <name>dfs.block.report.load.balancer.max.concurrent.block.reports.per.nn</name>
-    <value>5</value>
+    <value>1</value>
     <description>
         Number of concurrent block reports that a namenodes can process
     </description>

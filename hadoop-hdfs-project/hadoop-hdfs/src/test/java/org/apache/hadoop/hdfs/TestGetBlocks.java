@@ -107,6 +107,7 @@ public class TestGetBlocks {
     long staleInterval = 30 * 1000 * 60;
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_STALE_DATANODE_INTERVAL_KEY,
         staleInterval);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, numDatanodes);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
         .numDataNodes(numDatanodes).racks(racks).format(true).build();
 
@@ -139,7 +140,7 @@ public class TestGetBlocks {
       LocatedBlocks blocks = client.getNamenode().getBlockLocations(
           fileName.toString(), 0, blockSize);
       DatanodeInfo[] nodes = blocks.get(0).getLocations();
-      assertEquals(nodes.length, 3);
+      assertEquals(3, nodes.length);
       DataNode staleNode = null;
       DatanodeDescriptor staleNodeInfo = null;
       // stop the heartbeat of the first node
@@ -154,7 +155,7 @@ public class TestGetBlocks {
       LocatedBlocks blocksAfterStale = client.getNamenode().getBlockLocations(
           fileName.toString(), 0, blockSize);
       DatanodeInfo[] nodesAfterStale = blocksAfterStale.get(0).getLocations();
-      assertEquals(nodesAfterStale.length, 3);
+      assertEquals(3, nodesAfterStale.length);
       assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
 
       // restart the staleNode's heartbeat
@@ -165,7 +166,7 @@ public class TestGetBlocks {
       LocatedBlock lastBlock = client.getLocatedBlocks(fileName.toString(), 0,
           Long.MAX_VALUE).getLastLocatedBlock();
       nodes = lastBlock.getLocations();
-      assertEquals(nodes.length, 3);
+      assertEquals(3, nodes.length);
       // stop the heartbeat of the first node for the last block
       staleNode = this.stopDataNodeHeartbeat(cluster, nodes[0].getHostName());
       assertNotNull(staleNode);
@@ -178,7 +179,7 @@ public class TestGetBlocks {
       LocatedBlock lastBlockAfterStale = client.getLocatedBlocks(
           fileName.toString(), 0, Long.MAX_VALUE).getLastLocatedBlock();
       nodesAfterStale = lastBlockAfterStale.getLocations();
-      assertEquals(nodesAfterStale.length, 3);
+      assertEquals(3, nodesAfterStale.length);
       assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
     } finally {
       if (stm != null) {

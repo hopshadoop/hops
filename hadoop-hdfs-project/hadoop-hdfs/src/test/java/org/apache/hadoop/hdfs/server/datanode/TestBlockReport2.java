@@ -77,12 +77,13 @@ public class TestBlockReport2 {
     GenericTestUtils.setLogLevel(DFSClient.LOG, Level.ALL);
   }
 
-  private static void setConfiguration(Configuration conf, int numBuckets) {
+  private static void setConfiguration(Configuration conf, int numBuckets, int numDatanodes) {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY, BLOCK_SIZE);
     conf.setLong(DFSConfigKeys.DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY,
             DN_RESCAN_INTERVAL);
     conf.setInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY, numBuckets);
+    conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, numDatanodes);
   }
 
   private void waitForTempReplica(MiniDFSCluster cluster, Block bl, int DN_N1)
@@ -304,7 +305,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -374,7 +375,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -445,7 +446,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -543,7 +544,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       dfs = cluster.getFileSystem();
@@ -636,7 +637,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -715,7 +716,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -800,7 +801,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, numDataNodes);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(numDataNodes).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -861,7 +862,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -932,7 +933,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -997,7 +998,7 @@ public class TestBlockReport2 {
     try {
       Configuration conf = new Configuration();
       int numBuckets = 5;
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -1027,7 +1028,7 @@ public class TestBlockReport2 {
       cluster.shutdown();
       conf = new Configuration();
       numBuckets = 10;
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
       cluster.waitActive();
@@ -1044,7 +1045,7 @@ public class TestBlockReport2 {
       cluster.shutdown();
       conf = new Configuration();
       numBuckets = 3;
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (false).numDataNodes(NUM_DATANODES).build();
       cluster.waitActive();
@@ -1340,7 +1341,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -1404,7 +1405,7 @@ public class TestBlockReport2 {
     final int numBuckets = 5;
     try {
       Configuration conf = new Configuration();
-      setConfiguration(conf, numBuckets);
+      setConfiguration(conf, numBuckets, NUM_DATANODES);
       cluster = new MiniDFSCluster.Builder(conf).format
               (true).numDataNodes(NUM_DATANODES).build();
       fs = (DistributedFileSystem) cluster.getFileSystem();
@@ -1455,7 +1456,7 @@ public class TestBlockReport2 {
     short replicas = (short) 1;
     Configuration conf = new HdfsConfiguration();
     final int numBuckets = 5;
-    setConfiguration(conf, numBuckets);
+    setConfiguration(conf, numBuckets, replicas);
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
             DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT);
     EnumSet<HdfsDataOutputStream.SyncFlag> syncFlags =
