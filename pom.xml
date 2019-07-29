@@ -148,11 +148,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <module>hadoop-mapreduce-project</module>
     <module>hadoop-tools</module>
     <module>hops-erasure-coding-project</module>
-    <module>hadoop-dist</module>
     <module>hadoop-minicluster</module>
     <module>hadoop-client-modules</module>
     <module>hadoop-build-tools</module>
     <module>hadoop-cloud-storage-project</module>
+    <module>hadoop-dist</module>
   </modules>
 
   <build>

@@ -141,7 +141,7 @@ run cp -pr "${ROOT}/hadoop-common-project/hadoop-kms/target/hadoop-kms-${VERSION
 run mkdir -p "share/hadoop/client"
 run cp -p "${ROOT}/hadoop-client-modules/hadoop-client-api/target/hadoop-client-api-${VERSION}.jar" share/hadoop/client/
 run cp -p "${ROOT}/hadoop-client-modules/hadoop-client-runtime/target/hadoop-client-runtime-${VERSION}.jar" share/hadoop/client/
-run cp -p "${ROOT}/hadoop-client-modules/hadoop-client-minicluster/target/hadoop-client-minicluster-${VERSION}.jar" share/hadoop/client/
+# run cp -p "${ROOT}/hadoop-client-modules/hadoop-client-minicluster/target/hadoop-client-minicluster-${VERSION}.jar" share/hadoop/client/
 
 run copy "${ROOT}/hadoop-tools/hadoop-tools-dist/target/hadoop-tools-dist-${VERSION}" .
 
