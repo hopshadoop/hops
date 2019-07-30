@@ -83,7 +83,7 @@
                     <!-- annotations is provided, and both artifacts exclude the tools transitive,
                          but enforcer still sees it.
                     -->
-                    <exclude>org.apache.hadoop:hadoop-annotations</exclude>
+                    <exclude>io.hops:hadoop-annotations</exclude>
                     <!-- We leave HTrace as an unshaded dependnecy on purpose so that tracing within a JVM will work -->
                     <exclude>org.apache.htrace:htrace-core4</exclude>
                     <!-- Leave slf4j unshaded so downstream users can configure logging. -->
@@ -98,10 +98,24 @@
                     <exclude> org.hamcrest:hamcrest-core</exclude>
                     <!-- Leave javax annotations we need exposed -->
                     <exclude>com.google.code.findbugs:jsr305</exclude>
+                    <!-- for ndb profile -->
+                    <exclude>io.hops.metadata:hops-metadata-dal-impl-ndb</exclude>
                   </excludes>
                 </banTransitiveDependencies>
                 <banDuplicateClasses>
                   <findAllDuplicates>true</findAllDuplicates>
+                  <!-- Needed as long as HDFS is not up to date 
+                         with a proper separation of HDFS and HDFS client
+                         TODO remove when HDFS is up to date -->                        
+                  <ignoreClasses>
+                    <ignoreClass>org.apache.hadoop.hdfs.*</ignoreClass>
+                    <ignoreClass>io.hops.transaction.*</ignoreClass>
+                    <ignoreClass>io.hops.metadata.*</ignoreClass>
+                    <ignoreClass>io.hops.erasure_coding.*</ignoreClass>
+                    <ignoreClass>io.hops.common.*</ignoreClass>
+                    <ignoreClass>io.hops.resolvingcache.*</ignoreClass>
+                    <ignoreClass>org.apache.hadoop.fs.*</ignoreClass>
+                  </ignoreClasses>
                   <dependencies>
                     <dependency>
                       <groupId>io.hops</groupId>

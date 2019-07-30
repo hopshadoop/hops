@@ -60,6 +60,10 @@
           <groupId>org.json</groupId>
           <artifactId>json</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>io.hops</groupId>
+          <artifactId>hops-leader-election</artifactId>
+        </exclusion>
       </exclusions>
       <!--<scope>test</scope>-->
     </dependency>
@@ -72,6 +76,10 @@
         <exclusion>
           <groupId>org.json</groupId>
           <artifactId>json</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.hops</groupId>
+          <artifactId>hops-leader-election</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

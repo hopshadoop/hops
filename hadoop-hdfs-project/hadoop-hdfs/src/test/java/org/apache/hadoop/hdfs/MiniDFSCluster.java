@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs;
 
 import io.hops.erasure_coding.MockEncodingManager;
 import io.hops.erasure_coding.MockRepairManager;
-import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.security.UsersGroups;
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_DEFAULT;
@@ -805,13 +804,9 @@ public class MiniDFSCluster {
       HdfsStorageFactory.resetDALInitialized();
       HdfsStorageFactory.setConfiguration(conf);
       if (format) {
-        try {
-          // this should be done before creating namenodes
-          LOG.debug("MiniDFSClustring Formatting the Cluster");
-          assert (HdfsStorageFactory.formatStorage());
-        } catch (StorageException ex) {
-          throw new IOException(ex);
-        }
+        // this should be done before creating namenodes
+        LOG.debug("MiniDFSClustring Formatting the Cluster");
+        assert (HdfsStorageFactory.formatStorage());
         if (data_dir.exists() && !FileUtil.fullyDelete(data_dir)) {
           throw new IOException("Cannot remove data directory: " + data_dir);
         }

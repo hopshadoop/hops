@@ -34,12 +34,12 @@
     <!-- Should be used at runtime scope for remaining classes necessary for hadoop-client-api to function -->
     <module>hadoop-client-runtime</module>
     <!-- Should be used at test scope for those that need access to mini cluster that works with above api and runtime -->
-    <!--<module>hadoop-client-minicluster</module>-->
+    <module>hadoop-client-minicluster</module>
     <!-- Checks invariants above -->
-<!--    <module>hadoop-client-check-invariants</module>
-    <module>hadoop-client-check-test-invariants</module>-->
+    <module>hadoop-client-check-invariants</module>
+    <module>hadoop-client-check-test-invariants</module>
     <!-- Attempt to use the created libraries -->
-    <!--<module>hadoop-client-integration-tests</module>-->
+    <module>hadoop-client-integration-tests</module>
   </modules>
 
 </project>
