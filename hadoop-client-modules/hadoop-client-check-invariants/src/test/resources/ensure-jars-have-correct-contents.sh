@@ -24,10 +24,15 @@
 
 # we have to allow the directories that lead to the org/apache/hadoop dir
 allowed_expr="(^org/$|^org/apache/$"
+# we have to allow the directories that lead to the io/hops/hadoop dir
+allowed_expr+="|^io/$|^io/hops/$"
 # We allow the following things to exist in our client artifacts:
 #   * classes in packages that start with org.apache.hadoop, which by
 #     convention should be in a path that looks like org/apache/hadoop
 allowed_expr+="|^org/apache/hadoop/"
+#   * classes in packages that start with io.hops, which by
+#     convention should be in a path that looks like io/hops/
+allowed_expr+="|^io/hops/"
 #   * whatever in the "META-INF" directory
 allowed_expr+="|^META-INF/"
 #   * whatever under the "webapps" directory; for things shipped by yarn
@@ -35,6 +40,8 @@ allowed_expr+="|^webapps/"
 #   * Hadoop's default configuration files, which have the form
 #     "_module_-default.xml"
 allowed_expr+="|^[^-]*-default.xml$"
+#   * special case for erasure coding which does not match the above format
+allowed_expr+="|^erasure-coding-default.xml$"
 #   * Hadoop's versioning properties files, which have the form
 #     "_module_-version-info.properties"
 allowed_expr+="|^[^-]*-version-info.properties$"
@@ -56,6 +63,15 @@ allowed_expr+="|^krb5_udp-template.conf$"
 # Jetty uses this style sheet for directory listings. TODO ensure our
 # internal use of jetty disallows directory listings and remove this.
 allowed_expr+="|^jetty-dir.css$"
+# for ndb profile we allow:
+#   * the io/hops/metadata/ directory
+allowed_expr+="|^io/hops/metadata/"
+#   * the io/hops/util/ directory
+allowed_expr+="|^io/hops/util/"
+#   * the libndbclient.so
+allowed_expr+="|^libndbclient.so"
+#   * the ndb-config.properties
+allowed_expr+="|^ndb-config.properties$"
 
 allowed_expr+=")"
 declare -i bad_artifacts=0

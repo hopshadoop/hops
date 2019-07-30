@@ -29,7 +29,7 @@
   <name>Apache Hadoop Client Test Minicluster</name>
 
   <properties>
-    <shaded.dependency.prefix>org.apache.hadoop.shaded</shaded.dependency.prefix>
+    <shaded.dependency.prefix>io.hops.hadoop.shaded</shaded.dependency.prefix>
     <!-- We contain no source -->
     <maven.javadoc.skip>true</maven.javadoc.skip>
   </properties>
@@ -321,6 +321,18 @@
         <exclusion>
           <groupId>dnsjava</groupId>
           <artifactId>dnsjava</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-math3</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcprov-jdk15on</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcpkix-jdk15on</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -656,9 +668,9 @@
                   <artifactSet>
                     <excludes>
                       <!-- Fine to expose our already-shaded deps as dependencies -->
-                      <exclude>org.apache.hadoop:hadoop-annotations</exclude>
-                      <exclude>org.apache.hadoop:hadoop-client-api</exclude>
-                      <exclude>org.apache.hadoop:hadoop-client-runtime</exclude>
+                      <exclude>io.hops:hadoop-annotations</exclude>
+                      <exclude>io.hops:hadoop-client-api</exclude>
+                      <exclude>io.hops:hadoop-client-runtime</exclude>
                       <!-- Fine to expose our purposefully not-shaded deps as dependencies -->
                       <exclude>org.apache.htrace:htrace-core4</exclude>
                       <exclude>org.slf4j:slf4j-api</exclude>
@@ -706,7 +718,7 @@
                       </excludes>
                     </filter>
                     <filter>
-                      <artifact>org.apache.hadoop:hadoop-mapreduce-client-jobclient:*</artifact>
+                      <artifact>io.hops:hadoop-mapreduce-client-jobclient:*</artifact>
                       <excludes>
                         <exclude>testjar/*</exclude>
                         <exclude>testshell/*</exclude>
@@ -757,7 +769,7 @@
                       </excludes>
                     </filter>
                     <filter>
-                      <artifact>org.apache.hadoop:*</artifact>
+                      <artifact>io.hops:*</artifact>
                       <excludes>
                         <!-- No shipping log4j configs in a downstream facing library -->
                         <exclude>log4j.properties</exclude>
@@ -841,6 +853,7 @@
                         <exclude>com/sun/security/**/*</exclude>
                         <exclude>com/sun/jndi/**/*</exclude>
                         <exclude>com/sun/management/**/*</exclude>
+                        <exclude>com/google/common/**/*</exclude>
                       </excludes>
                     </relocation>
                     <relocation>
@@ -848,6 +861,8 @@
                       <shadedPattern>${shaded.dependency.prefix}.io.</shadedPattern>
                       <excludes>
                         <exclude>**/pom.xml</exclude>
+                        <exclude>io/hops/*</exclude>
+                        <exclude>io/hops/**/*</exclude>
                         <!-- Exclude config keys for Hadoop that look like package names -->
                         <exclude>io/compression/*</exclude>
                         <exclude>io/compression/**/*</exclude>

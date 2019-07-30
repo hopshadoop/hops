@@ -42,7 +42,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 
 import org.apache.hadoop.hdfs.web.WebHdfsTestUtil;
-import org.apache.hadoop.hdfs.web.WebHdfsConstants;
+import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 
 /**
  * Ensure that we can perform operations against the shaded minicluster
@@ -78,7 +78,7 @@ public class ITUseMiniCluster {
   @After
   public void clusterDown() {
     if (cluster != null) {
-      cluster.close();
+      cluster.shutdown();
     }
   }
 
@@ -108,7 +108,7 @@ public class ITUseMiniCluster {
   @Test
   public void useWebHDFS() throws IOException, URISyntaxException {
     try (FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(
-        cluster.getConfiguration(0), WebHdfsConstants.WEBHDFS_SCHEME)) {
+        cluster.getConfiguration(0), WebHdfsFileSystem.SCHEME)) {
       simpleReadAfterWrite(fs);
     }
   }

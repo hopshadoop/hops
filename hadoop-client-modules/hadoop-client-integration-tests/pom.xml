@@ -64,6 +64,12 @@
           <groupId>io.hops</groupId>
           <artifactId>hadoop-client-api</artifactId>
           <scope>test</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>io.hops</groupId>
+              <artifactId>hadoop-annotations</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.hops</groupId>

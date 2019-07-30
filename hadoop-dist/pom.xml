@@ -51,7 +51,7 @@
       <artifactId>hadoop-yarn-api</artifactId>
       <scope>provided</scope>
     </dependency>
-<!--    <dependency>
+    <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hadoop-client-check-invariants</artifactId>
       <type>pom</type>
@@ -67,7 +67,7 @@
       <groupId>io.hops</groupId>
       <artifactId>hadoop-client-integration-tests</artifactId>
       <scope>provided</scope>
-    </dependency>-->
+    </dependency>
 
   </dependencies>
 

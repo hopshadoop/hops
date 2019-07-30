@@ -29,7 +29,7 @@
   <name>Apache Hadoop Client Runtime</name>
 
   <properties>
-    <shaded.dependency.prefix>org.apache.hadoop.shaded</shaded.dependency.prefix>
+    <shaded.dependency.prefix>io.hops.hadoop.shaded</shaded.dependency.prefix>
     <!-- We contain no source -->
     <maven.javadoc.skip>true</maven.javadoc.skip>
   </properties>
@@ -51,6 +51,22 @@
         <exclusion>
           <groupId>xml-apis</groupId>
           <artifactId>xml-apis</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-all</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-util-ajax</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-daemon</groupId>
+          <artifactId>commons-daemon</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>xmlenc</groupId>
+          <artifactId>xmlenc</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -145,7 +161,7 @@
                   <artifactSet>
                     <excludes>
                       <!-- We need a filter that matches just those things that aer included in the api jar -->
-                      <exclude>org.apache.hadoop:hadoop-client-api</exclude>
+                      <exclude>io.hops:hadoop-client-api</exclude>
                       <!-- Leave HTrace as an unshaded dependency on purpose, since a static class member is used to trace within a given JVM instance -->
                       <exclude>org.apache.htrace:htrace-core4</exclude>
                       <!-- Leave slf4j unshaded so downstream users can configure logging. -->
@@ -163,7 +179,7 @@
                   <filters>
                     <!-- We need a filter that matches just those things that are included in the api jar -->
                     <filter>
-                      <artifact>org.apache.hadoop:*</artifact>
+                      <artifact>io.hops:*</artifact>
                       <excludes>
                         <exclude>**/*</exclude>
                         <exclude>*</exclude>

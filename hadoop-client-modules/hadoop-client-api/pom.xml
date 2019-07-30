@@ -29,7 +29,7 @@
   <name>Apache Hadoop Client API</name>
 
   <properties>
-    <shaded.dependency.prefix>org.apache.hadoop.shaded</shaded.dependency.prefix>
+    <shaded.dependency.prefix>io.hops.hadoop.shaded</shaded.dependency.prefix>
     <!-- We contain no source -->
     <maven.javadoc.skip>true</maven.javadoc.skip>
   </properties>
@@ -103,13 +103,13 @@
                 <configuration>
                   <artifactSet>
                     <includes>
-                      <include>org.apache.hadoop:*</include>
+                      <include>io.hops:*</include>
                     </includes>
                   </artifactSet>
                   <filters>
                     <!-- We get these package level classes from various yarn api jars -->
                     <filter>
-                      <artifact>org.apache.hadoop:hadoop-yarn-common</artifact>
+                      <artifact>io.hops:hadoop-yarn-common</artifact>
                       <excludes>
                         <exclude>org/apache/hadoop/yarn/factories/package-info.class</exclude>
                         <exclude>org/apache/hadoop/yarn/util/package-info.class</exclude>
@@ -161,12 +161,15 @@
                         <exclude>com/sun/security/**/*</exclude>
                         <exclude>com/sun/jndi/**/*</exclude>
                         <exclude>com/sun/management/**/*</exclude>
+                        <exclude>com/google/common/**/*</exclude>
                       </excludes>
                     </relocation>
                     <relocation>
                       <pattern>io/</pattern>
                       <shadedPattern>${shaded.dependency.prefix}.io.</shadedPattern>
                       <excludes>
+                        <exclude>io/hops/*</exclude>
+                        <exclude>io/hops/**/*</exclude>
                         <exclude>**/pom.xml</exclude>
                         <!-- Exclude config keys for Hadoop that look like package names -->
                         <exclude>io/compression/*</exclude>
