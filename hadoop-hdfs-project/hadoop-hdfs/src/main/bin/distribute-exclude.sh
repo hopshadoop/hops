@@ -36,8 +36,8 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
+HADOOP_DEFAULT_LIBEXEC_DIR="$bin"/../libexec
+HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}
 . $HADOOP_LIBEXEC_DIR/hdfs-config.sh
 
 if [ "$1" = '' ] ; then
@@ -52,14 +52,14 @@ if [ ! -f "$excludeFilenameLocal" ] ; then
   exit 1
 fi
 
-namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -namenodes)
-excludeFilenameRemote=$("$HADOOP_PREFIX/bin/hdfs" getconf -excludeFile)
+namenodes=$("$HADOOP_HOME/bin/hdfs" getconf -namenodes)
+excludeFilenameRemote=$("$HADOOP_HOME/bin/hdfs" getconf -excludeFile)
 
 if [ "$excludeFilenameRemote" = '' ] ; then
   echo \
-    "Error: hdfs getconf -excludeFile returned empty string, " \
-    "please setup dfs.hosts.exclude in hdfs-site.xml in local cluster " \
-    "configuration and on all namenodes"
+  "Error: hdfs getconf -excludeFile returned empty string, " \
+  "please setup dfs.hosts.exclude in hdfs-site.xml in local cluster " \
+  "configuration and on all namenodes"
   exit 1
 fi
 
