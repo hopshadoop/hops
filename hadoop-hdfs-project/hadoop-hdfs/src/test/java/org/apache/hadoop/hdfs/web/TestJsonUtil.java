@@ -223,6 +223,19 @@ public class TestJsonUtil {
           parsedXAttrMap.get(entry.getKey()));
     }
   }
+  
+  @Test
+  public void testGetXAttrFromJson() throws IOException {
+    String jsonString =
+        "{\"XAttrs\":[{\"name\":\"user.a1\",\"value\":\"0x313233\"}," +
+            "{\"name\":\"user.a2\",\"value\":\"0x313131\"}]}";
+    ObjectReader reader = new ObjectMapper().reader(Map.class);
+    Map<?, ?> json = reader.readValue(jsonString);
+    
+    // Get xattr: user.a2
+    byte[] value = JsonUtil.getXAttr(json, "user.a2");
+    Assert.assertArrayEquals(XAttrCodec.decodeValue("0x313131"), value);
+  }
 
   @Test
   public void testToJsonFromAclStatus() {

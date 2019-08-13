@@ -323,21 +323,6 @@ public class JsonUtil {
     return null;
   }
   
-  public static String toJsonString(final XAttr xAttr,
-      final XAttrCodec encoding) throws IOException {
-    if (xAttr == null) {
-      return "{}";
-    }
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("name", XAttrHelper.getPrefixName(xAttr));
-    m.put("value", xAttr.getValue() != null ?
-        XAttrCodec.encodeValue(xAttr.getValue(), encoding) : null);
-    final Map<String, Map<String, Object>> finalMap =
-        new TreeMap<String, Map<String, Object>>();
-    finalMap.put(XAttr.class.getSimpleName(), m);
-    ObjectMapper mapper = new ObjectMapper();
-    return mapper.writeValueAsString(finalMap);
-  }
   
   public static String toJsonString(final List<XAttr> xAttrs)
       throws IOException {
@@ -388,18 +373,18 @@ public class JsonUtil {
     return mapper.writeValueAsString(finalMap);
   }
   
-  public static XAttr toXAttr(final Map<?, ?> json) throws IOException {
+  public static byte[] getXAttr(final Map<?, ?> json, final String name)
+      throws IOException {
     if (json == null) {
       return null;
     }
     
-    Map<?, ?> m = (Map<?, ?>) json.get(XAttr.class.getSimpleName());
-    if (m == null) {
-      return null;
+    Map<String, byte[]> xAttrs = toXAttrs(json);
+    if (xAttrs != null) {
+      return xAttrs.get(name);
     }
-    String name = (String) m.get("name");
-    String value = (String) m.get("value");
-    return XAttrHelper.buildXAttr(name, decodeXAttrValue(value));
+    
+    return null;
   }
   
   static List<?> getList(Map<?, ?> m, String key) {
@@ -418,28 +403,6 @@ public class JsonUtil {
     }
 
     return toXAttrMap(getList(json, "XAttrs"));
-  }
-  
-  public static Map<String, byte[]> toXAttrs(final Map<?, ?> json,
-      List<String> names) throws IOException {
-    if (json == null || names == null) {
-      return null;
-    }
-    if (names.isEmpty()) {
-      return Maps.newHashMap();
-    }
-    Map<String, byte[]> xAttrs = toXAttrs(json);
-    if (xAttrs == null || xAttrs.isEmpty()) {
-      return xAttrs;
-    }
-    
-    Map<String, byte[]> result = Maps.newHashMap();
-    for (String name : names) {
-      if (xAttrs.containsKey(name)) {
-        result.put(name, xAttrs.get(name));
-      }
-    }
-    return result;
   }
   
   public static List<String> toXAttrNames(final Map<?, ?> json)
