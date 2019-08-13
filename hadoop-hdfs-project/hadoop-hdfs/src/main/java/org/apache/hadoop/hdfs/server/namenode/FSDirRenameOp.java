@@ -293,7 +293,8 @@ class FSDirRenameOp {
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
         } else {
           locks.add(lf.getLeaseLock(LockType.READ_COMMITTED))
-              .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src));
+              .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src)).
+              add(lf.getSubTreeOpsLock(LockType.WRITE, fsd.getFSNamesystem().getSubTreeLockPathPrefix(src), false));
         }
         if (fsd.isQuotaEnabled()) {
           locks.add(lf.getQuotaUpdateLock(true, src, dst));
@@ -574,7 +575,9 @@ class FSDirRenameOp {
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
         } else {
           locks.add(lf.getLeaseLock(LockType.WRITE))
-              .add(lf.getLeasePathLock(LockType.WRITE, src));
+              .add(lf.getLeasePathLock(LockType.WRITE, src)).
+              add(lf.getSubTreeOpsLock(LockType.WRITE, fsd.
+                    getFSNamesystem().getSubTreeLockPathPrefix(src), false));
         }
         if (fsd.getFSNamesystem().isErasureCodingEnabled()) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, dst));
@@ -1005,7 +1008,9 @@ class FSDirRenameOp {
       UnresolvedLinkException {
     if (isUsingSubTreeLocks) {
       if (!src.equals("/")) {
-        EntityManager.remove(new SubTreeOperation(fsd.getFSNamesystem().getSubTreeLockPathPrefix(src)));
+        SubTreeOperation subTreeOp = EntityManager.find(SubTreeOperation.Finder.ByPath, fsd.
+                    getFSNamesystem().getSubTreeLockPathPrefix(src));
+        EntityManager.remove(subTreeOp);
         INodesInPath inodesInPath = fsd.getINodesInPath(src, false);
         INode inode = inodesInPath.getLastINode();
         if (inode != null && inode.isSTOLocked()) {
