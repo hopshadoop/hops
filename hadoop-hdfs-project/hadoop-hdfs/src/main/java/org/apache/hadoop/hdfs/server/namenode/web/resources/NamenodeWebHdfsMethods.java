@@ -745,7 +745,7 @@ public class NamenodeWebHdfsMethods {
       @DefaultValue(BufferSizeParam.DEFAULT)
       final BufferSizeParam bufferSize,
       @QueryParam(XAttrNameParam.NAME) @DefaultValue(XAttrNameParam.DEFAULT)
-      final XAttrNameParam xattrName,
+      final List<XAttrNameParam> xattrNames,
       @QueryParam(XAttrEncodingParam.NAME) @DefaultValue(XAttrEncodingParam.DEFAULT)
       final XAttrEncodingParam xattrEncoding,
       @QueryParam(FsActionParam.NAME)
@@ -759,7 +759,7 @@ public class NamenodeWebHdfsMethods {
           final TokenServiceParam tokenService
       ) throws IOException, InterruptedException {
     return get(ugi, delegation, username, doAsUser, ROOT, op, offset, length,
-        renewer, bufferSize,  xattrName, xattrEncoding, excludeDatanodes,
+        renewer, bufferSize,  xattrNames, xattrEncoding, excludeDatanodes,
         fsAction, tokenKind, tokenService);
   }
 
@@ -799,7 +799,7 @@ public class NamenodeWebHdfsMethods {
       @DefaultValue(BufferSizeParam.DEFAULT)
       final BufferSizeParam bufferSize,
       @QueryParam(XAttrNameParam.NAME) @DefaultValue(XAttrNameParam.DEFAULT)
-      final XAttrNameParam xattrName,
+      final List<XAttrNameParam> xattrNames,
       @QueryParam(XAttrEncodingParam.NAME) @DefaultValue(XAttrEncodingParam.DEFAULT)
       final XAttrEncodingParam xattrEncoding,
       @QueryParam(ExcludeDatanodesParam.NAME) @DefaultValue(ExcludeDatanodesParam.DEFAULT)
@@ -813,7 +813,7 @@ public class NamenodeWebHdfsMethods {
       ) throws IOException, InterruptedException {
 
     init(ugi, delegation, username, doAsUser, path, op, offset, length,
-        renewer, bufferSize, xattrName, xattrEncoding, excludeDatanodes,
+        renewer, bufferSize, xattrEncoding, excludeDatanodes,
         fsAction, tokenKind, tokenService);
 
     return ugi.doAs(new PrivilegedExceptionAction<Response>() {
@@ -822,7 +822,7 @@ public class NamenodeWebHdfsMethods {
         try {
           return get(ugi, delegation, username, doAsUser,
               path.getAbsolutePath(), op, offset, length, renewer, bufferSize,
-              xattrName, xattrEncoding, excludeDatanodes, fsAction, tokenKind,
+              xattrNames, xattrEncoding, excludeDatanodes, fsAction, tokenKind,
               tokenService);
         } finally {
           reset();
@@ -842,7 +842,7 @@ public class NamenodeWebHdfsMethods {
       final LengthParam length,
       final RenewerParam renewer,
       final BufferSizeParam bufferSize,
-      final XAttrNameParam xattrName,
+      final List<XAttrNameParam> xattrNames,
       final XAttrEncodingParam xattrEncoding,
       final ExcludeDatanodesParam excludeDatanodes,
       final FsActionParam fsAction,
@@ -933,14 +933,18 @@ public class NamenodeWebHdfsMethods {
         final String js = JsonUtil.toJsonString(status);
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       }
-      case GETXATTR: {
-        XAttr xAttr = XAttrHelper.getFirstXAttr(np.getXAttrs(fullpath,
-            XAttrHelper.buildXAttrAsList(xattrName.getXAttrName())));
-        final String js = JsonUtil.toJsonString(xAttr, xattrEncoding.getEncoding());
-        return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
-      }
       case GETXATTRS: {
-        List<XAttr> xAttrs = np.getXAttrs(fullpath, null);
+        List<String> names = null;
+        if (xattrNames != null) {
+          names = Lists.newArrayListWithCapacity(xattrNames.size());
+          for (XAttrNameParam xattrName : xattrNames) {
+            if (xattrName.getXAttrName() != null) {
+              names.add(xattrName.getXAttrName());
+            }
+          }
+        }
+        List<XAttr> xAttrs = np.getXAttrs(fullpath, (names != null &&
+            !names.isEmpty()) ? XAttrHelper.buildXAttrs(names) : null);
         final String js = JsonUtil.toJsonString(xAttrs, xattrEncoding.getEncoding());
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       }
