@@ -544,6 +544,11 @@ public class TestUsersGroupsMultiNamenode {
     }
   
     @Override
+    public List<XAttr> listXAttrs(String src) throws IOException {
+      return null;
+    }
+  
+    @Override
     public void removeXAttr(String src, XAttr xAttr) throws IOException {
     
     }

@@ -2755,6 +2755,20 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }
   }
   
+  public List<String> listXAttrs(String src)
+          throws IOException {
+    checkOpen();
+    try {
+      final Map<String, byte[]> xattrs =
+        XAttrHelper.buildXAttrMap(namenode.listXAttrs(src));
+      return Lists.newArrayList(xattrs.keySet());
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+                                     FileNotFoundException.class,
+                                     UnresolvedPathException.class);
+    }
+  }
+
   public void removeXAttr(String src, String name) throws IOException {
     checkOpen();
     try {
