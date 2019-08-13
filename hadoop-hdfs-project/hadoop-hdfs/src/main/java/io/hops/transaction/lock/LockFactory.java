@@ -18,6 +18,7 @@ package io.hops.transaction.lock;
 
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -241,6 +242,10 @@ public class LockFactory {
     return new QuotaUpdateLock(targets);
   }
 
+  public Lock getQuotaUpdateLock(List<QuotaUpdate> updates) {
+    return new QuotaUpdateLock(updates);
+  }
+  
   public Lock getVariableLock(Variable.Finder[] finders,
       TransactionLockTypes.LockType[] lockTypes) {
     assert finders.length == lockTypes.length;
@@ -286,8 +291,8 @@ public class LockFactory {
   }
   
   public Lock getSubTreeOpsLock(TransactionLockTypes.LockType lockType, 
-          String pathPrefix) {
-    return new SubTreeOpLock(lockType, pathPrefix);
+          String pathPrefix, boolean prefix) {
+    return new SubTreeOpLock(lockType, pathPrefix, prefix);
   }
   
   public Lock getIndividualHashBucketLock(int storageId, int bucketId) {

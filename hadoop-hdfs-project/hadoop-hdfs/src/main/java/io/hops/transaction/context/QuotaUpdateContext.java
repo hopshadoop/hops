@@ -66,6 +66,17 @@ public class QuotaUpdateContext
   }
 
   @Override
+  public QuotaUpdate find(FinderType<QuotaUpdate> finder,
+      Object... params) throws TransactionContextException, StorageException {
+    QuotaUpdate.Finder qFinder = (QuotaUpdate.Finder) finder;
+    switch (qFinder) {
+      case ByKey:
+        return findByKey(qFinder, params);
+    }
+    throw new UnsupportedOperationException(UNSUPPORTED_FINDER);
+  }
+  
+  @Override
   public Collection<QuotaUpdate> findList(FinderType<QuotaUpdate> finder,
       Object... params) throws TransactionContextException, StorageException {
     QuotaUpdate.Finder qFinder = (QuotaUpdate.Finder) finder;
@@ -82,7 +93,7 @@ public class QuotaUpdateContext
     Collection<QuotaUpdate> modified =
         new ArrayList<>(getModified());
     modified.addAll(getAdded());
-    dataAccess.prepare(modified, getRemovedForced());
+    dataAccess.prepare(modified, getRemoved());
   }
 
   @Override
@@ -111,11 +122,32 @@ public class QuotaUpdateContext
     }
     return result;
   }
+  
+  private QuotaUpdate findByKey(QuotaUpdate.Finder qFinder,
+      Object[] params) throws StorageCallPreventedException, StorageException {
+    final int id = (Integer) params[0];
+    final long inodeId = (Long) params[1];
+    
+    aboutToAccessStorage(qFinder, params);
+    QuotaUpdate result = dataAccess.findByKey(id, inodeId);
+    gotFromDB(inodeId, result);
+    miss(qFinder, result, "id", id);
+    return result;
+  }
 
   private void gotFromDB(long inodeId, List<QuotaUpdate> quotaUpdates) {
     gotFromDB(quotaUpdates);
     inodeIdToQuotaUpdates.put(inodeId, quotaUpdates);
   }
 
+  private void gotFromDB(long inodeId, QuotaUpdate quotaUpdate) {
+    gotFromDB(quotaUpdate);
+    List<QuotaUpdate> list = inodeIdToQuotaUpdates.get(inodeId);
+    if(list==null){
+      list = new ArrayList<>();
+      inodeIdToQuotaUpdates.put(inodeId, list);
+    }
+    list.add(quotaUpdate);
+  }
 
 }

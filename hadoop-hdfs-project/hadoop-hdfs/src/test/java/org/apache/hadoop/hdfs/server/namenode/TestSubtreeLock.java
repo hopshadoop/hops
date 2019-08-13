@@ -1017,8 +1017,8 @@ public class TestSubtreeLock extends TestCase {
       public Object performTask() throws IOException {
         OngoingSubTreeOpsDataAccess<SubTreeOperation> dataAccess =
                 (OngoingSubTreeOpsDataAccess) HdfsStorageFactory.getDataAccess(OngoingSubTreeOpsDataAccess.class);
-        SubTreeOperation op = new SubTreeOperation(path);
-        op.setAsyncLockRecoveryTime(System.currentTimeMillis());
+        SubTreeOperation op = new SubTreeOperation(path, -1, -1, SubTreeOperation.Type.NA,
+            System.currentTimeMillis(), "user", System.currentTimeMillis());
         List<SubTreeOperation> modified = new ArrayList<SubTreeOperation>();
         modified.add(op);
         dataAccess.prepare(Collections.EMPTY_LIST, Collections.EMPTY_LIST, modified);

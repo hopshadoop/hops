@@ -31,6 +31,7 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.LockFactory.BLK;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -83,6 +84,8 @@ public class FSDirAttrOp {
               .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
           if (isSTO) {
             il.setIgnoredSTOInodes(inode.getInodeId());
+            locks.add(lf.getSubTreeOpsLock(TransactionLockTypes.LockType.WRITE, fsd.
+                    getFSNamesystem().getSubTreeLockPathPrefix(src), false));
           }
           locks.add(il).add(lf.getBlockLock());
           locks.add(lf.getAcesLock());
@@ -101,7 +104,9 @@ public class FSDirAttrOp {
               inode.setSubtreeLocked(false);
               EntityManager.update(inode);
             }
-            EntityManager.remove(new SubTreeOperation(fsd.getFSNamesystem().getSubTreeLockPathPrefix(src)));
+            SubTreeOperation subTreeOp = EntityManager.find(SubTreeOperation.Finder.ByPath, fsd.
+                    getFSNamesystem().getSubTreeLockPathPrefix(src));
+            EntityManager.remove(subTreeOp);
           }
           return fsd.getAuditFileInfo(iip);
         }
@@ -141,6 +146,8 @@ public class FSDirAttrOp {
                   .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
               if (isSTO) {
                 il.setIgnoredSTOInodes(inode.getInodeId());
+                locks.add(lf.getSubTreeOpsLock(TransactionLockTypes.LockType.WRITE, fsd.
+                    getFSNamesystem().getSubTreeLockPathPrefix(src), false));
               }
               locks.add(il).add(lf.getBlockLock()).add(lf.getAcesLock());
             }
@@ -168,7 +175,9 @@ public class FSDirAttrOp {
                   inode.setSubtreeLocked(false);
                   EntityManager.update(inode);
                 }
-                EntityManager.remove(new SubTreeOperation(fsd.getFSNamesystem().getSubTreeLockPathPrefix(src)));
+                SubTreeOperation subTreeOp = EntityManager.find(SubTreeOperation.Finder.ByPath, fsd.
+                    getFSNamesystem().getSubTreeLockPathPrefix(src));
+                EntityManager.remove(subTreeOp);
               }
               return fsd.getAuditFileInfo(iip);
             }
