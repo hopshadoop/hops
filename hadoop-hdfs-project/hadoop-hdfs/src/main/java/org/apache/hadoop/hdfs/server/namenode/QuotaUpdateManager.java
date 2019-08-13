@@ -228,14 +228,17 @@ public class QuotaUpdateManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE,
-                iNodeIdentifier));
+            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, iNodeIdentifier))
+            .add(lf.getQuotaUpdateLock(updates));
       }
 
       @Override
       public Object performTask() throws IOException {
         INodeDirectory dir = (INodeDirectory) EntityManager
             .find(INode.Finder.ByINodeIdFTIS, updates.get(0).getInodeId());
+        Collection<QuotaUpdate> dbUpdates = EntityManager.findList(QuotaUpdate.Finder.ByINodeId, updates.get(0).
+            getInodeId());
+        
         if (dir != null && SubtreeLockHelper
             .isSTOLocked(dir.isSTOLocked(), dir.getSTOLockOwner(),
                 namesystem.getNameNode().getActiveNameNodes()
@@ -250,7 +253,7 @@ public class QuotaUpdateManager {
         }
 
         QuotaCounts counts = new QuotaCounts.Builder().build();
-        for (QuotaUpdate update : updates) {
+        for (QuotaUpdate update : dbUpdates) {
           counts.addStorageSpace(update.getStorageSpaceDelta());
           counts.addNameSpace(update.getNamespaceDelta());
           

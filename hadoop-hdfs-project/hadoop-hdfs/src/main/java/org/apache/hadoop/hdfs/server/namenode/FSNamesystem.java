@@ -7194,7 +7194,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         locks.add(il).
                 //READ_COMMITTED because it is index scan and hierarchical locking for inodes is sufficient
                 add(lf.getSubTreeOpsLock(LockType.READ_COMMITTED,
-                getSubTreeLockPathPrefix(path))); // it is
+                getSubTreeLockPathPrefix(path), true)); // it is
         locks.add(lf.getAcesLock());
       }
 
@@ -7308,6 +7308,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 .enableHierarchicalLocking(conf.getBoolean(DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY,
                         DFSConfigKeys.DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY_DEFAULT));
         locks.add(il);
+        locks.add(lf.getSubTreeOpsLock(LockType.WRITE, getSubTreeLockPathPrefix(path), false));
       }
 
       @Override
@@ -7318,7 +7319,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           inode.setSubtreeLocked(false);
           EntityManager.update(inode);
         }
-        EntityManager.remove(new SubTreeOperation(getSubTreeLockPathPrefix(path)));
+        SubTreeOperation subTreeOp = EntityManager.find(SubTreeOperation.Finder.ByPath, getSubTreeLockPathPrefix(
+            path));
+        EntityManager.remove(subTreeOp);
         return null;
       }
     }.handle(this);

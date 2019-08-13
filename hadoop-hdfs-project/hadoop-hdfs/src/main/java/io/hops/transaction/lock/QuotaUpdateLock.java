@@ -28,23 +28,37 @@ import java.util.List;
 final class QuotaUpdateLock extends Lock {
   private final String[] targets;
   private final boolean includeChildren;
-
+  private final List<QuotaUpdate> updates;
+  
   QuotaUpdateLock(boolean includeChildren, String... targets) {
     this.includeChildren = includeChildren;
     this.targets = targets;
+    updates = null;
   }
 
   QuotaUpdateLock(String... paths) {
     this(false, paths);
   }
 
+  QuotaUpdateLock(List<QuotaUpdate> updates) {
+    this.includeChildren=false;
+    this.targets=null;
+    this.updates = updates;
+  }
+  
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    INodeLock inodeLock = (INodeLock) locks.getLock(Type.INode);
-    for (String target : targets) {
-      acquireQuotaUpdate(inodeLock.getTargetINode(target));
-      if (includeChildren) {
-        acquireQuotaUpdate(inodeLock.getChildINodes(target));
+    if (targets != null) {
+      INodeLock inodeLock = (INodeLock) locks.getLock(Type.INode);
+      for (String target : targets) {
+        acquireQuotaUpdate(inodeLock.getTargetINode(target));
+        if (includeChildren) {
+          acquireQuotaUpdate(inodeLock.getChildINodes(target));
+        }
+      }
+    } else if (updates!=null){
+      for(QuotaUpdate update : updates){
+        acquireQuotaUpdate(update);
       }
     }
   }
@@ -62,6 +76,11 @@ final class QuotaUpdateLock extends Lock {
       throws StorageException, TransactionContextException {
     acquireLockList(DEFAULT_LOCK_TYPE, QuotaUpdate.Finder.ByINodeId,
         iNode.getId());
+  }
+  
+  private void acquireQuotaUpdate(QuotaUpdate update)
+      throws StorageException, TransactionContextException {
+    acquireLock(DEFAULT_LOCK_TYPE, QuotaUpdate.Finder.ByKey, update.getId(), update.getInodeId());
   }
 
   @Override
