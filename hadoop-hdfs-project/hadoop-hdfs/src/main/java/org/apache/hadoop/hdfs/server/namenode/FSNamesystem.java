@@ -73,6 +73,7 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
@@ -8058,6 +8059,43 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
         } catch (AccessControlException e) {
           logAuditEvent(false, "getXAttrs", src);
+          throw e;
+        }
+      }
+    }.handle();
+  }
+  
+  List<XAttr> listXAttrs(final String src) throws IOException {
+    return (List<XAttr>) new HopsTransactionalRequestHandler(HDFSOperationType.LIST_XATTRS) {
+    
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH
+            , src)
+            .setNameNodeID(nameNode.getId())
+            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+        locks.add(il);
+        locks.add(lf.getXAttrLock());
+      }
+    
+      @Override
+      public Object performTask() throws IOException {
+        nnConf.checkXAttrsConfigFlag();
+        final FSPermissionChecker pc = getPermissionChecker();
+        try {
+          final INodesInPath iip = dir.getINodesInPath(src, true);
+          if (isPermissionEnabled) {
+            /* To access xattr names, you need EXECUTE in the owning directory. */
+            dir.checkParentAccess(pc, iip, FsAction.EXECUTE);
+          }
+          final List<XAttr> all = dir.getXAttrs(src);
+          final List<XAttr> filteredAll = XAttrPermissionFilter.
+              filterXAttrsForApi(pc, all);
+          return filteredAll;
+        } catch (AccessControlException e) {
+          logAuditEvent(false, "listXAttrs", src);
           throw e;
         }
       }

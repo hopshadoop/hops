@@ -75,6 +75,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -1599,4 +1600,7 @@ public class FSDirectory implements Closeable {
     return XAttrStorage.readINodeXAttrs(inode, xAttrs);
   }
   
+  List<XAttr> getXAttrs(String src) throws IOException {
+    return getXAttrs(src, Collections.<XAttr>emptyList());
+  }
 }

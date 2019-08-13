@@ -1187,7 +1187,7 @@ public abstract class AbstractFileSystem {
     throw new UnsupportedOperationException(getClass().getSimpleName()
             + " doesn't support listXAttrs");
   }
-
+  
   /**
    * Remove an xattr of a file or directory.
    * The name must be prefixed with the namespace followed by ".". For example,

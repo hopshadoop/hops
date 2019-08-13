@@ -38,7 +38,9 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.codehaus.jackson.map.ObjectReader;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -337,6 +339,19 @@ public class JsonUtil {
     return mapper.writeValueAsString(finalMap);
   }
   
+  public static String toJsonString(final List<XAttr> xAttrs)
+      throws IOException {
+    final List<String> names = Lists.newArrayListWithCapacity(xAttrs.size());
+    for (XAttr xAttr : xAttrs) {
+      names.add(XAttrHelper.getPrefixName(xAttr));
+    }
+    ObjectMapper mapper = new ObjectMapper();
+    String ret = mapper.writeValueAsString(names);
+    final Map<String, Object> finalMap = new TreeMap<String, Object>();
+    finalMap.put("XAttrNames", ret);
+    return mapper.writeValueAsString(finalMap);
+  }
+  
   private static Map<String, Object> toJsonMap(final XAttr xAttr,
       final XAttrCodec encoding) throws IOException {
     if (xAttr == null) {
@@ -425,6 +440,24 @@ public class JsonUtil {
       }
     }
     return result;
+  }
+  
+  public static List<String> toXAttrNames(final Map<?, ?> json)
+      throws IOException {
+    if (json == null) {
+      return null;
+    }
+    
+    final String namesInJson = (String) json.get("XAttrNames");
+    ObjectReader reader = new ObjectMapper().reader(List.class);
+    final List<Object> xattrs = reader.readValue(namesInJson);
+    final List<String> names =
+        Lists.newArrayListWithCapacity(json.keySet().size());
+    
+    for (Object xattr : xattrs) {
+      names.add((String) xattr);
+    }
+    return names;
   }
   
   private static Map<String, byte[]> toXAttrMap(final List<?> objects)
