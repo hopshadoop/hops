@@ -890,6 +890,7 @@ service ClientNamenodeProtocol {
   rpc getAclStatus(GetAclStatusRequestProto) returns(GetAclStatusResponseProto);
   rpc setXAttr(SetXAttrRequestProto) returns(SetXAttrResponseProto);
   rpc getXAttrs(GetXAttrsRequestProto) returns(GetXAttrsResponseProto);
+  rpc listXAttrs(ListXAttrsRequestProto) returns(ListXAttrsResponseProto);
   rpc removeXAttr(RemoveXAttrRequestProto) returns(RemoveXAttrResponseProto);
   rpc getActiveNamenodesForClient (ActiveNamenodeListRequestProto) returns (ActiveNamenodeListResponseProto);
   rpc ping (PingRequestProto) returns (PingResponseProto);
