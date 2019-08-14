@@ -65,8 +65,9 @@ public class FSDirAttrOp {
   static HdfsFileStatus setPermission(
       final FSDirectory fsd, final String srcArg, final FsPermission permission)
       throws IOException {
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     //we just want to lock the subtree the permission are checked in setPermissionInt
     final INodeIdentifier inode = fsd.getFSNamesystem().lockSubtreeAndCheckOwnerAndParentPermission(src, true,
         null, SubTreeOperation.Type.SET_PERMISSION_STO);
@@ -89,11 +90,12 @@ public class FSDirAttrOp {
           }
           locks.add(il).add(lf.getBlockLock());
           locks.add(lf.getAcesLock());
+          locks.add(lf.getEZLock());
+          locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
         }
 
         @Override
         public Object performTask() throws IOException {
-          FSPermissionChecker pc = fsd.getPermissionChecker();
           final INodesInPath iip = fsd.getINodesInPath4Write(src);
           fsd.checkOwner(pc, iip);
           unprotectedSetPermission(fsd, src, permission);
@@ -127,8 +129,9 @@ public class FSDirAttrOp {
       throws IOException {
     //only for testing STO
     fsd.getFSNamesystem().saveTimes();
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     boolean txFailed = true;
     //we just want to lock the subtree the permission are checked in setOwnerSTOInt
     final INodeIdentifier inode = fsd.getFSNamesystem().lockSubtreeAndCheckOwnerAndParentPermission(src, true,
@@ -150,12 +153,13 @@ public class FSDirAttrOp {
                     getFSNamesystem().getSubTreeLockPathPrefix(src), false));
               }
               locks.add(il).add(lf.getBlockLock()).add(lf.getAcesLock());
+              locks.add(lf.getEZLock());
+              locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
             }
 
             @Override
             public Object performTask() throws IOException {
 
-              FSPermissionChecker pc = fsd.getPermissionChecker();
               final INodesInPath iip = fsd.getINodesInPath4Write(src);
               fsd.checkOwner(pc, iip);
               if (!pc.isSuperUser()) {
@@ -202,9 +206,9 @@ public class FSDirAttrOp {
               " Please set " + DFS_NAMENODE_ACCESSTIME_PRECISION_KEY
               + " configuration parameter.");
     }
-
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.SET_TIMES, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -214,12 +218,13 @@ public class FSDirAttrOp {
             .setActiveNameNodes(fsd.getFSNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock());
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
 
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         final INodesInPath iip = fsd.getINodesInPath4Write(src);
         // Write access is required to set access and modification times
         if (fsd.isPermissionEnabled()) {
@@ -240,8 +245,9 @@ public class FSDirAttrOp {
       throws IOException {
     bm.verifyReplication(srcArg, replication, null);
     
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     HopsTransactionalRequestHandler setReplicationHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.SET_REPLICATION,
         src) {
@@ -259,7 +265,6 @@ public class FSDirAttrOp {
       @Override
       public Object performTask() throws IOException {
 
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         final INodesInPath iip = fsd.getINodesInPath4Write(src);
         if (fsd.isPermissionEnabled()) {
           fsd.checkPathAccess(pc, iip, FsAction.WRITE);
@@ -302,6 +307,8 @@ public class FSDirAttrOp {
             .setNameNodeID(fsd.getFSNamesystem().getNamenodeId())
             .setActiveNameNodes(fsd.getFSNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il);
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
@@ -336,8 +343,9 @@ public class FSDirAttrOp {
   static long getPreferredBlockSize(final FSDirectory fsd, String srcArg)
       throws IOException {
     
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
    
     HopsTransactionalRequestHandler getPreferredBlockSizeHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_PREFERRED_BLOCK_SIZE, src) {
@@ -352,7 +360,6 @@ public class FSDirAttrOp {
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         final INodesInPath iip = fsd.getINodesInPath(src, false);
         if (fsd.isPermissionEnabled()) {
           fsd.checkTraverse(pc, iip);
@@ -371,8 +378,8 @@ public class FSDirAttrOp {
    */
   static void setQuota(final FSDirectory fsd, String srcArg, final long nsQuota, final long ssQuota,
       final StorageType type) throws IOException {
+    FSPermissionChecker pc = fsd.getPermissionChecker();
     if (fsd.isPermissionEnabled()) {
-      FSPermissionChecker pc = fsd.getPermissionChecker();
       pc.checkSuperuserPrivilege();
     }
 
@@ -383,7 +390,7 @@ public class FSDirAttrOp {
     INodeIdentifier subtreeRoot = null;
     boolean removeSTOLock = false;
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents, fsd);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     try {
       PathInformation pathInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(src,
           false, null, null, null, null);

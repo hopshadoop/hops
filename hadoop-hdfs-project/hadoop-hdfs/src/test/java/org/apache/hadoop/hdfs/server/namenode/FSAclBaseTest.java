@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.AclException;
+import org.apache.hadoop.hdfs.protocol.FsPermissionExtension;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
@@ -53,7 +54,6 @@ import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.protocol.FsAclPermission;
 import org.apache.hadoop.security.AccessControlException;
 import org.junit.After;
 
@@ -848,7 +848,8 @@ public abstract class FSAclBaseTest {
     fs.setPermission(path, FsPermission.createImmutable((short)0700));
     assertPermission((short)0700);
     fs.setPermission(path,
-      new FsAclPermission(FsPermission.createImmutable((short)0755)));
+      new FsPermissionExtension(FsPermission.
+          createImmutable((short)0755), true, true));
     INode inode = getInode();
     assertNotNull(inode);
     FsPermission perm = inode.getFsPermission();

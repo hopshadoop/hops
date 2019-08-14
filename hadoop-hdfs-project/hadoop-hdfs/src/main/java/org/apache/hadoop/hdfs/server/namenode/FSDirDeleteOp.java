@@ -105,7 +105,7 @@ class FSDirDeleteOp {
       throws IOException {
     final FSDirectory fsd = fsn.getFSDirectory();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(fsd.getPermissionChecker(), srcArg, pathComponents);
 
     if (!recursive) {
       // It is safe to do this as it will only delete a single file or an empty directory
@@ -127,7 +127,7 @@ class FSDirDeleteOp {
     }
 
     INodeIdentifier subtreeRoot = null;
-    if (pathInode.isFile()) {
+    if (pathInode.isFile() || pathInode.isSymlink()) {
       return deleteTransaction(fsn, src, false);
     }
 
@@ -272,6 +272,7 @@ class FSDirDeleteOp {
             if (fsn.isErasureCodingEnabled()) {
               locks.add(lf.getEncodingStatusLock(true, LockType.WRITE, src));
             }
+            locks.add(lf.getEZLock());
           }
 
           @Override
@@ -296,8 +297,9 @@ class FSDirDeleteOp {
       final FSNamesystem fsn, String srcArg, final boolean recursive)
       throws IOException {
     final FSDirectory fsd = fsn.getFSDirectory();
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
 
     HopsTransactionalRequestHandler deleteHandler = new HopsTransactionalRequestHandler(HDFSOperationType.DELETE, src) {
       @Override
@@ -324,6 +326,7 @@ class FSDirDeleteOp {
         if (fsn.isErasureCodingEnabled()) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
         }
+        locks.add(lf.getEZLock());
       }
 
       @Override
@@ -335,7 +338,6 @@ class FSDirDeleteOp {
         boolean ret = false;
         try {
 
-          FSPermissionChecker pc = fsd.getPermissionChecker();
           final INodesInPath iip = fsd.getINodesInPath4Write(src, false);
           if (!recursive && fsd.isNonEmptyDirectory(iip)) {
             throw new PathIsNotEmptyDirectoryException(src + " is non empty");

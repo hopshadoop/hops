@@ -23,6 +23,10 @@ import io.hops.metadata.hdfs.entity.EncodingStatus;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
+import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -220,60 +224,46 @@ public interface ClientProtocol {
    * multi-block files must also use
    * {@link #addBlock}
    *
-   * @param src
-   *     path of the file being created.
-   * @param masked
-   *     masked permission.
-   * @param clientName
-   *     name of the current client.
-   * @param flag
-   *     indicates whether the file should be
-   *     overwritten if it already exists or create if it does not exist or
-   *     append.
-   * @param createParent
-   *     create missing parent directory if true
-   * @param replication
-   *     block replication factor.
-   * @param blockSize
-   *     maximum block size.
-   * @param policy
-   *     name of the codec used for erasure coding. Use Codec.NO_ENCODING fo no
+   * @param src path of the file being created.
+   * @param masked masked permission.
+   * @param clientName name of the current client.
+   * @param flag indicates whether the file should be 
+   * overwritten if it already exists or create if it does not exist or append.
+   * @param createParent create missing parent directory if true
+   * @param replication block replication factor.
+   * @param blockSize maximum block size.
+   * @param supportedVersions CryptoProtocolVersions supported by the client
+   * @param policy name of the codec used for erasure coding. Use Codec.NO_ENCODING for no
    *     encoding
-   * @throws AccessControlException
-   *     If access is denied
-   * @throws AlreadyBeingCreatedException
-   *     if the path does not exist.
-   * @throws DSQuotaExceededException
-   *     If file creation violates disk space
-   *     quota restriction
-   * @throws FileAlreadyExistsException
-   *     If file <code>src</code> already exists
-   * @throws FileNotFoundException
-   *     If parent of <code>src</code> does not exist
-   *     and <code>createParent</code> is false
-   * @throws ParentNotDirectoryException
-   *     If parent of <code>src</code> is not a
-   *     directory.
-   * @throws NSQuotaExceededException
-   *     If file creation violates name space
-   *     quota restriction
-   * @throws SafeModeException
-   *     create not allowed in safemode
-   * @throws UnresolvedLinkException
-   *     If <code>src</code> contains a symlink
-   * @throws IOException
-   *     If an I/O error occurred
-   *     <p/>
-   *     RuntimeExceptions:
-   * @throws InvalidPathException
-   *     Path <code>src</code> is invalid
+   * 
+   * @return the status of the created file, it could be null if the server
+   *           doesn't support returning the file status
+   * @throws AccessControlException If access is denied
+   * @throws AlreadyBeingCreatedException if the path does not exist.
+   * @throws DSQuotaExceededException If file creation violates disk space 
+   *           quota restriction
+   * @throws FileAlreadyExistsException If file <code>src</code> already exists
+   * @throws FileNotFoundException If parent of <code>src</code> does not exist
+   *           and <code>createParent</code> is false
+   * @throws ParentNotDirectoryException If parent of <code>src</code> is not a
+   *           directory.
+   * @throws NSQuotaExceededException If file creation violates name space 
+   *           quota restriction
+   * @throws SafeModeException create not allowed in safemode
+   * @throws UnresolvedLinkException If <code>src</code> contains a symlink
+   * @throws SnapshotAccessControlException if path is in RO snapshot
+   * @throws IOException If an I/O error occurred
+   *
+   * RuntimeExceptions:
+   * @throws InvalidPathException Path <code>src</code> is invalid
    * <p>
    * <em>Note that create with {@link CreateFlag#OVERWRITE} is idempotent.</em>
    */
   @AtMostOnce
   public HdfsFileStatus create(String src, FsPermission masked,
-      String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
-      short replication, long blockSize, EncodingPolicy policy)
+      String clientName, EnumSetWritable<CreateFlag> flag, 
+      boolean createParent, short replication, long blockSize,
+      CryptoProtocolVersion[] supportedVersions, EncodingPolicy policy)
       throws AccessControlException, AlreadyBeingCreatedException,
       DSQuotaExceededException, FileAlreadyExistsException,
       FileNotFoundException, NSQuotaExceededException,
@@ -297,55 +287,41 @@ public interface ClientProtocol {
    * multi-block files must also use
    * {@link #addBlock(String, String, ExtendedBlock, DatanodeInfo[])}
    *
-   * @param src
-   *     path of the file being created.
-   * @param masked
-   *     masked permission.
-   * @param clientName
-   *     name of the current client.
-   * @param flag
-   *     indicates whether the file should be
-   *     overwritten if it already exists or create if it does not exist or
-   *     append.
-   * @param createParent
-   *     create missing parent directory if true
-   * @param replication
-   *     block replication factor.
-   * @param blockSize
-   *     maximum block size.
-   * @throws AccessControlException
-   *     If access is denied
-   * @throws AlreadyBeingCreatedException
-   *     if the path does not exist.
-   * @throws DSQuotaExceededException
-   *     If file creation violates disk space
-   *     quota restriction
-   * @throws FileAlreadyExistsException
-   *     If file <code>src</code> already exists
-   * @throws FileNotFoundException
-   *     If parent of <code>src</code> does not exist
-   *     and <code>createParent</code> is false
-   * @throws ParentNotDirectoryException
-   *     If parent of <code>src</code> is not a
-   *     directory.
-   * @throws NSQuotaExceededException
-   *     If file creation violates name space
-   *     quota restriction
-   * @throws SafeModeException
-   *     create not allowed in safemode
-   * @throws UnresolvedLinkException
-   *     If <code>src</code> contains a symlink
-   * @throws IOException
-   *     If an I/O error occurred
-   *     <p/>
-   *     RuntimeExceptions:
-   * @throws InvalidPathException
-   *     Path <code>src</code> is invalid
+   * @param src path of the file being created.
+   * @param masked masked permission.
+   * @param clientName name of the current client.
+   * @param flag indicates whether the file should be 
+   * overwritten if it already exists or create if it does not exist or append.
+   * @param createParent create missing parent directory if true
+   * @param replication block replication factor.
+   * @param blockSize maximum block size.
+   * @param supportedVersions CryptoProtocolVersions supported by the client
+   * 
+   * @return the status of the created file, it could be null if the server
+   *           doesn't support returning the file status
+   * @throws AccessControlException If access is denied
+   * @throws AlreadyBeingCreatedException if the path does not exist.
+   * @throws DSQuotaExceededException If file creation violates disk space 
+   *           quota restriction
+   * @throws FileAlreadyExistsException If file <code>src</code> already exists
+   * @throws FileNotFoundException If parent of <code>src</code> does not exist
+   *           and <code>createParent</code> is false
+   * @throws ParentNotDirectoryException If parent of <code>src</code> is not a
+   *           directory.
+   * @throws NSQuotaExceededException If file creation violates name space 
+   *           quota restriction
+   * @throws SafeModeException create not allowed in safemode
+   * @throws UnresolvedLinkException If <code>src</code> contains a symlink
+   * @throws SnapshotAccessControlException if path is in RO snapshot
+   * @throws IOException If an I/O error occurred
+   *
+   * RuntimeExceptions:
+   * @throws InvalidPathException Path <code>src</code> is invalid
    */
   @AtMostOnce
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
-      short replication, long blockSize)
+      short replication, long blockSize, CryptoProtocolVersion[] supportedVersions)
       throws AccessControlException, AlreadyBeingCreatedException,
       DSQuotaExceededException, FileAlreadyExistsException,
       FileNotFoundException, NSQuotaExceededException,
@@ -1570,6 +1546,31 @@ public interface ClientProtocol {
    */
   @Idempotent
   public AclStatus getAclStatus(String src) throws IOException;
+  
+  /**
+   * Create an encryption zone
+   */
+  @AtMostOnce
+  public void createEncryptionZone(String src, String keyName)
+    throws IOException;
+
+  /**
+   * Get the encryption zone for a path.
+   */
+  @Idempotent
+  public EncryptionZone getEZForPath(String src)
+    throws IOException;
+
+  /**
+   * Used to implement cursor-based batched listing of {@EncryptionZone}s.
+   *
+   * @param prevId ID of the last item in the previous batch. If there is no
+   *               previous batch, a negative value can be used.
+   * @return Batch of encryption zones.
+   */
+  @Idempotent
+  public BatchedEntries<EncryptionZone> listEncryptionZones(
+      long prevId) throws IOException;
   
   /**
    * Set xattr of a file or directory.

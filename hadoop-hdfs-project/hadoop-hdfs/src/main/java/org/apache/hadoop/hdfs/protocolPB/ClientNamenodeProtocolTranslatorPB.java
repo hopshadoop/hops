@@ -27,8 +27,11 @@ import io.hops.metadata.hdfs.entity.EncodingStatus;
 import java.util.EnumSet;
 
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.ContentSummary;
@@ -53,6 +56,7 @@ import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
@@ -137,6 +141,10 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Update
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLastUpdatedContentSummaryRequestProto;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
+import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos;
+import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.CreateEncryptionZoneRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.GetEZForPathRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.ListEncryptionZonesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.GetXAttrsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.ListXAttrsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.RemoveXAttrRequestProto;
@@ -174,6 +182,10 @@ import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 
+
+import static org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
+import static org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos
+    .EncryptionZoneProto;
 
 /**
  * This class forwards NN's ClientProtocol calls as RPC calls to the NN server
@@ -286,21 +298,22 @@ public class ClientNamenodeProtocolTranslatorPB
 
   @Override
   public HdfsFileStatus create(String src, FsPermission masked,
-      String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
-      short replication, long blockSize)
+      String clientName, EnumSetWritable<CreateFlag> flag,
+      boolean createParent, short replication, long blockSize, 
+      CryptoProtocolVersion[] supportedVersions)
       throws AccessControlException, AlreadyBeingCreatedException,
       DSQuotaExceededException, FileAlreadyExistsException,
       FileNotFoundException, NSQuotaExceededException,
       ParentNotDirectoryException, SafeModeException, UnresolvedLinkException,
       IOException {
     return create(src, masked, clientName, flag, createParent, replication,
-        blockSize, null);
+        blockSize, supportedVersions, null);
   }
 
   @Override
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
-      short replication, long blockSize, EncodingPolicy policy)
+      short replication, long blockSize, CryptoProtocolVersion[] supportedVersions, EncodingPolicy policy)
       throws AccessControlException, AlreadyBeingCreatedException,
       DSQuotaExceededException, FileAlreadyExistsException,
       FileNotFoundException, NSQuotaExceededException,
@@ -315,6 +328,7 @@ public class ClientNamenodeProtocolTranslatorPB
     if (policy != null) {
       builder.setPolicy(PBHelper.convert(policy));
     }
+    builder.addAllCryptoProtocolVersion(PBHelper.convert(supportedVersions));
     CreateRequestProto req = builder.build();
     try {
       CreateResponseProto result = rpcProxy.create(null, req);
@@ -1561,7 +1575,66 @@ public class ClientNamenodeProtocolTranslatorPB
       throw ProtobufHelper.getRemoteException(ex);
     }
   }
-  
+
+  @Override
+  public void createEncryptionZone(String src, String keyName)
+    throws IOException {
+    final CreateEncryptionZoneRequestProto.Builder builder =
+      CreateEncryptionZoneRequestProto.newBuilder();
+    builder.setSrc(src);
+    if (keyName != null && !keyName.isEmpty()) {
+      builder.setKeyName(keyName);
+    }
+    CreateEncryptionZoneRequestProto req = builder.build();
+    try {
+      rpcProxy.createEncryptionZone(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public EncryptionZone getEZForPath(String src)
+      throws IOException {
+    final GetEZForPathRequestProto.Builder builder =
+        GetEZForPathRequestProto.newBuilder();
+    builder.setSrc(src);
+    final GetEZForPathRequestProto req = builder.build();
+    try {
+      final EncryptionZonesProtos.GetEZForPathResponseProto response =
+          rpcProxy.getEZForPath(null, req);
+      if (response.hasZone()) {
+        return PBHelper.convert(response.getZone());
+      } else {
+        return null;
+      }
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public BatchedEntries<EncryptionZone> listEncryptionZones(long id)
+      throws IOException {
+    final ListEncryptionZonesRequestProto req =
+      ListEncryptionZonesRequestProto.newBuilder()
+          .setId(id)
+          .build();
+    try {
+      EncryptionZonesProtos.ListEncryptionZonesResponseProto response =
+          rpcProxy.listEncryptionZones(null, req);
+      List<EncryptionZone> elements =
+          Lists.newArrayListWithCapacity(response.getZonesCount());
+      for (EncryptionZoneProto p : response.getZonesList()) {
+        elements.add(PBHelper.convert(p));
+      }
+      return new BatchedListEntries<EncryptionZone>(elements,
+          response.getHasMore());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
   @Override
   public void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag)
       throws IOException {

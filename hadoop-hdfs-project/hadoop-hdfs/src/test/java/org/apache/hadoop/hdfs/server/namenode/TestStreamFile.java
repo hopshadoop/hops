@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -118,7 +119,7 @@ public class TestStreamFile {
   @Test
   public void testWriteTo() throws IOException {
 
-    FSInputStream fsin = new MockFSInputStream();
+    FSDataInputStream fsdin = new FSDataInputStream(new MockFSInputStream());
     ByteArrayOutputStream os = new ByteArrayOutputStream();
 
     // new int[]{s_1, c_1, s_2, c_2, ..., s_n, c_n} means to test
@@ -129,11 +130,12 @@ public class TestStreamFile {
 
     assertTrue("Pairs array must be even", pairs.length % 2 == 0);
     
-    for (int i = 0; i < pairs.length; i += 2) {
-      StreamFile.copyFromOffset(fsin, os, pairs[i], pairs[i + 1]);
-      assertArrayEquals(
-          "Reading " + pairs[i + 1] + " bytes from offset " + pairs[i],
-          getOutputArray(pairs[i], pairs[i + 1]), os.toByteArray());
+    for (int i = 0; i < pairs.length; i+=2) {
+      StreamFile.copyFromOffset(fsdin, os, pairs[i], pairs[i+1]);
+      assertArrayEquals("Reading " + pairs[i+1]
+                        + " bytes from offset " + pairs[i],
+                        getOutputArray(pairs[i], pairs[i+1]),
+                        os.toByteArray());
       os.reset();
     }
     
@@ -148,7 +150,7 @@ public class TestStreamFile {
   
   @Test
   public void testSendPartialData() throws IOException {
-    FSInputStream in = new MockFSInputStream();
+    FSDataInputStream in = new FSDataInputStream(new MockFSInputStream());
     ByteArrayOutputStream os = new ByteArrayOutputStream();
 
     // test if multiple ranges, then 416

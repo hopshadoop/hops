@@ -52,6 +52,7 @@ import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -60,6 +61,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.Time;
@@ -85,8 +87,8 @@ class FSDirRenameOp {
     byte[][] srcComponents = FSDirectory.getPathComponentsForReservedPath(src);
     byte[][] dstComponents = FSDirectory.getPathComponentsForReservedPath(dst);
     HdfsFileStatus resultingStat = null;
-    src = fsd.resolvePath(src, srcComponents, fsd);
-    dst = fsd.resolvePath(dst, dstComponents, fsd);
+    src = fsd.resolvePath(pc, src, srcComponents);
+    dst = fsd.resolvePath(pc, dst, dstComponents);
     
      @SuppressWarnings("deprecation")
     final boolean status = renameTo(fsd, pc, src, dst);
@@ -299,6 +301,8 @@ class FSDirRenameOp {
         if (fsd.isQuotaEnabled()) {
           locks.add(lf.getQuotaUpdateLock(true, src, dst));
         }
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE));
       }
 
       @Override
@@ -328,6 +332,7 @@ class FSDirRenameOp {
 
         AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(logEntries);
 
+        fsd.ezManager.checkMoveValidity(srcIIP, dstIIP, src);
         // Ensure dst has quota to accommodate rename
         verifyFsLimitsForRename(fsd, srcIIP, dstIIP);
         verifyQuotaForRename(fsd, srcIIP, dstIIP, srcCounts, dstCounts);
@@ -392,8 +397,8 @@ class FSDirRenameOp {
     byte[][] srcComponents = FSDirectory.getPathComponentsForReservedPath(src);
     byte[][] dstComponents = FSDirectory.getPathComponentsForReservedPath(dst);
     BlocksMapUpdateInfo collectedBlocks = new BlocksMapUpdateInfo();
-    src = fsd.resolvePath(src, srcComponents);
-    dst = fsd.resolvePath(dst, dstComponents);
+    src = fsd.resolvePath(pc, src, srcComponents);
+    dst = fsd.resolvePath(pc, dst, dstComponents);
     HdfsFileStatus resultingStat = renameTo(fsd, pc, src, dst, collectedBlocks, options);
 
     return new AbstractMap.SimpleImmutableEntry<>(
@@ -589,13 +594,18 @@ class FSDirRenameOp {
             locks.add(lf.getAllUsedHashBucketsLock());
           }
         }
+        locks.add(lf.getEZLock());
+        List<XAttr> xAttrsToLock = new ArrayList<>();
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
+        locks.add(lf.getXAttrLock(xAttrsToLock));
       }
 
       @Override
       public Object performTask() throws IOException {
         INodesInPath dstIIP = fsd.getINodesInPath(dst, false);
         INodesInPath srcIIP = fsd.getINodesInPath(src, false);
-
+        fsd.ezManager.checkMoveValidity(srcIIP, dstIIP, src);
         if (!isUsingSubTreeLocks) {
           if (fsd.isPermissionEnabled()) {
             FSPermissionChecker pc = fsd.getFSNamesystem().getPermissionChecker();

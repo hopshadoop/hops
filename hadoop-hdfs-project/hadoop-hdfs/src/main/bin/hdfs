@@ -27,7 +27,7 @@
 
 bin=`which $0`
 bin=`dirname ${bin}`
-bin=`cd "$bin"; pwd`
+bin=`cd "$bin" > /dev/null; pwd`
 
 DEFAULT_LIBEXEC_DIR="$bin"/../libexec
 HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
@@ -52,6 +52,7 @@ function print_usage(){
   echo "  groups               get the groups which users belong to"
   echo "						Use -help to see options"
   echo "  cacheadmin           configure the HDFS cache"
+  echo "  crypto               configure HDFS encryption zones"
   echo "  storagepolicies      list/get/set block storage policies"
   echo "  version              print the version"
   echo ""
@@ -133,6 +134,8 @@ elif [ "$COMMAND" = "groups" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.GetGroups
 elif [ "$COMMAND" = "cacheadmin" ] ; then
   CLASS=org.apache.hadoop.hdfs.tools.CacheAdmin
+elif [ "$COMMAND" = "crypto" ] ; then
+  CLASS=org.apache.hadoop.hdfs.tools.CryptoAdmin
 elif [ "$COMMAND" = "version" ] ; then
   CLASS=org.apache.hadoop.util.VersionInfo
 elif [ "$COMMAND" = "debug" ]; then

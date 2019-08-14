@@ -212,14 +212,19 @@ public class TestNamenodeRetryCache {
     newCall();
         HdfsFileStatus status = nnRpc.create(src, perm, "holder",
       new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true,
-      (short) 1, BlockSize, null);
-    Assert.assertEquals(status.getFileId(), nnRpc.create(src, perm, "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null).getFileId());
-    Assert.assertEquals(status.getFileId(), nnRpc.create(src, perm, "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null).getFileId());
+      (short) 1, BlockSize, null, null);
+    Assert.assertEquals(status.getFileId(), nnRpc.create(src, perm, 
+        "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)),
+        true, (short) 1, BlockSize, null, null).getFileId());
+    Assert.assertEquals(status.getFileId(), nnRpc.create(src, perm,
+        "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)),
+        true, (short) 1, BlockSize, null, null).getFileId());
     
     // A non-retried call fails
     newCall();
     try {
-      nnRpc.create(src, perm, "holder", new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null);
+      nnRpc.create(src, perm, "holder", 
+          new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)), true, (short) 1, BlockSize, null, null);
       Assert.fail("testCreate - expected exception is not thrown");
     } catch (IOException e) {
       // expected

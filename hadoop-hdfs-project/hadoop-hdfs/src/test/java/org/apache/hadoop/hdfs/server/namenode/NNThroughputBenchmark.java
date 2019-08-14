@@ -633,7 +633,7 @@ public class NNThroughputBenchmark implements Tool {
           .create(fileNames[daemonId][inputIdx], FsPermission.getDefault(),
               clientName, new EnumSetWritable<>(
                   EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
-              replication, BLOCK_SIZE);
+              replication, BLOCK_SIZE, null);
       long end = Time.now();
       for(boolean written = !closeUponCreate; !written; 
         written = nameNodeProto.complete(fileNames[daemonId][inputIdx],
@@ -1196,7 +1196,7 @@ public class NNThroughputBenchmark implements Tool {
         nameNodeProto.create(fileName, FsPermission.getDefault(), clientName,
             new EnumSetWritable<>(
                 EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
-            replication, BLOCK_SIZE);
+            replication, BLOCK_SIZE, null);
         ExtendedBlock lastBlock = addBlocks(fileName, clientName);
         nameNodeProto.complete(fileName, clientName, lastBlock, HdfsConstantsClient.GRANDFATHER_INODE_ID, null);
       }

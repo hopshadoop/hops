@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -63,6 +64,13 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import org.apache.hadoop.fs.FileStatus;
+import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
+import static org.apache.hadoop.fs.permission.AclEntryScope.DEFAULT;
+import static org.apache.hadoop.fs.permission.AclEntryType.*;
+import static org.apache.hadoop.fs.permission.FsAction.*;
+import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import static org.hamcrest.CoreMatchers.is;
@@ -81,6 +89,13 @@ public class TestDFSShell {
   static final String TEST_ROOT_DIR =
       new Path(System.getProperty("test.build.data", "/tmp")).toString()
           .replace(' ', '+');
+
+  private static final String RAW_A1 = "raw.a1";
+  private static final String TRUSTED_A1 = "trusted.a1";
+  private static final String USER_A1 = "user.a1";
+  private static final byte[] RAW_A1_VALUE = new byte[]{0x32, 0x32, 0x32};
+  private static final byte[] TRUSTED_A1_VALUE = new byte[]{0x31, 0x31, 0x31};
+  private static final byte[] USER_A1_VALUE = new byte[]{0x31, 0x32, 0x33};
 
   static Path writeFile(FileSystem fs, Path f) throws IOException {
     DataOutputStream out = fs.create(f);
@@ -1629,8 +1644,556 @@ public class TestDFSShell {
     Configuration conf = new Configuration(); // default FS (non-DFS)
     DFSAdmin admin = new DFSAdmin();
     admin.setConf(conf);
-    int res = admin.run(new String[]{"-refreshNodes"});
-    assertEquals("expected to fail -1", res, -1);
+    int res = admin.run(new String[] {"-refreshNodes"});
+    assertEquals("expected to fail -1", res , -1);
+  }
+  
+  // Preserve Copy Option is -ptopxa (timestamps, ownership, permission, XATTR,
+  // ACLs)
+  @Test (timeout = 120000)
+  public void testCopyCommandsWithPreserveOption() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .format(true).build();
+    FsShell shell = null;
+    FileSystem fs = null;
+    final String testdir = "/tmp/TestDFSShell-testCopyCommandsWithPreserveOption-"
+        + counter.getAndIncrement();
+    final Path hdfsTestDir = new Path(testdir);
+    try {
+      fs = cluster.getFileSystem();
+      fs.mkdirs(hdfsTestDir);
+      Path src = new Path(hdfsTestDir, "srcfile");
+      fs.create(src).close();
+
+      fs.setAcl(src, Lists.newArrayList(
+          aclEntry(ACCESS, USER, ALL),
+          aclEntry(ACCESS, USER, "foo", ALL),
+          aclEntry(ACCESS, GROUP, READ_EXECUTE),
+          aclEntry(ACCESS, GROUP, "bar", READ_EXECUTE),
+          aclEntry(ACCESS, OTHER, EXECUTE)));
+
+      FileStatus status = fs.getFileStatus(src);
+      final long mtime = status.getModificationTime();
+      final long atime = status.getAccessTime();
+      final String owner = status.getOwner();
+      final String group = status.getGroup();
+      final FsPermission perm = status.getPermission();
+      
+      fs.setXAttr(src, USER_A1, USER_A1_VALUE);
+      fs.setXAttr(src, TRUSTED_A1, TRUSTED_A1_VALUE);
+      
+      shell = new FsShell(conf);
+      
+      // -p
+      Path target1 = new Path(hdfsTestDir, "targetfile1");
+      String[] argv = new String[] { "-cp", "-p", src.toUri().toString(), 
+          target1.toUri().toString() };
+      int ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -p is not working", SUCCESS, ret);
+      FileStatus targetStatus = fs.getFileStatus(target1);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      FsPermission targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      Map<String, byte[]> xattrs = fs.getXAttrs(target1);
+      assertTrue(xattrs.isEmpty());
+      List<AclEntry> acls = fs.getAclStatus(target1).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptop
+      Path target2 = new Path(hdfsTestDir, "targetfile2");
+      argv = new String[] { "-cp", "-ptop", src.toUri().toString(), 
+          target2.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptop is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(target2);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(target2);
+      assertTrue(xattrs.isEmpty());
+      acls = fs.getAclStatus(target2).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptopx
+      Path target3 = new Path(hdfsTestDir, "targetfile3");
+      argv = new String[] { "-cp", "-ptopx", src.toUri().toString(), 
+          target3.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptopx is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(target3);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(target3);
+      assertEquals(xattrs.size(), 2);
+      assertArrayEquals(USER_A1_VALUE, xattrs.get(USER_A1));
+      assertArrayEquals(TRUSTED_A1_VALUE, xattrs.get(TRUSTED_A1));
+      acls = fs.getAclStatus(target3).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptopa
+      Path target4 = new Path(hdfsTestDir, "targetfile4");
+      argv = new String[] { "-cp", "-ptopa", src.toUri().toString(),
+          target4.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptopa is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(target4);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(target4);
+      assertTrue(xattrs.isEmpty());
+      acls = fs.getAclStatus(target4).getEntries();
+      assertFalse(acls.isEmpty());
+      assertTrue(targetPerm.getAclBit());
+      assertEquals(fs.getAclStatus(src), fs.getAclStatus(target4));
+
+      // -ptoa (verify -pa option will preserve permissions also)
+      Path target5 = new Path(hdfsTestDir, "targetfile5");
+      argv = new String[] { "-cp", "-ptoa", src.toUri().toString(),
+          target5.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptoa is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(target5);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(target5);
+      assertTrue(xattrs.isEmpty());
+      acls = fs.getAclStatus(target5).getEntries();
+      assertFalse(acls.isEmpty());
+      assertTrue(targetPerm.getAclBit());
+      assertEquals(fs.getAclStatus(src), fs.getAclStatus(target5));
+    } finally {
+      if (null != shell) {
+        shell.close();
+      }
+
+      if (null != fs) {
+        fs.delete(hdfsTestDir, true);
+        fs.close();
+      }
+      cluster.shutdown();
+    }
+  }
+
+  @Test (timeout = 120000)
+  public void testCopyCommandsWithRawXAttrs() throws Exception {
+    final Configuration conf = new Configuration();
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).
+      numDataNodes(1).format(true).build();
+    FsShell shell = null;
+    FileSystem fs = null;
+    final String testdir = "/tmp/TestDFSShell-testCopyCommandsWithRawXAttrs-"
+      + counter.getAndIncrement();
+    final Path hdfsTestDir = new Path(testdir);
+    final Path rawHdfsTestDir = new Path("/.reserved/raw" + testdir);
+    try {
+      fs = cluster.getFileSystem();
+      fs.mkdirs(hdfsTestDir);
+      final Path src = new Path(hdfsTestDir, "srcfile");
+      final String rawSrcBase = "/.reserved/raw" + testdir;
+      final Path rawSrc = new Path(rawSrcBase, "srcfile");
+      fs.create(src).close();
+
+      final Path srcDir = new Path(hdfsTestDir, "srcdir");
+      final Path rawSrcDir = new Path("/.reserved/raw" + testdir, "srcdir");
+      fs.mkdirs(srcDir);
+      final Path srcDirFile = new Path(srcDir, "srcfile");
+      final Path rawSrcDirFile =
+              new Path("/.reserved/raw" + srcDirFile);
+      fs.create(srcDirFile).close();
+
+      final Path[] paths = { rawSrc, rawSrcDir, rawSrcDirFile };
+      final String[] xattrNames = { USER_A1, RAW_A1 };
+      final byte[][] xattrVals = { USER_A1_VALUE, RAW_A1_VALUE };
+
+      for (int i = 0; i < paths.length; i++) {
+        for (int j = 0; j < xattrNames.length; j++) {
+          fs.setXAttr(paths[i], xattrNames[j], xattrVals[j]);
+        }
+      }
+
+      shell = new FsShell(conf);
+
+      /* Check that a file as the source path works ok. */
+      doTestCopyCommandsWithRawXAttrs(shell, fs, src, hdfsTestDir, false);
+      doTestCopyCommandsWithRawXAttrs(shell, fs, rawSrc, hdfsTestDir, false);
+      doTestCopyCommandsWithRawXAttrs(shell, fs, src, rawHdfsTestDir, false);
+      doTestCopyCommandsWithRawXAttrs(shell, fs, rawSrc, rawHdfsTestDir, true);
+
+      /* Use a relative /.reserved/raw path. */
+      final Path savedWd = fs.getWorkingDirectory();
+      try {
+        fs.setWorkingDirectory(new Path(rawSrcBase));
+        final Path relRawSrc = new Path("../srcfile");
+        final Path relRawHdfsTestDir = new Path("..");
+        doTestCopyCommandsWithRawXAttrs(shell, fs, relRawSrc, relRawHdfsTestDir,
+                true);
+      } finally {
+        fs.setWorkingDirectory(savedWd);
+      }
+
+      /* Check that a directory as the source path works ok. */
+      doTestCopyCommandsWithRawXAttrs(shell, fs, srcDir, hdfsTestDir, false);
+      doTestCopyCommandsWithRawXAttrs(shell, fs, rawSrcDir, hdfsTestDir, false);
+      doTestCopyCommandsWithRawXAttrs(shell, fs, srcDir, rawHdfsTestDir, false);
+      doTestCopyCommandsWithRawXAttrs(shell, fs, rawSrcDir, rawHdfsTestDir,
+        true);
+
+      /* Use relative in an absolute path. */
+      final String relRawSrcDir = "./.reserved/../.reserved/raw/../raw" +
+          testdir + "/srcdir";
+      final String relRawDstDir = "./.reserved/../.reserved/raw/../raw" +
+          testdir;
+      doTestCopyCommandsWithRawXAttrs(shell, fs, new Path(relRawSrcDir),
+          new Path(relRawDstDir), true);
+    } finally {
+      if (null != shell) {
+        shell.close();
+      }
+
+      if (null != fs) {
+        fs.delete(hdfsTestDir, true);
+        fs.close();
+      }
+      cluster.shutdown();
+    }
+  }
+
+  private void doTestCopyCommandsWithRawXAttrs(FsShell shell, FileSystem fs,
+      Path src, Path hdfsTestDir, boolean expectRaw) throws Exception {
+    Path target;
+    boolean srcIsRaw;
+    if (src.isAbsolute()) {
+      srcIsRaw = src.toString().contains("/.reserved/raw");
+    } else {
+      srcIsRaw = new Path(fs.getWorkingDirectory(), src).
+          toString().contains("/.reserved/raw");
+    }
+    final boolean destIsRaw = hdfsTestDir.toString().contains("/.reserved/raw");
+    final boolean srcDestMismatch = srcIsRaw ^ destIsRaw;
+
+    // -p (possibly preserve raw if src & dst are both /.r/r */
+    if (srcDestMismatch) {
+      doCopyAndTest(shell, hdfsTestDir, src, "-p", ERROR);
+    } else {
+      target = doCopyAndTest(shell, hdfsTestDir, src, "-p", SUCCESS);
+      checkXAttrs(fs, target, expectRaw, false);
+    }
+
+    // -px (possibly preserve raw, always preserve non-raw xattrs. */
+    if (srcDestMismatch) {
+      doCopyAndTest(shell, hdfsTestDir, src, "-px", ERROR);
+    } else {
+      target = doCopyAndTest(shell, hdfsTestDir, src, "-px", SUCCESS);
+      checkXAttrs(fs, target, expectRaw, true);
+    }
+
+    // no args (possibly preserve raw, never preserve non-raw xattrs. */
+    if (srcDestMismatch) {
+      doCopyAndTest(shell, hdfsTestDir, src, null, ERROR);
+    } else {
+      target = doCopyAndTest(shell, hdfsTestDir, src, null, SUCCESS);
+      checkXAttrs(fs, target, expectRaw, false);
+    }
+  }
+
+  private Path doCopyAndTest(FsShell shell, Path dest, Path src,
+      String cpArgs, int expectedExitCode) throws Exception {
+    final Path target = new Path(dest, "targetfile" +
+        counter.getAndIncrement());
+    final String[] argv = cpArgs == null ?
+        new String[] { "-cp",         src.toUri().toString(),
+            target.toUri().toString() } :
+        new String[] { "-cp", cpArgs, src.toUri().toString(),
+            target.toUri().toString() };
+    final int ret = ToolRunner.run(shell, argv);
+    assertEquals("cp -p is not working", expectedExitCode, ret);
+    return target;
+  }
+
+  private void checkXAttrs(FileSystem fs, Path target, boolean expectRaw,
+      boolean expectVanillaXAttrs) throws Exception {
+    final Map<String, byte[]> xattrs = fs.getXAttrs(target);
+    int expectedCount = 0;
+    if (expectRaw) {
+      assertArrayEquals("raw.a1 has incorrect value",
+          RAW_A1_VALUE, xattrs.get(RAW_A1));
+      expectedCount++;
+    }
+    if (expectVanillaXAttrs) {
+      assertArrayEquals("user.a1 has incorrect value",
+          USER_A1_VALUE, xattrs.get(USER_A1));
+      expectedCount++;
+    }
+    assertEquals("xattrs size mismatch", expectedCount, xattrs.size());
+  }
+
+  // verify cp -ptopxa option will preserve directory attributes.
+  @Test (timeout = 120000)
+  public void testCopyCommandsToDirectoryWithPreserveOption()
+      throws Exception {
+    Configuration conf = new Configuration();
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .format(true).build();
+    FsShell shell = null;
+    FileSystem fs = null;
+    final String testdir =
+        "/tmp/TestDFSShell-testCopyCommandsToDirectoryWithPreserveOption-"
+        + counter.getAndIncrement();
+    final Path hdfsTestDir = new Path(testdir);
+    try {
+      fs = cluster.getFileSystem();
+      fs.mkdirs(hdfsTestDir);
+      Path srcDir = new Path(hdfsTestDir, "srcDir");
+      fs.mkdirs(srcDir);
+
+      fs.setAcl(srcDir, Lists.newArrayList(
+          aclEntry(ACCESS, USER, ALL),
+          aclEntry(ACCESS, USER, "foo", ALL),
+          aclEntry(ACCESS, GROUP, READ_EXECUTE),
+          aclEntry(DEFAULT, GROUP, "bar", READ_EXECUTE),
+          aclEntry(ACCESS, OTHER, EXECUTE)));
+      // set sticky bit
+      fs.setPermission(srcDir,
+          new FsPermission(ALL, READ_EXECUTE, EXECUTE, true));
+
+      // Create a file in srcDir to check if modification time of
+      // srcDir to be preserved after copying the file.
+      // If cp -p command is to preserve modification time and then copy child
+      // (srcFile), modification time will not be preserved.
+      Path srcFile = new Path(srcDir, "srcFile");
+      fs.create(srcFile).close();
+
+      FileStatus status = fs.getFileStatus(srcDir);
+      final long mtime = status.getModificationTime();
+      final long atime = status.getAccessTime();
+      final String owner = status.getOwner();
+      final String group = status.getGroup();
+      final FsPermission perm = status.getPermission();
+
+      fs.setXAttr(srcDir, USER_A1, USER_A1_VALUE);
+      fs.setXAttr(srcDir, TRUSTED_A1, TRUSTED_A1_VALUE);
+
+      shell = new FsShell(conf);
+
+      // -p
+      Path targetDir1 = new Path(hdfsTestDir, "targetDir1");
+      String[] argv = new String[] { "-cp", "-p", srcDir.toUri().toString(),
+          targetDir1.toUri().toString() };
+      int ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -p is not working", SUCCESS, ret);
+      FileStatus targetStatus = fs.getFileStatus(targetDir1);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      FsPermission targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      Map<String, byte[]> xattrs = fs.getXAttrs(targetDir1);
+      assertTrue(xattrs.isEmpty());
+      List<AclEntry> acls = fs.getAclStatus(targetDir1).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptop
+      Path targetDir2 = new Path(hdfsTestDir, "targetDir2");
+      argv = new String[] { "-cp", "-ptop", srcDir.toUri().toString(),
+          targetDir2.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptop is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(targetDir2);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(targetDir2);
+      assertTrue(xattrs.isEmpty());
+      acls = fs.getAclStatus(targetDir2).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptopx
+      Path targetDir3 = new Path(hdfsTestDir, "targetDir3");
+      argv = new String[] { "-cp", "-ptopx", srcDir.toUri().toString(),
+          targetDir3.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptopx is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(targetDir3);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(targetDir3);
+      assertEquals(xattrs.size(), 2);
+      assertArrayEquals(USER_A1_VALUE, xattrs.get(USER_A1));
+      assertArrayEquals(TRUSTED_A1_VALUE, xattrs.get(TRUSTED_A1));
+      acls = fs.getAclStatus(targetDir3).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptopa
+      Path targetDir4 = new Path(hdfsTestDir, "targetDir4");
+      argv = new String[] { "-cp", "-ptopa", srcDir.toUri().toString(),
+          targetDir4.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptopa is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(targetDir4);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(targetDir4);
+      assertTrue(xattrs.isEmpty());
+      acls = fs.getAclStatus(targetDir4).getEntries();
+      assertFalse(acls.isEmpty());
+      assertTrue(targetPerm.getAclBit());
+      assertEquals(fs.getAclStatus(srcDir), fs.getAclStatus(targetDir4));
+
+      // -ptoa (verify -pa option will preserve permissions also)
+      Path targetDir5 = new Path(hdfsTestDir, "targetDir5");
+      argv = new String[] { "-cp", "-ptoa", srcDir.toUri().toString(),
+          targetDir5.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptoa is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(targetDir5);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      xattrs = fs.getXAttrs(targetDir5);
+      assertTrue(xattrs.isEmpty());
+      acls = fs.getAclStatus(targetDir5).getEntries();
+      assertFalse(acls.isEmpty());
+      assertTrue(targetPerm.getAclBit());
+      assertEquals(fs.getAclStatus(srcDir), fs.getAclStatus(targetDir5));
+    } finally {
+      if (shell != null) {
+        shell.close();
+      }
+      if (fs != null) {
+        fs.delete(hdfsTestDir, true);
+        fs.close();
+      }
+      cluster.shutdown();
+    }
+  }
+
+  // Verify cp -pa option will preserve both ACL and sticky bit.
+  @Test (timeout = 120000)
+  public void testCopyCommandsPreserveAclAndStickyBit() throws Exception {
+    Configuration conf = new Configuration();
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1)
+        .format(true).build();
+    FsShell shell = null;
+    FileSystem fs = null;
+    final String testdir =
+        "/tmp/TestDFSShell-testCopyCommandsPreserveAclAndStickyBit-"
+        + counter.getAndIncrement();
+    final Path hdfsTestDir = new Path(testdir);
+    try {
+      fs = cluster.getFileSystem();
+      fs.mkdirs(hdfsTestDir);
+      Path src = new Path(hdfsTestDir, "srcfile");
+      fs.create(src).close();
+
+      fs.setAcl(src, Lists.newArrayList(
+          aclEntry(ACCESS, USER, ALL),
+          aclEntry(ACCESS, USER, "foo", ALL),
+          aclEntry(ACCESS, GROUP, READ_EXECUTE),
+          aclEntry(ACCESS, GROUP, "bar", READ_EXECUTE),
+          aclEntry(ACCESS, OTHER, EXECUTE)));
+      // set sticky bit
+      fs.setPermission(src,
+          new FsPermission(ALL, READ_EXECUTE, EXECUTE, true));
+
+      FileStatus status = fs.getFileStatus(src);
+      final long mtime = status.getModificationTime();
+      final long atime = status.getAccessTime();
+      final String owner = status.getOwner();
+      final String group = status.getGroup();
+      final FsPermission perm = status.getPermission();
+
+      shell = new FsShell(conf);
+
+      // -p preserves sticky bit and doesn't preserve ACL
+      Path target1 = new Path(hdfsTestDir, "targetfile1");
+      String[] argv = new String[] { "-cp", "-p", src.toUri().toString(),
+          target1.toUri().toString() };
+      int ret = ToolRunner.run(shell, argv);
+      assertEquals("cp is not working", SUCCESS, ret);
+      FileStatus targetStatus = fs.getFileStatus(target1);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      FsPermission targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      List<AclEntry> acls = fs.getAclStatus(target1).getEntries();
+      assertTrue(acls.isEmpty());
+      assertFalse(targetPerm.getAclBit());
+
+      // -ptopa preserves both sticky bit and ACL
+      Path target2 = new Path(hdfsTestDir, "targetfile2");
+      argv = new String[] { "-cp", "-ptopa", src.toUri().toString(),
+          target2.toUri().toString() };
+      ret = ToolRunner.run(shell, argv);
+      assertEquals("cp -ptopa is not working", SUCCESS, ret);
+      targetStatus = fs.getFileStatus(target2);
+      assertEquals(mtime, targetStatus.getModificationTime());
+      assertEquals(atime, targetStatus.getAccessTime());
+      assertEquals(owner, targetStatus.getOwner());
+      assertEquals(group, targetStatus.getGroup());
+      targetPerm = targetStatus.getPermission();
+      assertTrue(perm.equals(targetPerm));
+      acls = fs.getAclStatus(target2).getEntries();
+      assertFalse(acls.isEmpty());
+      assertTrue(targetPerm.getAclBit());
+      assertEquals(fs.getAclStatus(src), fs.getAclStatus(target2));
+    } finally {
+      if (null != shell) {
+        shell.close();
+      }
+      if (null != fs) {
+        fs.delete(hdfsTestDir, true);
+        fs.close();
+      }
+      cluster.shutdown();
+    }
   }
 
   // force Copy Option is -f

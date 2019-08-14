@@ -78,7 +78,7 @@ public class TestBlockSending extends ClusterTest {
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
     lostBlocks.add(lb);
     LocatedBlocks locatedBlocks =
-        new LocatedBlocks(0, false, lostBlocks, null, true);
+        new LocatedBlocks(0, false, lostBlocks, null, true, null);
     testDfsClient.setMissingLocatedBlocks(locatedBlocks);
     LOG.info("Losing block " + lb.toString());
 

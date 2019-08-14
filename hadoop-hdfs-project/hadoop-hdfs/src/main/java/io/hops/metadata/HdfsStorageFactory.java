@@ -147,6 +147,9 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.namenode.CachePool;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
+import io.hops.metadata.hdfs.dal.EncryptionZoneDataAccess;
+import io.hops.metadata.hdfs.entity.EncryptionZone;
+import io.hops.transaction.context.EncryptionZoneContext;
 import org.apache.hadoop.hdfs.server.namenode.DirectoryWithQuotaFeature;
 
 public class HdfsStorageFactory {
@@ -360,6 +363,8 @@ public class HdfsStorageFactory {
             (CachedBlockDataAccess) getDataAccess(CachedBlockDataAccess.class)));
         entityContexts.put(StoredXAttr.class,
             new XAttrContext((XAttrDataAccess)getDataAccess(XAttrDataAccess.class)));
+        entityContexts.put(EncryptionZone.class,
+            new EncryptionZoneContext((EncryptionZoneDataAccess)getDataAccess(EncryptionZoneDataAccess.class)));
         return entityContexts;
       }
 

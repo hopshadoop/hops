@@ -64,6 +64,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.permission.PermissionStatus;
+import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -113,6 +114,7 @@ import org.apache.log4j.Level;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -159,6 +161,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import static org.junit.Assert.fail;
 
 /**
  * Utilities for HDFS tests
@@ -1630,6 +1633,87 @@ public class DFSTestUtil {
       DFSInputStream.tcpReadsDisabledForTesting = formerTcpReadsDisabled;
       sockDir.close();
     }
+  }
+  
+  /*
+   * Verify that two files have the same contents.
+   *
+   * @param fs The file system containing the two files.
+   * @param p1 The path of the first file.
+   * @param p2 The path of the second file.
+   * @param len The length of the two files.
+   * @throws IOException
+   */
+  public static void verifyFilesEqual(FileSystem fs, Path p1, Path p2, int len)
+      throws IOException {
+    final FSDataInputStream in1 = fs.open(p1);
+    final FSDataInputStream in2 = fs.open(p2);
+    for (int i = 0; i < len; i++) {
+      assertEquals("Mismatch at byte " + i, in1.read(), in2.read());
+    }
+    in1.close();
+    in2.close();
+  }
+
+  /**
+   * Verify that two files have different contents.
+   *
+   * @param fs The file system containing the two files.
+   * @param p1 The path of the first file.
+   * @param p2 The path of the second file.
+   * @param len The length of the two files.
+   * @throws IOException
+   */
+  public static void verifyFilesNotEqual(FileSystem fs, Path p1, Path p2,
+      int len)
+          throws IOException {
+    final FSDataInputStream in1 = fs.open(p1);
+    final FSDataInputStream in2 = fs.open(p2);
+    try {
+      for (int i = 0; i < len; i++) {
+        if (in1.read() != in2.read()) {
+          return;
+        }
+      }
+      fail("files are equal, but should not be");
+    } finally {
+      in1.close();
+      in2.close();
+    }
+  }
+
+  /**
+   * Helper function to create a key in the Key Provider. Defaults
+   * to the first indexed NameNode's Key Provider.
+   *
+   * @param keyName The name of the key to create
+   * @param cluster The cluster to create it in
+   * @param conf Configuration to use
+   */
+  public static void createKey(String keyName, MiniDFSCluster cluster,
+                                Configuration conf)
+          throws NoSuchAlgorithmException, IOException {
+    createKey(keyName, cluster, 0, conf);
+  }
+
+  /**
+   * Helper function to create a key in the Key Provider.
+   *
+   * @param keyName The name of the key to create
+   * @param cluster The cluster to create it in
+   * @param idx The NameNode index
+   * @param conf Configuration to use
+   */
+  public static void createKey(String keyName, MiniDFSCluster cluster,
+                               int idx, Configuration conf)
+      throws NoSuchAlgorithmException, IOException {
+    NameNode nn = cluster.getNameNode(idx);
+    KeyProvider provider = nn.getNamesystem().getProvider();
+    final KeyProvider.Options options = KeyProvider.options(conf);
+    options.setDescription(keyName);
+    options.setBitLength(128);
+    provider.createKey(keyName, options);
+    provider.flush();
   }
 
   public static void addDataNodeLayoutVersion(final int lv, final String description)

@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -221,12 +222,14 @@ public class DistCpUtils {
 
     final boolean preserveXAttrs = attributes.contains(FileAttribute.XATTR);
     if (preserveXAttrs || preserveRawXattrs) {
+      final String rawNS =
+          StringUtils.toLowerCase(XAttr.NameSpace.RAW.name());
       Map<String, byte[]> srcXAttrs = srcFileStatus.getXAttrs();
       Map<String, byte[]> targetXAttrs = getXAttrs(targetFS, path);
       if (srcXAttrs != null && !srcXAttrs.equals(targetXAttrs)) {
         for (Entry<String, byte[]> entry : srcXAttrs.entrySet()) {
           String xattrName = entry.getKey();
-          if (preserveXAttrs) {
+          if (xattrName.startsWith(rawNS) || preserveXAttrs) {
             targetFS.setXAttr(path, xattrName, entry.getValue());
           }
         }
@@ -320,9 +323,15 @@ public class DistCpUtils {
          copyListingFileStatus.setXAttrs(srcXAttrs);
       } else {
         Map<String, byte[]> trgXAttrs = Maps.newHashMap();
+        final String rawNS =
+            StringUtils.toLowerCase(XAttr.NameSpace.RAW.name());
         for (Map.Entry<String, byte[]> ent : srcXAttrs.entrySet()) {
           final String xattrName = ent.getKey();
-          if (preserveXAttrs) {
+          if (xattrName.startsWith(rawNS)) {
+            if (preserveRawXAttrs) {
+              trgXAttrs.put(xattrName, ent.getValue());
+            }
+          } else if (preserveXAttrs) {
             trgXAttrs.put(xattrName, ent.getValue());
           }
         }

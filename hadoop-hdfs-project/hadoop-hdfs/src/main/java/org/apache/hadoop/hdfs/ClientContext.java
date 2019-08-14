@@ -31,6 +31,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.util.ByteArrayManager;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
 
 /**
  * ClientContext contains context information for a client.
@@ -74,6 +75,10 @@ public class ClientContext {
   private final DomainSocketFactory domainSocketFactory;
 
   /**
+   * Caches key Providers for the DFSClient
+   */
+  private final KeyProviderCache keyProviderCache;
+  /**
    * True if we should use the legacy BlockReaderLocal.
    */
   private final boolean useLegacyBlockReaderLocal;
@@ -104,8 +109,8 @@ public class ClientContext {
     this.shortCircuitCache = ShortCircuitCache.fromConf(scConf);
     this.peerCache = new PeerCache(scConf.getSocketCacheCapacity(),
         scConf.getSocketCacheExpiry());
-//    this.keyProviderCache = new KeyProviderCache(
-//        scConf.getKeyProviderCacheExpiryMs());
+    this.keyProviderCache = new KeyProviderCache(
+        scConf.getKeyProviderCacheExpiryMs());
     this.useLegacyBlockReaderLocal = scConf.isUseLegacyBlockReaderLocal();
     this.domainSocketFactory = new DomainSocketFactory(scConf);
 
@@ -163,6 +168,10 @@ public class ClientContext {
 
   public PeerCache getPeerCache() {
     return peerCache;
+  }
+
+  public KeyProviderCache getKeyProviderCache() {
+    return keyProviderCache;
   }
 
   public boolean getUseLegacyBlockReaderLocal() {
