@@ -51,8 +51,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
+import org.apache.hadoop.io.retry.Idempotent;
 import static org.junit.Assert.*;
 
 public class TestUsersGroupsMultiNamenode {
@@ -115,7 +117,7 @@ public class TestUsersGroupsMultiNamenode {
     public HdfsFileStatus create(String src, FsPermission masked,
         String clientName, EnumSetWritable<CreateFlag> flag,
         boolean createParent, short replication, long blockSize,
-        EncodingPolicy policy)
+        CryptoProtocolVersion[] supportedVersions, EncodingPolicy policy)
         throws AccessControlException, AlreadyBeingCreatedException,
         DSQuotaExceededException, FileAlreadyExistsException,
         FileNotFoundException, NSQuotaExceededException,
@@ -127,7 +129,7 @@ public class TestUsersGroupsMultiNamenode {
     @Override
     public HdfsFileStatus create(String src, FsPermission masked,
         String clientName, EnumSetWritable<CreateFlag> flag,
-        boolean createParent, short replication, long blockSize)
+        boolean createParent, short replication, long blockSize, CryptoProtocolVersion[] supportedVersions)
         throws AccessControlException, AlreadyBeingCreatedException,
         DSQuotaExceededException, FileAlreadyExistsException,
         FileNotFoundException, NSQuotaExceededException,
@@ -649,6 +651,20 @@ public class TestUsersGroupsMultiNamenode {
 
     void clearCache(){
       usersGroupsMapping.clear();
+    }
+    
+    public void createEncryptionZone(String src, String keyName)
+        throws IOException {
+    }
+
+    public EncryptionZone getEZForPath(String src)
+        throws IOException {
+      return null;
+    }
+
+    public BatchedRemoteIterator.BatchedEntries<EncryptionZone> listEncryptionZones(
+        long prevId) throws IOException {
+      return null;
     }
   }
 

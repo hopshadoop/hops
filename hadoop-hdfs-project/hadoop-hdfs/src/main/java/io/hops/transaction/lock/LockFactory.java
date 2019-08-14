@@ -396,6 +396,10 @@ public class LockFactory {
     return new AcesLock();
   }
   
+  public Lock getEZLock(){
+    return new EZLock();
+  }
+  
   public void setConfiguration(Configuration conf) {
     BaseINodeLock.enableSetPartitionKey(
         conf.getBoolean(DFSConfigKeys.DFS_SET_PARTITION_KEY_ENABLED,
@@ -443,6 +447,8 @@ public class LockFactory {
   public Lock getXAttrLock(){ return new XAttrLock(); }
   
   public Lock getXAttrLock(XAttr attr){ return new XAttrLock(attr); }
+  
+  public Lock getXAttrLock(XAttr attr, String path){ return new XAttrLock(attr, path); }
   
   public Lock getXAttrLock(List<XAttr> attrs){ return new XAttrLock(attrs); }
   

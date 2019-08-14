@@ -96,6 +96,8 @@ class FSDirConcatOp {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE.WRITE, srcs));
         }
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
@@ -137,7 +139,10 @@ class FSDirConcatOp {
 
   private static void verifyTargetFile(FSDirectory fsd, final String target,
       final INodesInPath targetIIP) throws IOException {
-    // check the target
+    if (fsd.getEZForPath(targetIIP) != null) {
+      throw new HadoopIllegalArgumentException(
+          "concat can not be called for files in an encryption zone.");
+    }
     final INodeFile targetINode = INodeFile.valueOf(targetIIP.getLastINode(),
         target);
 

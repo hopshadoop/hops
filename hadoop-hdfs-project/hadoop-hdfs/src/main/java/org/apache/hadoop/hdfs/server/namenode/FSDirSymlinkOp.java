@@ -22,6 +22,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -35,7 +36,10 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.ipc.RetryCache;
 import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.Server;
@@ -60,9 +64,9 @@ class FSDirSymlinkOp {
       NameNode.stateChangeLog.debug("DIR* NameSystem.createSymlink: target="
           + target + " link=" + linkArg);
     }
-
+    final FSPermissionChecker pc = fsn.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(linkArg);
-    final String link = fsd.resolvePath(linkArg, pathComponents);
+    final String link = fsd.resolvePath(pc, linkArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.CREATE_SYM_LINK,
         link) {
       @Override
@@ -76,6 +80,11 @@ class FSDirSymlinkOp {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
               Server.getCallId()));
         }
+        locks.add(lf.getEZLock());
+        List<XAttr> xAttrsToLock = new ArrayList<>();
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
+        locks.add(lf.getXAttrLock(xAttrsToLock));
       }
 
       @Override
@@ -87,7 +96,6 @@ class FSDirSymlinkOp {
         boolean success = false;
         try {
 
-          FSPermissionChecker pc = fsn.getPermissionChecker();
           final INodesInPath iip = fsd.getINodesInPath4Write(link, false);
           if (!createParent) {
             fsd.verifyParentDir(iip, link);

@@ -1568,6 +1568,16 @@ Release 2.6.0 - 2014-11-18
     HDFS-7233. NN logs unnecessary org.apache.hadoop.hdfs.protocol.UnresolvedPathException.
     (Rushabh S Shah via jing9)
 
+
+    HDFS-7061. Add test to verify encryption zone creation after NameNode
+    restart without saving namespace. (Stephen Chu via wang)
+
+    HDFS-6851. Refactor EncryptionZoneWithId and EncryptionZone. (clamb via wang)
+
+    HDFS-7004. Update KeyProvider instantiation to create by URI. (wang)
+
+    HDFS-7047. Expose FileStatus#isEncrypted in libhdfs (cmccabe)
+
   OPTIMIZATIONS
 
     HDFS-6690. Deduplicate xattr names in memory. (wang)
@@ -2002,6 +2012,12 @@ Release 2.6.0 - 2014-11-18
     file descriptors when SASL is enabled on DataTransferProtocol.
     (Chris Nauroth via wheat9)
 
+    HDFS-7179. DFSClient should instantiate a KeyProvider, not a
+    KeyProviderCryptoExtension. (wang)
+
+    HDFS-7181. Remove incorrect precondition check on key length in
+    FileEncryptionInfo. (wang)
+
     BREAKDOWN OF HDFS-6134 AND HADOOP-10150 SUBTASKS AND RELATED JIRAS
   
       HDFS-6387. HDFS CLI admin tool for creating & deleting an
@@ -2092,7 +2108,8 @@ Release 2.6.0 - 2014-11-18
       HDFS-6817. Fix findbugs and other warnings. (yliu)
   
       HDFS-6839. Fix TestCLI to expect new output. (clamb)
-    --
+
+      HDFS-6954. With crypto, no native lib systems are too verbose. (clamb via wang)
 
     HDFS-6776. Using distcp to copy data between insecure and secure cluster via webdhfs 
     doesn't work. (yzhangal via tucu)

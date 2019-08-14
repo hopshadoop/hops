@@ -21,6 +21,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -44,8 +45,9 @@ class FSDirAclOp {
       final FSDirectory fsd, final String srcArg, final List<AclEntry> aclSpec)
       throws IOException {
     checkAclsConfigFlag(fsd);
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.MODIFY_ACL_ENTRIES) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -56,11 +58,12 @@ class FSDirAclOp {
             .skipReadingQuotaAttr(false);
         locks.add(il);
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
 
         INodesInPath iip = fsd.getINodesInPath4Write(
             FSDirectory.normalizePath(src), true);
@@ -94,8 +97,9 @@ class FSDirAclOp {
       final FSDirectory fsd, final String srcArg, final List<AclEntry> aclSpec)
       throws IOException {
     checkAclsConfigFlag(fsd);
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL_ENTRIES) {
 
       @Override
@@ -107,11 +111,12 @@ class FSDirAclOp {
             .skipReadingQuotaAttr(true);
         locks.add(il);
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath4Write(
             FSDirectory.normalizePath(src), true);
         fsd.checkOwner(pc, iip);
@@ -134,8 +139,9 @@ class FSDirAclOp {
   static HdfsFileStatus removeDefaultAcl(final FSDirectory fsd, final String srcArg)
       throws IOException {
     checkAclsConfigFlag(fsd);
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_DEFAULT_ACL) {
 
       @Override
@@ -147,11 +153,12 @@ class FSDirAclOp {
             .skipReadingQuotaAttr(true);
         locks.add(il);
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath4Write(
             FSDirectory.normalizePath(src), true);
         fsd.checkOwner(pc, iip);
@@ -173,8 +180,9 @@ class FSDirAclOp {
   static HdfsFileStatus removeAcl(final FSDirectory fsd, final String srcArg)
       throws IOException {
     checkAclsConfigFlag(fsd);
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.REMOVE_ACL) {
 
       @Override
@@ -186,11 +194,12 @@ class FSDirAclOp {
             .skipReadingQuotaAttr(true);
         locks.add(il);
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath4Write(src);
         fsd.checkOwner(pc, iip);
         unprotectedRemoveAcl(fsd, iip);
@@ -203,8 +212,9 @@ class FSDirAclOp {
       final FSDirectory fsd, final String srcArg, final List<AclEntry> aclSpec)
       throws IOException {
     checkAclsConfigFlag(fsd);
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.SET_ACL) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -215,11 +225,12 @@ class FSDirAclOp {
             .skipReadingQuotaAttr(true);
         locks.add(il);
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath4Write(src);
         fsd.checkOwner(pc, iip);
         List<AclEntry> newAcl = unprotectedSetAcl(fsd, src, aclSpec);
@@ -231,8 +242,9 @@ class FSDirAclOp {
   static AclStatus getAclStatus(
       final FSDirectory fsd, String srcArg) throws IOException {
     checkAclsConfigFlag(fsd);
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (AclStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_ACL_STATUS) {
 
       @Override
@@ -248,7 +260,6 @@ class FSDirAclOp {
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath(src, true);
         if (fsd.isPermissionEnabled()) {
           fsd.checkTraverse(pc, iip);

@@ -128,6 +128,9 @@ public class JsonUtil {
     if (perm.getAclBit()) {
       m.put("aclBit", true);
     }
+    if (perm.getEncryptedBit()) {
+      m.put("encBit", true);
+    }
     m.put("accessTime", status.getAccessTime());
     m.put("modificationTime", status.getModificationTime());
     m.put("blockSize", status.getBlockSize());

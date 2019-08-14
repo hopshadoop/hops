@@ -275,6 +275,35 @@ message CipherOptionProto {
   optional bytes outIv = 5;
 }
 
+message FileEncryptionInfoProto {
+  required CipherSuiteProto suite = 1;
+  required CryptoProtocolVersionProto cryptoProtocolVersion = 2;
+  required bytes key = 3;
+  required bytes iv = 4;
+  required string keyName = 5;
+  required string ezKeyVersionName = 6;
+}
+
+/**
+ * Encryption information for an individual
+ * file within an encryption zone
+ */
+message PerFileEncryptionInfoProto {
+  required bytes key = 1;
+  required bytes iv = 2;
+  required string ezKeyVersionName = 3;
+}
+
+/**
+ * Encryption information for an encryption
+ * zone
+ */
+message ZoneEncryptionInfoProto {
+  required CipherSuiteProto suite = 1;
+  required CryptoProtocolVersionProto cryptoProtocolVersion = 2;
+  required string keyName = 3;
+}
+
 /**
  * A set of file blocks and their locations.
  */
@@ -284,8 +313,8 @@ message LocatedBlocksProto {
   required bool underConstruction = 3;
   optional LocatedBlockProto lastBlock = 4;
   required bool isLastBlockComplete = 5;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 6;
 }
-
 
 /**
  * Status of a file, directory  or symlink
@@ -316,7 +345,7 @@ message HdfsFileStatusProto {
   optional uint64 fileId = 13 [default = 0]; // default as an invalid id
   optional int32 childrenNum = 14 [default = -1];
   // Optional field for file encryption
-  //optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 15;
   optional uint32 storagePolicy = 16 [default = 0]; // block storage policy id
   
   //hopsfs

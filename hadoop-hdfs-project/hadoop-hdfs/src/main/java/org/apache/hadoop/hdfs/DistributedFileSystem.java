@@ -53,13 +53,13 @@ import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.client.impl.CorruptFileBlockIterator;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
@@ -72,8 +72,10 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.crypto.key.KeyProviderDelegationTokenExtension;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -299,8 +301,9 @@ public class DistributedFileSystem extends FileSystem {
       @Override
       public FSDataInputStream doCall(final Path p)
           throws IOException, UnresolvedLinkException {
-        return new HdfsDataInputStream(
-            dfs.open(getPathName(p), bufferSize, verifyChecksum));
+        final DFSInputStream dfsis =
+          dfs.open(getPathName(p), bufferSize, verifyChecksum);
+        return dfs.createWrappedInputStream(dfsis);
       }
       @Override
       public FSDataInputStream next(final FileSystem fs, final Path p)
@@ -428,7 +431,7 @@ public class DistributedFileSystem extends FileSystem {
                 : EnumSet.of(CreateFlag.CREATE),
             true, replication, blockSize, progress, bufferSize, null,
             favoredNodes, policy);
-        return new HdfsDataOutputStream(out, statistics);
+        return dfs.createWrappedOutputStream(out, statistics);
       }
       @Override
       public HdfsDataOutputStream next(final FileSystem fs, final Path p)
@@ -488,9 +491,10 @@ public class DistributedFileSystem extends FileSystem {
       @Override
       public FSDataOutputStream doCall(final Path p)
           throws IOException, UnresolvedLinkException {
-        return new HdfsDataOutputStream(dfs.create(getPathName(p), permission,
-            cflags, replication, blockSize, progress, bufferSize, checksumOpt, null),
-            statistics);
+        final DFSOutputStream dfsos = dfs.create(getPathName(p), permission,
+                cflags, replication, blockSize, progress, bufferSize,
+                checksumOpt, null);
+        return dfs.createWrappedOutputStream(dfsos, statistics);
       }
       @Override
       public FSDataOutputStream next(final FileSystem fs, final Path p)
@@ -507,11 +511,12 @@ public class DistributedFileSystem extends FileSystem {
     short replication, long blockSize, Progressable progress,
     ChecksumOpt checksumOpt) throws IOException {
     statistics.incrementWriteOps(1);
-    return new HdfsDataOutputStream(dfs.primitiveCreate(
-        getPathName(fixRelativePart(f)),
-        absolutePermission, flag, true, replication, blockSize,
-        progress, bufferSize, checksumOpt),statistics);
-   }
+    final DFSOutputStream dfsos = dfs.primitiveCreate(
+      getPathName(fixRelativePart(f)),
+      absolutePermission, flag, true, replication, blockSize,
+      progress, bufferSize, checksumOpt);
+    return dfs.createWrappedOutputStream(dfsos, statistics);
+  }
 
   /**
    * Same as create(), except fails if parent directory doesn't already exist.
@@ -531,9 +536,9 @@ public class DistributedFileSystem extends FileSystem {
       @Override
       public FSDataOutputStream doCall(final Path p) throws IOException,
           UnresolvedLinkException {
-        return new HdfsDataOutputStream(dfs.create(getPathName(p), permission,
-            flag, false, replication, blockSize, progress, bufferSize, null),
-            statistics);
+        final DFSOutputStream dfsos = dfs.create(getPathName(p), permission,
+          flag, false, replication, blockSize, progress, bufferSize, null);
+        return dfs.createWrappedOutputStream(dfsos, statistics);
       }
 
       @Override
@@ -2025,6 +2030,25 @@ public class DistributedFileSystem extends FileSystem {
     dfs.removeUserFromGroup(userName, groupName);
   }
   
+  /* HDFS only */
+  public void createEncryptionZone(Path path, String keyName)
+    throws IOException {
+    dfs.createEncryptionZone(getPathName(path), keyName);
+  }
+
+  /* HDFS only */
+  public EncryptionZone getEZForPath(Path path)
+          throws IOException {
+    Preconditions.checkNotNull(path);
+    return dfs.getEZForPath(getPathName(path));
+  }
+
+  /* HDFS only */
+  public RemoteIterator<EncryptionZone> listEncryptionZones()
+      throws IOException {
+    return dfs.listEncryptionZones();
+  }
+
   @Override
   public void setXAttr(Path path, final String name, final byte[] value,
       final EnumSet<XAttrSetFlag> flag) throws IOException {
@@ -2127,5 +2151,27 @@ public class DistributedFileSystem extends FileSystem {
         return null;
       }
     }.resolve(this, absF);
+  }
+  
+  @Override
+  public Token<?>[] addDelegationTokens(
+      final String renewer, Credentials credentials) throws IOException {
+    Token<?>[] tokens = super.addDelegationTokens(renewer, credentials);
+    if (dfs.getKeyProvider() != null) {
+      KeyProviderDelegationTokenExtension keyProviderDelegationTokenExtension =
+          KeyProviderDelegationTokenExtension.
+              createKeyProviderDelegationTokenExtension(dfs.getKeyProvider());
+      Token<?>[] kpTokens = keyProviderDelegationTokenExtension.
+          addDelegationTokens(renewer, credentials);
+      if (tokens != null && kpTokens != null) {
+        Token<?>[] all = new Token<?>[tokens.length + kpTokens.length];
+        System.arraycopy(tokens, 0, all, 0, tokens.length);
+        System.arraycopy(kpTokens, 0, all, tokens.length, kpTokens.length);
+        tokens = all;
+      } else {
+        tokens = (tokens != null) ? tokens : kpTokens;
+      }
+    }
+    return tokens;
   }
 }

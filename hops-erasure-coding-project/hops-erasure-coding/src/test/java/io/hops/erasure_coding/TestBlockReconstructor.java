@@ -93,12 +93,12 @@ public class TestBlockReconstructor extends ClusterTest {
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
     lostBlocks.add(lb);
     LocatedBlocks locatedBlocks =
-        new LocatedBlocks(0, false, lostBlocks, null, true);
+        new LocatedBlocks(0, false, lostBlocks, null, true, null);
     testDfsClient.setMissingLocatedBlocks(locatedBlocks);
 
     LocatedBlocks missingBlocks =
         new LocatedBlocks(testFileStatus.getLen(), false,
-            new ArrayList<LocatedBlock>(), null, true);
+            new ArrayList<LocatedBlock>(), null, true, null);
     missingBlocks.getLocatedBlocks().add(lb);
     BlockReconstructor blockReconstructor = new BlockReconstructor(conf);
     Decoder decoder = new Decoder(conf, Util.getCodec(Util.Codecs.SRC));
@@ -132,12 +132,12 @@ public class TestBlockReconstructor extends ClusterTest {
     List<LocatedBlock> lostBlocks = new ArrayList<LocatedBlock>();
     lostBlocks.add(lb);
     LocatedBlocks locatedBlocks =
-        new LocatedBlocks(0, false, lostBlocks, null, true);
+        new LocatedBlocks(0, false, lostBlocks, null, true, null);
     testDfsClient.setMissingLocatedBlocks(locatedBlocks);
 
     LocatedBlocks missingBlocks =
         new LocatedBlocks(parityFileStatus.getLen(), false,
-            new ArrayList<LocatedBlock>(), null, true);
+            new ArrayList<LocatedBlock>(), null, true, null);
     missingBlocks.getLocatedBlocks().add(lb);
     BlockReconstructor blockReconstructor = new BlockReconstructor(conf);
     Decoder decoder = new Decoder(conf, Util.getCodec(Util.Codecs.SRC));

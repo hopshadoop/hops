@@ -232,6 +232,19 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.htrace</groupId>
       <artifactId>htrace-core4</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-kms</artifactId>
+      <classifier>classes</classifier>
+      <type>jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hadoop-kms</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -454,6 +467,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <include>xattr.proto</include>
                   <include>datatransfer.proto</include>
                   <include>hdfs.proto</include>
+                  <include>encryption.proto</include>
                 </includes>
               </source>
               <output>${project.build.directory}/generated-sources/java</output>

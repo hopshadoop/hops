@@ -42,6 +42,65 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import java.util.TreeMap;
+import static org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
+    .EncryptedKeyVersion;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CHECKSUM_TYPE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DEFAULT_AUDIT_LOGGER_NAME;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_MAX_OBJECTS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MIN_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPL_QUEUE_THRESHOLD_PCT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_HEAP_PERCENT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUPPORT_APPEND_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUPPORT_APPEND_KEY;
+import java.security.GeneralSecurityException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
@@ -49,11 +108,16 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
@@ -74,6 +138,7 @@ import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.UnknownCryptoProtocolVersionException;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
@@ -81,6 +146,7 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
@@ -219,6 +285,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.CRYPTO_XATTR_FILE_ENCRYPTION_INFO;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 
 /**
@@ -407,6 +474,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   private volatile boolean startingActiveService = false;
 
+  private KeyProviderCryptoExtension provider = null;
+
   private volatile boolean imageLoaded = false;
   
 
@@ -526,6 +595,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   private FSNamesystem(Configuration conf, NameNode namenode, boolean ignoreRetryCache) throws IOException {
     try {
+      provider = DFSUtil.createKeyProviderCryptoExtension(conf);
+      if (provider == null) {
+        LOG.info("No KeyProvider found.");
+      } else {
+        LOG.info("Found KeyProvider: " + provider.toString());
+      }
       if (conf.getBoolean(DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY,
           DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT)) {
         LOG.info("Enabling async auditlog");
@@ -681,6 +756,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
 
+  public KeyProviderCryptoExtension getProvider() {
+    return provider;
+  }
+  
   @VisibleForTesting
   static RetryCacheDistributed initRetryCache(Configuration conf) {
     boolean enable = conf.getBoolean(DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY,
@@ -1108,7 +1187,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   LocatedBlocks getBlockLocationsWithLock(final String clientMachine, final String srcArg,
       final long offset, final long length, final INodeLockType lockType) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents);
+    final String src = dir.resolvePath(getPermissionChecker(), srcArg, pathComponents);
     final boolean isSuperUser =  dir.getPermissionChecker().isSuperUser();
     HopsTransactionalRequestHandler getBlockLocationsHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
@@ -1121,9 +1200,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .skipReadingQuotaAttr(!dir.isQuotaEnabled());
         locks.add(il).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
-        locks.add(lf.getAcesLock());
+        locks.add(lf.getAcesLock());        
+        locks.add(lf.getEZLock());
         if(isSuperUser) {
           locks.add(lf.getXAttrLock());
+        }else {
+          locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
         }
       }
 
@@ -1131,7 +1213,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       public Object performTask() throws IOException {
         GetBlockLocationsResult res = null;
         
-        res = getBlockLocationsInt(src, offset, length, true, true);
+        res = getBlockLocationsInt(srcArg, src, offset, length, true, true);
 
         if (res.updateAccessTime()) {
           final long now = now();
@@ -1179,8 +1261,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public GetBlockLocationsResult getBlockLocations(final String srcArg, final long offset,
       final long length, final boolean needBlockToken, final boolean checkSafeMode)
       throws IOException {
+    final FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     final boolean isSuperUser =  dir.getPermissionChecker().isSuperUser();
     HopsTransactionalRequestHandler getBlockLocationsHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_BLOCK_LOCATIONS, src) {
@@ -1192,20 +1275,23 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
-        if(isSuperUser) {
+        locks.add(lf.getEZLock());
+        if (isSuperUser) {
           locks.add(lf.getXAttrLock());
+        } else {
+          locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
         }
       }
 
       @Override
       public Object performTask() throws IOException {
-        return getBlockLocationsInt(src, offset, length, needBlockToken, checkSafeMode);
+        return getBlockLocationsInt(srcArg, src, offset, length, needBlockToken, checkSafeMode);
       }
     };
     return (GetBlockLocationsResult) getBlockLocationsHandler.handle(this);
   }
   
-  private GetBlockLocationsResult getBlockLocationsInt(final String src, final long offset,
+  private GetBlockLocationsResult getBlockLocationsInt(final String srcArg, final String src, final long offset,
       final long length, final boolean needBlockToken, final boolean checkSafeMode)
       throws IOException {
 
@@ -1222,9 +1308,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final INodeFile inodeFile = INodeFile.valueOf(dir.getINode(src), src);
     if (inodeFile.isFileStoredInDB()) {
       LOG.debug("SMALL_FILE The file is stored in the database. Returning Phantom Blocks");
-      ret = getPhantomBlockLocationsUpdateTimes(src, needBlockToken);
+      ret = getPhantomBlockLocationsUpdateTimes(srcArg, src, needBlockToken);
     } else {
-      ret = getBlockLocationsInt(src, offset, length, needBlockToken);
+      ret = getBlockLocationsInt(srcArg, src, offset, length, needBlockToken);
     }
 
     if (checkSafeMode && isInSafeMode()) {
@@ -1245,8 +1331,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * access times if necessary.
    */
 
-  private GetBlockLocationsResult getPhantomBlockLocationsUpdateTimes(String src, boolean needBlockToken) throws
-      IOException {
+  private GetBlockLocationsResult getPhantomBlockLocationsUpdateTimes(String srcArg, String src, boolean needBlockToken)
+      throws IOException {
     
     FSPermissionChecker pc = getPermissionChecker();
 
@@ -1258,9 +1344,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       checkUnreadableBySuperuser(pc, inode);
     }
     
+    final FileEncryptionInfo feInfo =
+      FSDirectory.isReservedRawName(srcArg) ?
+      null : dir.getFileEncryptionInfo(inode, iip);
+            
     final LocatedBlocks blocks = blockManager
           .createPhantomLocatedBlocks(inode, inode.getFileDataInDB(),
-              inode.isUnderConstruction(), needBlockToken);
+              inode.isUnderConstruction(), needBlockToken, feInfo);
     
     final long now = now();
     boolean updateAccessTime = isAccessTimeSupported() && !isInSafeMode()
@@ -1273,7 +1363,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * Get block locations within the specified range, updating the
    * access times if necessary.
    */
-  private GetBlockLocationsResult getBlockLocationsInt(String src, long offset,
+  private GetBlockLocationsResult getBlockLocationsInt(String srcArg, String src, long offset,
       long length, boolean needBlockToken)
       throws IOException {
     FSPermissionChecker pc = getPermissionChecker();
@@ -1289,9 +1379,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
     boolean isUc = inode.isUnderConstruction();
 
+    final FileEncryptionInfo feInfo =
+      FSDirectory.isReservedRawName(srcArg) ?
+      null : dir.getFileEncryptionInfo(inode, iip);
+
     final LocatedBlocks blocks = blockManager.createLocatedBlocks(
         inode.getBlocks(), fileSize,
-        isUc, offset, length, needBlockToken);
+        isUc, offset, length, needBlockToken, feInfo);
 
     // Set caching information for the located blocks.
     for (LocatedBlock lb : blocks.getLocatedBlocks()) {
@@ -1417,8 +1511,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   void setMetaEnabled(final String srcArg, final boolean metaEnabled)
       throws IOException {
+    final FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     INodeIdentifier stoRootINode = null;
     try {
       //we just want to lock the subtree, the access check is done in the perform task.
@@ -1445,7 +1540,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         @Override
         public Object performTask() throws IOException {
           try {
-            FSPermissionChecker pc = getPermissionChecker();
             final INodesInPath iip = dir.getINodesInPath4Write(src);
             dir.checkPathAccess(pc, iip, FsAction.WRITE);
             setMetaEnabledInt(src, fileTree, metaEnabled);
@@ -1571,8 +1665,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new HadoopIllegalArgumentException(
           "Cannot truncate to a negative file size: " + newLength + ".");
     }
+    final FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents);
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.TRUNCATE) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -1589,12 +1684,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           locks.add(lf.getEncodingStatusLock(LockType.WRITE.WRITE, src));
         }
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
       }
 
       @Override
       public Object performTask() throws IOException {
         BlocksMapUpdateInfo toRemoveBlocks = new BlocksMapUpdateInfo();
-        FSPermissionChecker pc = getPermissionChecker();
         HdfsFileStatus stat = null;
         boolean res;
         checkNameNodeSafeMode("Cannot truncate for " + src);
@@ -1804,6 +1900,67 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   /**
+   * If the file is within an encryption zone, select the appropriate 
+   * CryptoProtocolVersion from the list provided by the client. Since the
+   * client may be newer, we need to handle unknown versions.
+   *
+   * @param zone EncryptionZone of the file
+   * @param supportedVersions List of supported protocol versions
+   * @return chosen protocol version
+   * @throws IOException
+   */
+  private CryptoProtocolVersion chooseProtocolVersion(EncryptionZone zone,
+      CryptoProtocolVersion[] supportedVersions)
+      throws UnknownCryptoProtocolVersionException, UnresolvedLinkException {
+    Preconditions.checkNotNull(zone);
+    Preconditions.checkNotNull(supportedVersions);
+    // Right now, we only support a single protocol version,
+    // so simply look for it in the list of provided options
+    final CryptoProtocolVersion required = zone.getVersion();
+
+    for (CryptoProtocolVersion c : supportedVersions) {
+      if (c.equals(CryptoProtocolVersion.UNKNOWN)) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Ignoring unknown CryptoProtocolVersion provided by " +
+              "client: " + c.getUnknownValue());
+        }
+        continue;
+      }
+      if (c.equals(required)) {
+        return c;
+      }
+    }
+    throw new UnknownCryptoProtocolVersionException(
+        "No crypto protocol versions provided by the client are supported."
+            + " Client provided: " + Arrays.toString(supportedVersions)
+            + " NameNode supports: " + Arrays.toString(CryptoProtocolVersion
+            .values()));
+  }
+
+  /**
+   * Invoke KeyProvider APIs to generate an encrypted data encryption key for an
+   * encryption zone. Should not be called with any locks held.
+   *
+   * @param ezKeyName key name of an encryption zone
+   * @return New EDEK, or null if ezKeyName is null
+   * @throws IOException
+   */
+  private EncryptedKeyVersion generateEncryptedDataEncryptionKey(String
+      ezKeyName) throws IOException {
+    if (ezKeyName == null) {
+      return null;
+    }
+    EncryptedKeyVersion edek = null;
+    try {
+      edek = provider.generateEncryptedKey(ezKeyName);
+    } catch (GeneralSecurityException e) {
+      throw new IOException(e);
+    }
+    Preconditions.checkNotNull(edek);
+    return edek;
+  }
+  
+  /**
    * Create a new file entry in the namespace.
    * <p/>
    * For description of parameters and exceptions thrown see
@@ -1814,34 +1971,99 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * {@link #getFileStatus(boolean, CacheEntryWithPayload)}
    *
    */
-  HdfsFileStatus startFile(final String src1, final PermissionStatus permissions,
+  HdfsFileStatus startFile(final String srcArg, final PermissionStatus permissions,
       final String holder, final String clientMachine,
       final EnumSet<CreateFlag> flag, final boolean createParent,
-      final short replication, final long blockSize) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
-      return (HdfsFileStatus) new HopsTransactionalRequestHandler(
+      final short replication, final long blockSize,
+      final CryptoProtocolVersion[] supportedVersions) throws IOException {
+    
+    HdfsFileStatus stat = null;
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    
+    /**
+     * If the file is in an encryption zone, we optimistically create an
+     * EDEK for the file by calling out to the configured KeyProvider.
+     * Since this typically involves doing an RPC, we do the RPC out of a transaction.
+     * 
+     * Since the path can flip-flop between being in an encryption zone and not
+     * in the meantime, we need to recheck the preconditions when we retake the
+     * lock to do the create. If the preconditions are not met, we throw a
+     * special RetryStartFileException to ask the DFSClient to try the create
+     * again later.
+     */
+    final CryptoProtocolVersion[] protocolVersion = new CryptoProtocolVersion[1];
+    final CipherSuite[] suite = {null};
+    final String[] ezKeyName = {null};
+    final EncryptedKeyVersion[] edek = {null};
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
+    if (provider != null) {
+      new HopsTransactionalRequestHandler(
           HDFSOperationType.START_FILE, src) {
         @Override
         public void acquireLock(TransactionLocks locks) throws IOException {
           LockFactory lf = getInstance();
           INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
-                  .setNameNodeID(nameNode.getId())
-                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-                  .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-          locks.add(il)
-                  .add(lf.getBlockLock())
-                  .add(lf.getLeaseLock(LockType.WRITE, holder))
-                  .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
-                  lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
-                      BLK.PE, BLK.IV));
+              .setNameNodeID(nameNode.getId())
+              .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+              .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+          locks.add(il);
+          locks.add(lf.getEZLock());
+        }
 
-          locks.add(lf.getAllUsedHashBucketsLock());
+        @Override
+        public Object performTask() throws IOException {
+          INodesInPath iip = dir.getINodesInPath4Write(src);
+          // Nothing to do if the path is not within an EZ
+          final EncryptionZone zone = dir.getEZForPath(iip);
+          if (zone != null) {
+            protocolVersion[0] = chooseProtocolVersion(zone, supportedVersions);
+            suite[0] = zone.getSuite();
+            ezKeyName[0] = zone.getKeyName();
 
-          if(isRetryCacheEnabled) {
-            locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-                Server.getCallId()));
+            Preconditions.checkNotNull(protocolVersion);
+            Preconditions.checkNotNull(suite);
+            Preconditions.checkArgument(!suite.equals(CipherSuite.UNKNOWN),
+                "Chose an UNKNOWN CipherSuite!");
+            Preconditions.checkNotNull(ezKeyName);
           }
+          return null;
+        }
+      }.handle(this);
+
+      Preconditions.checkState(
+          (suite == null && ezKeyName == null) || (suite != null && ezKeyName != null),
+          "Both suite and ezKeyName should both be null or not null");
+
+      // Generate EDEK if necessary while not holding the lock
+      edek[0] = generateEncryptedDataEncryptionKey(ezKeyName[0]);
+      EncryptionFaultInjector.getInstance().startFileAfterGenerateKey();
+    }
+        
+    // Proceed with the create, using the computed cipher suite and 
+    // generated EDEK
+    stat = (HdfsFileStatus) new HopsTransactionalRequestHandler(
+        HDFSOperationType.START_FILE, src) {
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = getInstance();
+        INodeLock il = lf.getINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src)
+            .setNameNodeID(nameNode.getId())
+            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
+            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
+        locks.add(il)
+            .add(lf.getBlockLock())
+            .add(lf.getLeaseLock(LockType.WRITE, holder))
+            .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
+            lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
+                BLK.PE, BLK.IV));
+
+        locks.add(lf.getAllUsedHashBucketsLock());
+
+        if (isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
 
         if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
           locks.add(lf.getQuotaUpdateLock(src));
@@ -1850,21 +2072,44 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
         }
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        List<XAttr> xAttrsToLock = new ArrayList<>();
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
+        locks.add(lf.getXAttrLock(xAttrsToLock));
       }
 
-        @Override
-        public Object performTask() throws IOException {
+      @Override
+      public Object performTask() throws IOException {
         CacheEntryWithPayload cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache,
             null);
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           HdfsFileStatus test = PBHelper.convert(HdfsProtos.HdfsFileStatusProto.parseFrom(cacheEntry.getPayload()));
           return test;
         }
+        if (NameNode.stateChangeLog.isDebugEnabled()) {
+          StringBuilder builder = new StringBuilder();
+          builder.append("DIR* NameSystem.startFile: src=" + src
+              + ", holder=" + holder
+              + ", clientMachine=" + clientMachine
+              + ", createParent=" + createParent
+              + ", replication=" + replication
+              + ", createFlag=" + flag.toString()
+              + ", blockSize=" + blockSize);
+          builder.append(", supportedVersions=");
+          if (supportedVersions != null) {
+            builder.append(Arrays.toString(supportedVersions));
+          } else {
+            builder.append("null");
+          }
+          NameNode.stateChangeLog.debug(builder.toString());
+        }
         HdfsFileStatus status = null;
         try {
-           status = startFileInt(src, permissions, holder, clientMachine, flag,
-              createParent, replication, blockSize);
-           return status;
+          checkNameNodeSafeMode("Cannot create file" + src);
+          status = startFileInt(srcArg, src, permissions, holder, clientMachine, flag,
+              createParent, replication, blockSize, suite[0], protocolVersion[0], edek[0]);
+          return status;
         } catch (AccessControlException e) {
           logAuditEvent(false, "create", src);
           throw e;
@@ -1874,25 +2119,21 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
       }
     }.handle(this);
+    logAuditEvent(true, "create", srcArg, null, stat);
+    return stat;
   }
 
-  private HdfsFileStatus startFileInt(String src, PermissionStatus permissions,
+  private HdfsFileStatus startFileInt(String srcArg, String src, PermissionStatus permissions,
       String holder, String clientMachine, EnumSet<CreateFlag> flag,
-      boolean createParent, short replication, long blockSize)
-      throws
-      IOException {
+      boolean createParent, short replication, long blockSize, CipherSuite suite,
+      CryptoProtocolVersion version, EncryptedKeyVersion edek)
+      throws IOException, RetryStartFileException {
     FSPermissionChecker pc = getPermissionChecker();
-    if (NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug(
-          "DIR* NameSystem.startFile: src=" + src + ", holder=" + holder +
-              ", clientMachine=" + clientMachine + ", createParent=" +
-              createParent + ", replication=" + replication + ", createFlag=" +
-              flag.toString());
-    }
     if (!DFSUtil.isValidName(src)) {
       throw new InvalidPathException(src);
     }
-
+    blockManager.verifyReplication(src, replication, clientMachine);
+    
     if (blockSize < minBlockSize) {
       throw new IOException("Specified block size is less than configured" + " minimum value ("
           + DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY
@@ -1904,8 +2145,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     
     final INodesInPath iip = dir.getINodesInPath4Write(src);
     startFileInternal(pc, iip, permissions, holder, clientMachine, create, overwrite,
-        createParent, replication, blockSize);
-    final HdfsFileStatus stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
+        createParent, replication, blockSize, suite, version, edek);
+    final HdfsFileStatus stat = FSDirStatAndListingOp.
+        getFileInfo(dir, src, false, FSDirectory.isReservedRawName(srcArg), true);
 
     //Set HdfsFileStatus if the file shoudl be stored in DB
     final INode inode = dir.getINodesInPath4Write(src).getLastINode();
@@ -1931,8 +2173,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private void startFileInternal(FSPermissionChecker pc, INodesInPath iip,
       PermissionStatus permissions, String holder, String clientMachine,
       boolean create, boolean overwrite, boolean createParent, short replication,
-      long blockSize) throws
-      IOException {
+      long blockSize, CipherSuite suite, CryptoProtocolVersion version,
+      EncryptedKeyVersion edek) throws RetryStartFileException, IOException {
 
     // Verify that the destination does not exist as a directory already.
     final INode inode = iip.getLastINode();
@@ -1940,6 +2182,26 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (inode != null && inode.isDirectory()) {
       throw new FileAlreadyExistsException(src +
           " already exists as a directory");
+    }
+    
+    FileEncryptionInfo feInfo = null;
+
+    final EncryptionZone zone = dir.getEZForPath(iip);
+    if (zone != null) {
+      // The path is now within an EZ, but we're missing encryption parameters
+      if (suite == null || edek == null) {
+        throw new RetryStartFileException();
+      }
+      // Path is within an EZ and we have provided encryption parameters.
+      // Make sure that the generated EDEK matches the settings of the EZ.
+      final String ezKeyName = zone.getKeyName();
+      if (!ezKeyName.equals(edek.getEncryptionKeyName())) {
+        throw new RetryStartFileException();
+      }
+      feInfo = new FileEncryptionInfo(suite, version,
+          edek.getEncryptedKeyVersion().getMaterial(),
+          edek.getEncryptedKeyIv(),
+          ezKeyName, edek.getEncryptionKeyVersionName());
     }
     
     final INodeFile myFile = INodeFile.valueOf(inode, src, true);
@@ -1999,6 +2261,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
       leaseManager.addLease(newNode.getFileUnderConstructionFeature()
           .getClientName(), src);
+
+      // Set encryption attributes if necessary
+      if (feInfo != null) {
+        dir.setFileEncryptionInfo(src, feInfo);
+        newNode = dir.getInode(newNode.getId()).asFile();
+      }
 
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug("DIR* NameSystem.startFile: added " +
@@ -2092,7 +2360,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if(file.isFileStoredInDB()){
       LOG.debug("Stuffed Inode:  prepareFileForWrite stored in database. " +
           "Returning phantom block");
-      return blockManager.createPhantomLocatedBlocks(file,file.getFileDataInDB(),true,false).getLocatedBlocks().get(0);
+      return blockManager.createPhantomLocatedBlocks(file, file.getFileDataInDB(), true, false, null).getLocatedBlocks().
+          get(0);
     } else {
       LocatedBlock ret = null;
       if (!newBlock) {
@@ -2173,8 +2442,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   boolean recoverLease(final String srcArg, final String holder,
       final String clientMachine) throws IOException {
+    final FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     HopsTransactionalRequestHandler recoverLeaseHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.RECOVER_LEASE,
             src) {
@@ -2193,7 +2463,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
           @Override
           public Object performTask() throws IOException {
-            FSPermissionChecker pc = getPermissionChecker();
             if (isInSafeMode()) {
               checkNameNodeSafeMode("Cannot recover the lease of " + src);
             }
@@ -2359,7 +2628,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private LastBlockWithStatus appendFileHopFS(final String srcArg, final String holder,
       final String clientMachine, final boolean newBlock) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(getPermissionChecker(), srcArg, pathComponents);
     HopsTransactionalRequestHandler appendFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.APPEND_FILE,
             src) {
@@ -2384,6 +2653,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               locks.add(lf.getEncodingStatusLock(LockType.READ_COMMITTED, src));
             }
             locks.add(lf.getAcesLock());
+            locks.add(lf.getEZLock());
+            locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
           }
 
       @Override
@@ -2426,7 +2697,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 "HDFS can not directly append to a file stored in the database");
           }
 
-          lastBlockWithStatus = appendFileInt(src, holder, clientMachine, newBlock);
+          lastBlockWithStatus = appendFileInt(srcArg, src, holder, clientMachine, newBlock);
 
           if (lastBlockWithStatus != null &&
                   lastBlockWithStatus.getLastBlock() != null &&
@@ -2445,7 +2716,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           success = true;
           return lastBlockWithStatus;
         } catch (AccessControlException e) {
-          logAuditEvent(false, "append", src);
+          logAuditEvent(false, "append", srcArg);
           throw e;
         } finally {
           //do not put data in the cache as it may be too big.
@@ -2473,10 +2744,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
       }
     };
-    return (LastBlockWithStatus) appendFileHandler.handle(this);
+    LastBlockWithStatus lb = (LastBlockWithStatus) appendFileHandler.handle(this);
+    logAuditEvent(true, "append", srcArg);
+    return lb;
   }
 
-  private LastBlockWithStatus appendFileInt(String src, String holder,
+  private LastBlockWithStatus appendFileInt(String srcArg, String src, String holder,
       String clientMachine, boolean newBlock) throws
       IOException {
 
@@ -2490,7 +2763,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FSPermissionChecker pc = getPermissionChecker();
     final INodesInPath iip = dir.getINodesInPath4Write(src);
     lb = appendFileInternal(pc, iip, holder, clientMachine, newBlock);
-    stat = FSDirStatAndListingOp.getFileInfo(dir, src, false, true);
+    stat = FSDirStatAndListingOp.getFileInfo(dir, src, false,
+        FSDirectory.isReservedRawName(srcArg), true);
     if (lb != null) {
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug(
@@ -2499,7 +2773,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 " block size " + lb.getBlock().getNumBytes());
       }
     }
-    logAuditEvent(true, "append", src);
     return new LastBlockWithStatus(lb, stat);
   }
 
@@ -2523,7 +2796,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final List<String> favoredNodes) throws IOException {
     final LocatedBlock[] onRetryBlock = new LocatedBlock[1];
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(getPermissionChecker(), srcArg, pathComponents);
     HopsTransactionalRequestHandler additionalBlockHandler = new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_ADDITIONAL_BLOCK, src) {
       @Override
@@ -2836,12 +3109,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   /**
    * @see ClientProtocol#getAdditionalDatanode(String, ExtendedBlock, DatanodeInfo[], String[], DatanodeInfo[], int, String)
    */
-  LocatedBlock getAdditionalDatanode(final String src1, final long fileId, final ExtendedBlock blk,
+  LocatedBlock getAdditionalDatanode(final String srcArg, final long fileId, final ExtendedBlock blk,
       final DatanodeInfo[] existings, final String[] storageIDs,
       final HashSet<Node> excludes, final int numAdditionalNodes,
       final String clientName) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(getPermissionChecker(), srcArg, pathComponents);
     HopsTransactionalRequestHandler getAdditionalDatanodeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_ADDITIONAL_DATANODE, src) {
@@ -2929,7 +3202,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   boolean abandonBlock(final ExtendedBlock b, final long fileId, final String srcArg,
       final String holder) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final String src = dir.resolvePath(getPermissionChecker(), srcArg, pathComponents);
     HopsTransactionalRequestHandler abandonBlockHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.ABANDON_BLOCK,
             src) {
@@ -3055,10 +3328,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws IOException
    *     on error (eg lease mismatch, file not open, file deleted)
    */
-  boolean completeFile(final String src1, final String holder,
+  boolean completeFile(final String srcArg, final String holder,
       final ExtendedBlock last, final long fileId, final byte[] data) throws IOException {
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src1);
-    final String src = dir.resolvePath(src1, pathComponents, dir);
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(getPermissionChecker(), srcArg, pathComponents);
     HopsTransactionalRequestHandler completeFileHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.COMPLETE_FILE, src) {
           @Override
@@ -3393,9 +3666,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     leaseManager.removeLeaseWithPrefixPath(src);
     // remove inodes from inodesMap
     if (removedINodes != null) {
-      for(INode inode: removedINodes){
-        inode.remove();
-      }
+      dir.removeFromInodeMap(removedINodes);
       removedINodes.clear();
     }
   }
@@ -3425,7 +3696,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   /**
    * Get the file info for a specific file.
    *
-   * @param src1
+   * @param src
    *     The string representation of the path to the file
    * @param resolveLink
    *     whether to throw UnresolvedLinkException
@@ -3526,8 +3797,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws IOException
    *     if path does not exist
    */
-  void fsync(final String src, final long fileId, final String clientName,
+  void fsync(final String srcArg, final long fileId, final String clientName,
       final long lastBlockLength) throws IOException {
+    final FSPermissionChecker pc = getPermissionChecker();
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     new HopsTransactionalRequestHandler(HDFSOperationType.FSYNC, src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -7450,8 +7724,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    */
   public EncodingStatus getEncodingStatus(final String filePathArg)
       throws IOException {
+    final FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(filePathArg);
-    final String filePath = dir.resolvePath(filePathArg, pathComponents, dir);
+    final String filePath = dir.resolvePath(pc, filePathArg, pathComponents);
     HopsTransactionalRequestHandler findReq =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.FIND_ENCODING_STATUS) {
@@ -7466,7 +7741,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
           @Override
           public Object performTask() throws IOException {
-            FSPermissionChecker pc = getPermissionChecker();
+            
             INodesInPath iip = dir.getINodesInPath(filePath, true);
             try {
               if (isPermissionEnabled) {
@@ -7570,7 +7845,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final EncodingPolicy policy, final EncodingStatus.Status status, final boolean checkRetryCache)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(sourcePathArg);
-    final String sourcePath = dir.resolvePath(sourcePathArg, pathComponents, dir);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String sourcePath = dir.resolvePath(pc, sourcePathArg, pathComponents);
     new HopsTransactionalRequestHandler(HDFSOperationType.ADD_ENCODING_STATUS) {
 
       @Override
@@ -7598,7 +7874,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
         boolean success = false;
         try {
-          FSPermissionChecker pc = getPermissionChecker();
           INodesInPath iip = dir.getINodesInPath(sourcePath, true);
           try {
             if (isPermissionEnabled) {
@@ -7698,7 +7973,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public void revokeEncoding(final String filePathArg, short replication)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(filePathArg);
-    final String filePath = dir.resolvePath(filePathArg, pathComponents, dir);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String filePath = dir.resolvePath(pc, filePathArg, pathComponents);
     setReplication(filePath, replication);
     new HopsTransactionalRequestHandler(
         HDFSOperationType.REVOKE_ENCODING_STATUS) {
@@ -7715,7 +7991,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
         INodesInPath iip = dir.getINodesInPath(filePath, true);
         try {
           if (isPermissionEnabled) {
@@ -7797,7 +8072,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       final EncodingStatus.ParityStatus parityStatus, final String parityFile)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(sourceFileArg);
-    final String sourceFile = dir.resolvePath(sourceFileArg, pathComponents, dir);
+    final String sourceFile = dir.resolvePath(getPermissionChecker(), sourceFileArg, pathComponents);
     new HopsTransactionalRequestHandler(
         HDFSOperationType.UPDATE_ENCODING_STATUS) {
 
@@ -7850,7 +8125,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public void addBlockChecksum(final String srcArg, final int blockIndex,
       final long checksum) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     new HopsTransactionalRequestHandler(HDFSOperationType.ADD_BLOCK_CHECKSUM) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -7863,7 +8139,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
         INodesInPath iip = dir.getINodesInPath(src, true);
         try {
           if (isPermissionEnabled) {
@@ -7888,7 +8163,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public long getBlockChecksum(final String srcArg, final int blockIndex)
       throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     return (Long) new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_BLOCK_CHECKSUM) {
           
@@ -7903,7 +8179,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = getPermissionChecker();
         INodesInPath iip = dir.getINodesInPath(src, true);
         try {
           if (isPermissionEnabled) {
@@ -8001,11 +8276,196 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
   
-  void setXAttr(final String src,final XAttr xAttr,
+  /**
+   * Create an encryption zone on directory src using the specified key.
+   *
+   * @param src     the path of a directory which will be the root of the
+   *                encryption zone. The directory must be empty.
+   * @param keyName name of a key which must be present in the configured
+   *                KeyProvider.
+   * @throws AccessControlException  if the caller is not the superuser.
+   * @throws UnresolvedLinkException if the path can't be resolved.
+   * @throws SafeModeException       if the Namenode is in safe mode.
+   */
+  void createEncryptionZone(final String src, final String keyName)
+    throws IOException, UnresolvedLinkException,
+      SafeModeException, AccessControlException {
+    
+    try {
+      if (provider == null) {
+        throw new IOException(
+            "Can't create an encryption zone for " + src +
+            " since no key provider is available.");
+      }
+      if (keyName == null || keyName.isEmpty()) {
+        throw new IOException("Must specify a key name when creating an " +
+            "encryption zone");
+      }
+      KeyProvider.Metadata metadata = provider.getMetadata(keyName);
+      if (metadata == null) {
+        /*
+         * It would be nice if we threw something more specific than
+         * IOException when the key is not found, but the KeyProvider API
+         * doesn't provide for that. If that API is ever changed to throw
+         * something more specific (e.g. UnknownKeyException) then we can
+         * update this to match it, or better yet, just rethrow the
+         * KeyProvider's exception.
+         */
+        throw new IOException("Key " + keyName + " doesn't exist.");
+      }
+      // If the provider supports pool for EDEKs, this will fill in the pool
+      provider.warmUpEncryptedKeys(keyName);
+      createEncryptionZoneInt(src, metadata.getCipher(),
+          keyName);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "createEncryptionZone", src);
+      throw e;
+    }
+  }
+
+  private void createEncryptionZoneInt(final String srcArg, String cipher,
+      final String keyName) throws IOException {
+    
+    checkSuperuserPrivilege();
+    final byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    FSPermissionChecker pc = getPermissionChecker();
+    checkNameNodeSafeMode("Cannot create encryption zone on " + srcArg);
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
+    final CipherSuite suite = CipherSuite.convert(cipher);
+    // For now this is hardcoded, as we only support one method.
+    final CryptoProtocolVersion version = CryptoProtocolVersion.ENCRYPTION_ZONES;
+    HdfsFileStatus resultingStat
+        = (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.CREATE_EZ, src) {
+          @Override
+          public void acquireLock(TransactionLocks locks) throws IOException {
+            LockFactory lf = getInstance();
+            INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src)
+                .setNameNodeID(nameNode.getId())
+                .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+            locks.add(il);
+            locks.add(lf.getEZLock());
+            List<XAttr> xAttrsToLock = new ArrayList<>();
+            xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+            xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
+            locks.add(lf.getXAttrLock(xAttrsToLock));
+         
+            if (isRetryCacheEnabled) {
+              locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+                  Server.getCallId()));
+            }
+          }
+
+          @Override
+          public Object performTask() throws IOException {
+            final CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+            if (cacheEntry != null && cacheEntry.isSuccess()) {
+              return null; // Return previous response
+            }
+
+            boolean success = false;
+            try {
+              final XAttr ezXAttr = dir.createEncryptionZone(src, suite,
+                  version, keyName);
+              List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
+              xAttrs.add(ezXAttr);
+              final INodesInPath iip = dir.getINodesInPath4Write(src, false);
+              HdfsFileStatus resultingStat = dir.getAuditFileInfo(iip);
+              return resultingStat;
+            } finally {
+              RetryCache.setState(cacheEntry, success);
+            }
+          }
+        }.handle();
+    logAuditEvent(true, "createEncryptionZone", srcArg, null, resultingStat);
+  }
+
+  /**
+   * Get the encryption zone for the specified path.
+   *
+   * @param srcArg the path of a file or directory to get the EZ for.
+   * @return the EZ of the of the path or null if none.
+   * @throws AccessControlException  if the caller is not the superuser.
+   * @throws UnresolvedLinkException if the path can't be resolved.
+   */
+  EncryptionZone getEZForPath(final String srcArg)
+    throws AccessControlException, UnresolvedLinkException, IOException {
+    final HdfsFileStatus[] resultingStat = {null};
+    final byte[][] pathComponents =
+        FSDirectory.getPathComponentsForReservedPath(srcArg);
+    boolean success = false;
+    final FSPermissionChecker pc = getPermissionChecker();
+    try {
+      final String src = dir.resolvePath(pc, srcArg, pathComponents);
+
+      final EncryptionZone ret
+          = (EncryptionZone) new HopsTransactionalRequestHandler(HDFSOperationType.GET_EZ_PATH, src) {
+            @Override
+            public void acquireLock(TransactionLocks locks) throws IOException {
+              LockFactory lf = getInstance();
+              INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH, src)
+                  .setNameNodeID(nameNode.getId())
+                  .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
+              locks.add(il);
+              locks.add(lf.getEZLock());
+              locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
+            }
+
+            @Override
+            public Object performTask() throws IOException {
+              final INodesInPath iip = dir.getINodesInPath(src, true);
+              if (isPermissionEnabled) {
+                dir.checkPathAccess(pc, iip, FsAction.READ);
+              }
+              final EncryptionZone ret = dir.getEZForPath(iip);
+              resultingStat[0] = dir.getAuditFileInfo(iip);
+
+              return ret;
+            }
+          }.handle();
+      success = true;
+      return ret;
+    } finally {
+      logAuditEvent(success, "getEZForPath", srcArg, null, resultingStat[0]);
+    }
+  }
+
+  BatchedListEntries<EncryptionZone> listEncryptionZones(long prevId)
+      throws IOException {
+    boolean success = false;
+    checkSuperuserPrivilege();
+    try {
+      checkSuperuserPrivilege();
+      final BatchedListEntries<EncryptionZone> ret =
+          dir.listEncryptionZones(prevId);
+      success = true;
+      return ret;
+    } finally {
+      logAuditEvent(success, "listEncryptionZones", null);
+    }
+  }
+
+  /**
+   * Set xattr for a file or directory.
+   *
+   * @param src
+   *          - path on which it sets the xattr
+   * @param xAttr
+   *          - xAttr details to set
+   * @param flag
+   *          - xAttrs flags
+   * @throws AccessControlException
+   * @throws SafeModeException
+   * @throws UnresolvedLinkException
+   * @throws IOException
+   */
+  void setXAttr(final String srcArg,final XAttr xAttr,
       final EnumSet<XAttrSetFlag> flag)
       throws AccessControlException, SafeModeException,
       UnresolvedLinkException, IOException {
   
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     new HopsTransactionalRequestHandler(HDFSOperationType.SET_XATTR) {
   
       @Override
@@ -8016,8 +8476,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
             .skipReadingQuotaAttr(!dir.isQuotaEnabled());
         locks.add(il);
-        locks.add(lf.getXAttrLock(xAttr));
+        List<XAttr> xAttrsToLock = new ArrayList<>();
+        xAttrsToLock.add(xAttr);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
+        locks.add(lf.getXAttrLock(xAttrsToLock));
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
         
         if(isRetryCacheEnabled) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
@@ -8033,10 +8498,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
         boolean success = false;
         try {
-          setXAttr(src, xAttr, flag, cacheEntry != null);
+          setXAttr(srcArg, src, xAttr, flag, cacheEntry != null);
           success = true;
         } catch (AccessControlException e) {
-          logAuditEvent(false, "setXAttr", src);
+          logAuditEvent(false, "setXAttr", srcArg);
           throw e;
         } finally {
           RetryCacheDistributed.setState(cacheEntry, success);
@@ -8047,13 +8512,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
   
   
-  private void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag,
+  private void setXAttr(String srcArg, String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag,
       boolean logRetryCache)
       throws IOException {
     HdfsFileStatus auditStat = null;
     try {
       checkNameNodeSafeMode("Cannot set XAttr on " + src);
-      auditStat = FSDirXAttrOp.setXAttr(dir, src, xAttr, flag, logRetryCache);
+      auditStat = FSDirXAttrOp.setXAttr(dir, srcArg, src, xAttr, flag, logRetryCache);
     } catch (AccessControlException e) {
       logAuditEvent(false, "setXAttr", src);
       throw e;
@@ -8061,9 +8526,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     logAuditEvent(true, "setXAttr", src, null, auditStat);
   }
   
-  List<XAttr> getXAttrs(final String src, final List<XAttr> xAttrs) throws IOException {
+  List<XAttr> getXAttrs(final String srcArg, final List<XAttr> xAttrs) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     return (List<XAttr>) new HopsTransactionalRequestHandler(HDFSOperationType.GET_XATTRS) {
-  
+
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
@@ -8080,7 +8548,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       @Override
       public Object performTask() throws IOException {
         try {
-          return FSDirXAttrOp.getXAttrs(dir, src, xAttrs);
+          return FSDirXAttrOp.getXAttrs(dir, srcArg, src, xAttrs);
         } catch (AccessControlException e) {
           logAuditEvent(false, "getXAttrs", src);
           throw e;
@@ -8089,7 +8557,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }.handle();
   }
   
-  List<XAttr> listXAttrs(final String src) throws IOException {
+  List<XAttr> listXAttrs(final String srcArg) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     return (List<XAttr>) new HopsTransactionalRequestHandler(HDFSOperationType.LIST_XATTRS) {
     
       @Override
@@ -8107,9 +8578,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       @Override
       public Object performTask() throws IOException {
         try {
-          return FSDirXAttrOp.listXAttrs(dir, src);
+          return FSDirXAttrOp.listXAttrs(dir, srcArg, src);
         } catch (AccessControlException e) {
-          logAuditEvent(false, "listXAttrs", src);
+          logAuditEvent(false, "listXAttrs", srcArg);
           throw e;
         }
       }
@@ -8117,7 +8588,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
   
 
-  void removeXAttr(final String src, final XAttr xAttr) throws IOException {
+  void removeXAttr(final String srcArg, final XAttr xAttr) throws IOException {
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     new HopsTransactionalRequestHandler(HDFSOperationType.GET_XATTRS){
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -8128,12 +8602,16 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
             .skipReadingQuotaAttr(!dir.isQuotaEnabled());
         locks.add(il);
-        locks.add(lf.getXAttrLock(xAttr));
+        List<XAttr> xAttrsToLock = new ArrayList<>();
+        xAttrsToLock.add(xAttr);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+        locks.add(lf.getXAttrLock(xAttrsToLock));
         locks.add(lf.getAcesLock());
         if(isRetryCacheEnabled) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
               Server.getCallId()));
         }
+        locks.add(lf.getEZLock());
       }
       
       @Override
@@ -8144,7 +8622,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
         boolean success = false;
         try {
-          removeXAttr(src, xAttr, cacheEntry != null);
+          removeXAttr(srcArg, src, xAttr, cacheEntry != null);
           success = true;
         } catch (AccessControlException e) {
           logAuditEvent(false, "removeXAttr", src);
@@ -8158,12 +8636,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }.handle();
   }
   
-  void removeXAttr(String src, XAttr xAttr, boolean logRetryCache)
+  void removeXAttr(String srcArg, String src, XAttr xAttr, boolean logRetryCache)
       throws IOException {
     HdfsFileStatus auditStat = null;
     try{
       checkNameNodeSafeMode("Cannot remove XAttr entry on " + src);
-      auditStat = FSDirXAttrOp.removeXAttr(dir, src, xAttr, logRetryCache);
+      auditStat = FSDirXAttrOp.removeXAttr(dir, srcArg, src, xAttr, logRetryCache);
     } catch (AccessControlException e) {
       logAuditEvent(false, "removeXAttr", src);
       throw e;
@@ -8384,7 +8862,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   void checkAccess(final String srcArg, final FsAction mode) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = dir.resolvePath(srcArg, pathComponents, dir);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     HopsTransactionalRequestHandler checkAccessHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.CHECK_ACCESS,
             src) {
@@ -8401,7 +8880,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
           @Override
           public Object performTask() throws IOException {
-            FSPermissionChecker pc = getPermissionChecker();
             INodesInPath iip = dir.getINodesInPath(src, true);
             try {
               INode inode = iip.getLastINode();
@@ -8426,9 +8904,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkAccessHandler.handle(this);
   }
 
-  public LastUpdatedContentSummary getLastUpdatedContentSummary(final String path) throws
+  public LastUpdatedContentSummary getLastUpdatedContentSummary(final String pathArg) throws
       IOException{
 
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(pathArg);
+    final FSPermissionChecker pc = getPermissionChecker();
+    final String path = dir.resolvePath(pc, pathArg, pathComponents);
+    
     LastUpdatedContentSummary luSummary = (LastUpdatedContentSummary) new
         HopsTransactionalRequestHandler (HDFSOperationType
             .GET_LAST_UPDATED_CONTENT_SUMMARY){

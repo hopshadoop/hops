@@ -52,7 +52,6 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.io.EnumSetWritable;
@@ -72,6 +71,7 @@ import java.util.logging.Logger;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
@@ -1209,7 +1209,7 @@ public class TestFileCreation {
               nnrpc.create(pathStr, new FsPermission((short) 0755), "client",
                   new EnumSetWritable<>(
                       EnumSet.of(CreateFlag.CREATE)), true, (short) 1,
-                  128 * 1024 * 1024L);
+                  128 * 1024 * 1024L, null);
               fail("Should have thrown exception when creating '" + pathStr +
                   "'" + " by " + method);
             } catch (InvalidPathException ipe) {

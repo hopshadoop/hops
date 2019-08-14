@@ -1924,6 +1924,14 @@
 </property>
 
 <property>
+  <name>dfs.encryption.key.provider.uri</name>
+  <description>
+    The KeyProvider to use when interacting with encryption keys used
+    when reading and writing to an encryption zone.
+  </description>
+</property>
+
+<property>
   <name>dfs.namenode.top.enabled</name>
   <value>true</value>
   <description>Enable nntop: reporting top users on namenode
@@ -2022,5 +2030,14 @@
     it is possible to force client to write the file to disk.
     </description>
   </property>
+
+<property>
+  <name>dfs.namenode.list.encryption.zones.num.responses</name>
+  <value>100</value>
+  <description>When listing encryption zones, the maximum number of zones
+    that will be returned in a batch. Fetching the list incrementally in
+    batches improves namenode performance.
+  </description>
+</property>
 
 </configuration>

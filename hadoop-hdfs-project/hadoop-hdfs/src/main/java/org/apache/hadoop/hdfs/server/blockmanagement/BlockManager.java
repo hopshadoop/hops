@@ -54,6 +54,8 @@ import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.fs.FileEncryptionInfo;
+
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.UnregisteredNodeException;
@@ -72,7 +74,6 @@ import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
-import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockReport;
 import org.apache.hadoop.hdfs.server.protocol.Bucket;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
@@ -1009,7 +1010,7 @@ public class BlockManager {
    */
   public LocatedBlocks createPhantomLocatedBlocks(INodeFile file, byte[] data,
       final boolean isFileUnderConstruction,
-      final boolean needBlockToken)
+      final boolean needBlockToken, FileEncryptionInfo feInfo)
       throws IOException, StorageException {
     if (needBlockToken == true) {
       new IOException("Block Tokens are not currently supported for files stored in the database");
@@ -1019,20 +1020,20 @@ public class BlockManager {
         createPhantomLocatedBlockList(file, data, mode);
 
     return new LocatedBlocks(file.getSize(),
-        isFileUnderConstruction, locatedblocks, null, false/*last block is not complete*/);
+        isFileUnderConstruction, locatedblocks, null, false/*last block is not complete*/, feInfo);
   }
 
   /** Create a LocatedBlocks. */
   public LocatedBlocks createLocatedBlocks(final BlockInfoContiguous[] blocks,
       final long fileSizeExcludeBlocksUnderConstruction,
       final boolean isFileUnderConstruction, final long offset,
-      final long length, final boolean needBlockToken)
+      final long length, final boolean needBlockToken, FileEncryptionInfo feInfo)
       throws IOException, StorageException {
     if (blocks == null) {
       return null;
     } else if (blocks.length == 0) {
       return new LocatedBlocks(0, isFileUnderConstruction,
-          Collections.<LocatedBlock>emptyList(), null, false);
+          Collections.<LocatedBlock>emptyList(), null, false, feInfo);
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("blocks = " + java.util.Arrays.asList(blocks));
@@ -1048,7 +1049,7 @@ public class BlockManager {
       final boolean isComplete = last.isComplete();
 
       return new LocatedBlocks(fileSizeExcludeBlocksUnderConstruction,
-          isFileUnderConstruction, locatedblocks, lastlb, isComplete);
+          isFileUnderConstruction, locatedblocks, lastlb, isComplete, feInfo);
     }
   }
 

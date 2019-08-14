@@ -24,6 +24,7 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -41,9 +42,11 @@ import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 
 import java.io.IOException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.Charsets;
+import org.apache.hadoop.fs.XAttr;
 
 import static org.apache.hadoop.util.Time.now;
 
@@ -59,9 +62,9 @@ class FSDirMkdirOp {
     if (!DFSUtil.isValidName(srcArg)) {
       throw new InvalidPathException(srcArg);
     }
-
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
 
     HopsTransactionalRequestHandler mkdirsHandler = new HopsTransactionalRequestHandler(HDFSOperationType.MKDIRS, src) {
       @Override
@@ -74,11 +77,15 @@ class FSDirMkdirOp {
             .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
         locks.add(il);
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        List<XAttr> xAttrsToLock = new ArrayList<>();
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
+        xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
+        locks.add(lf.getXAttrLock(xAttrsToLock));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         INodesInPath iip = fsd.getINodesInPath4Write(src);
         if (fsd.isPermissionEnabled()) {
           fsd.checkTraverse(pc, iip);

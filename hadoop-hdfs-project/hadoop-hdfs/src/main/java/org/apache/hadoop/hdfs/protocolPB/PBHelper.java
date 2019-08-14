@@ -18,8 +18,13 @@
 package org.apache.hadoop.hdfs.protocolPB;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.CipherSuiteProto;
 import com.google.common.base.Preconditions;
+import static org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos
+    .EncryptionZoneProto;
+import static org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.CipherSuiteProto;
+import static org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.CryptoProtocolVersionProto;
+
+
 import org.apache.hadoop.fs.CacheFlag;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Shorts;
@@ -47,7 +52,6 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveStats;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -58,13 +62,17 @@ import org.apache.hadoop.crypto.CipherOption;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
 import org.apache.hadoop.hdfs.protocol.DatanodeLocalInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdfs.protocol.FsPermissionExtension;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
@@ -202,7 +210,6 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
-import org.apache.hadoop.hdfs.protocol.FsAclPermission;
 
 /**
  * Utilities for converting protobuf classes to and from implementation classes
@@ -1209,11 +1216,12 @@ public class PBHelper {
 
   // LocatedBlocks
   public static LocatedBlocks convert(LocatedBlocksProto lb) {
-    LocatedBlocks locatedBlocks =  new LocatedBlocks(lb.getFileLength(), lb.getUnderConstruction(),
+    return  new LocatedBlocks(lb.getFileLength(), lb.getUnderConstruction(),
         PBHelper.convertLocatedBlock(lb.getBlocksList()),
         lb.hasLastBlock() ? PBHelper.convert(lb.getLastBlock()) : null,
-        lb.getIsLastBlockComplete());
-    return locatedBlocks;
+        lb.getIsLastBlockComplete(),
+        lb.hasFileEncryptionInfo() ? convert(lb.getFileEncryptionInfo()) :
+            null);
   }
 
   public static LocatedBlocksProto convert(LocatedBlocks lb) {
@@ -1223,6 +1231,9 @@ public class PBHelper {
     LocatedBlocksProto.Builder builder = LocatedBlocksProto.newBuilder();
     if (lb.getLastLocatedBlock() != null) {
       builder.setLastBlock(PBHelper.convert(lb.getLastLocatedBlock()));
+    }
+    if (lb.getFileEncryptionInfo() != null) {
+      builder.setFileEncryptionInfo(convert(lb.getFileEncryptionInfo()));
     }
     return builder.setFileLength(lb.getFileLength())
         .setUnderConstruction(lb.isUnderConstruction())
@@ -1284,7 +1295,7 @@ public class PBHelper {
   }
 
   public static FsPermission convert(FsPermissionProto p) {
-    return new FsAclPermission((short)p.getPerm());
+    return new FsPermissionExtension((short)p.getPerm());
   }
 
 
@@ -1361,6 +1372,8 @@ public class PBHelper {
         fs.hasFileId()? fs.getFileId(): HdfsConstantsClient.GRANDFATHER_INODE_ID,
         fs.hasLocations() ? PBHelper.convert(fs.getLocations()) : null,
         fs.hasChildrenNum() ? fs.getChildrenNum() : -1,
+        fs.hasFileEncryptionInfo() ? convert(fs.getFileEncryptionInfo()) :
+            null,
         fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
         fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy(): BlockStoragePolicySuite.ID_UNSPECIFIED);
   }
@@ -1395,7 +1408,9 @@ public class PBHelper {
     if (fs.isSymlink()) {
       builder.setSymlink(ByteString.copyFrom(fs.getSymlinkInBytes()));
     }
-
+    if (fs.getFileEncryptionInfo() != null) {
+      builder.setFileEncryptionInfo(convert(fs.getFileEncryptionInfo()));
+    }
     if (fs instanceof HdfsLocatedFileStatus) {
       LocatedBlocks locations =
           ((HdfsLocatedFileStatus) fs).getBlockLocations();
@@ -2196,7 +2211,7 @@ public class PBHelper {
     }
     return xAttrs;
   }
-  
+
   public static List<XAttr> convert(GetXAttrsResponseProto a) {
     List<XAttrProto> xAttrs = a.getXAttrsList();
     return convertXAttrs(xAttrs);
@@ -2227,6 +2242,22 @@ public class PBHelper {
     return builder.build();
   }
   
+  public static EncryptionZoneProto convert(EncryptionZone zone) {
+    return EncryptionZoneProto.newBuilder()
+        .setId(zone.getId())
+        .setPath(zone.getPath())
+        .setSuite(convert(zone.getSuite()))
+        .setCryptoProtocolVersion(convert(zone.getVersion()))
+        .setKeyName(zone.getKeyName())
+        .build();
+  }
+
+  public static EncryptionZone convert(EncryptionZoneProto proto) {
+    return new EncryptionZone(proto.getId(), proto.getPath(),
+        convert(proto.getSuite()), convert(proto.getCryptoProtocolVersion()),
+        proto.getKeyName());
+  }
+
   public static ShortCircuitShmSlotProto convert(SlotId slotId) {
     return ShortCircuitShmSlotProto.newBuilder().
         setShmId(convert(slotId.getShmId())).
@@ -2249,6 +2280,142 @@ public class PBHelper {
 
   public static ShmId convert(ShortCircuitShmIdProto shmId) {
     return new ShmId(shmId.getHi(), shmId.getLo());
+  }
+  
+    public static CipherSuiteProto convert(CipherSuite suite) {
+    switch (suite) {
+    case UNKNOWN:
+      return CipherSuiteProto.UNKNOWN;
+    case AES_CTR_NOPADDING:
+      return CipherSuiteProto.AES_CTR_NOPADDING;
+    default:
+      return null;
+    }
+  }
+
+  public static CipherSuite convert(CipherSuiteProto proto) {
+    switch (proto) {
+    case AES_CTR_NOPADDING:
+      return CipherSuite.AES_CTR_NOPADDING;
+    default:
+      // Set to UNKNOWN and stash the unknown enum value
+      CipherSuite suite = CipherSuite.UNKNOWN;
+      suite.setUnknownValue(proto.getNumber());
+      return suite;
+    }
+  }
+
+  public static List<CryptoProtocolVersionProto> convert(
+      CryptoProtocolVersion[] versions) {
+    List<CryptoProtocolVersionProto> protos =
+        Lists.newArrayListWithCapacity(versions.length);
+    for (CryptoProtocolVersion v: versions) {
+      protos.add(convert(v));
+    }
+    return protos;
+  }
+
+  public static CryptoProtocolVersion[] convertCryptoProtocolVersions(
+      List<CryptoProtocolVersionProto> protos) {
+    List<CryptoProtocolVersion> versions =
+        Lists.newArrayListWithCapacity(protos.size());
+    for (CryptoProtocolVersionProto p: protos) {
+      versions.add(convert(p));
+    }
+    return versions.toArray(new CryptoProtocolVersion[] {});
+  }
+
+  public static CryptoProtocolVersion convert(CryptoProtocolVersionProto
+      proto) {
+    switch(proto) {
+    case ENCRYPTION_ZONES:
+      return CryptoProtocolVersion.ENCRYPTION_ZONES;
+    default:
+      // Set to UNKNOWN and stash the unknown enum value
+      CryptoProtocolVersion version = CryptoProtocolVersion.UNKNOWN;
+      version.setUnknownValue(proto.getNumber());
+      return version;
+    }
+  }
+
+  public static CryptoProtocolVersionProto convert(CryptoProtocolVersion
+      version) {
+    switch(version) {
+    case UNKNOWN:
+      return CryptoProtocolVersionProto.UNKNOWN_PROTOCOL_VERSION;
+    case ENCRYPTION_ZONES:
+      return CryptoProtocolVersionProto.ENCRYPTION_ZONES;
+    default:
+      return null;
+    }
+  }
+
+  public static HdfsProtos.FileEncryptionInfoProto convert(
+      FileEncryptionInfo info) {
+    if (info == null) {
+      return null;
+    }
+    return HdfsProtos.FileEncryptionInfoProto.newBuilder()
+        .setSuite(convert(info.getCipherSuite()))
+        .setCryptoProtocolVersion(convert(info.getCryptoProtocolVersion()))
+        .setKey(getByteString(info.getEncryptedDataEncryptionKey()))
+        .setIv(getByteString(info.getIV()))
+        .setEzKeyVersionName(info.getEzKeyVersionName())
+        .setKeyName(info.getKeyName())
+        .build();
+  }
+
+  public static HdfsProtos.PerFileEncryptionInfoProto convertPerFileEncInfo(
+      FileEncryptionInfo info) {
+    if (info == null) {
+      return null;
+    }
+    return HdfsProtos.PerFileEncryptionInfoProto.newBuilder()
+        .setKey(getByteString(info.getEncryptedDataEncryptionKey()))
+        .setIv(getByteString(info.getIV()))
+        .setEzKeyVersionName(info.getEzKeyVersionName())
+        .build();
+  }
+
+  public static HdfsProtos.ZoneEncryptionInfoProto convert(
+      CipherSuite suite, CryptoProtocolVersion version, String keyName) {
+    if (suite == null || version == null || keyName == null) {
+      return null;
+    }
+    return HdfsProtos.ZoneEncryptionInfoProto.newBuilder()
+        .setSuite(convert(suite))
+        .setCryptoProtocolVersion(convert(version))
+        .setKeyName(keyName)
+        .build();
+  }
+
+  public static FileEncryptionInfo convert(
+      HdfsProtos.FileEncryptionInfoProto proto) {
+    if (proto == null) {
+      return null;
+    }
+    CipherSuite suite = convert(proto.getSuite());
+    CryptoProtocolVersion version = convert(proto.getCryptoProtocolVersion());
+    byte[] key = proto.getKey().toByteArray();
+    byte[] iv = proto.getIv().toByteArray();
+    String ezKeyVersionName = proto.getEzKeyVersionName();
+    String keyName = proto.getKeyName();
+    return new FileEncryptionInfo(suite, version, key, iv, keyName,
+        ezKeyVersionName);
+  }
+
+  public static FileEncryptionInfo convert(
+      HdfsProtos.PerFileEncryptionInfoProto fileProto,
+      CipherSuite suite, CryptoProtocolVersion version, String keyName) {
+    if (fileProto == null || suite == null || version == null ||
+        keyName == null) {
+      return null;
+    }
+    byte[] key = fileProto.getKey().toByteArray();
+    byte[] iv = fileProto.getIv().toByteArray();
+    String ezKeyVersionName = fileProto.getEzKeyVersionName();
+    return new FileEncryptionInfo(suite, version, key, iv, keyName,
+        ezKeyVersionName);
   }
 
   //HOP_CODE_START
@@ -2541,29 +2708,6 @@ public class PBHelper {
       return options;
     }
     return null;
-  }
-
-  public static CipherSuiteProto convert(CipherSuite suite) {
-    switch (suite) {
-    case UNKNOWN:
-      return CipherSuiteProto.UNKNOWN;
-    case AES_CTR_NOPADDING:
-      return CipherSuiteProto.AES_CTR_NOPADDING;
-    default:
-      return null;
-    }
-  }
-
-  public static CipherSuite convert(CipherSuiteProto proto) {
-    switch (proto) {
-    case AES_CTR_NOPADDING:
-      return CipherSuite.AES_CTR_NOPADDING;
-    default:
-      // Set to UNKNOWN and stash the unknown enum value
-      CipherSuite suite = CipherSuite.UNKNOWN;
-      suite.setUnknownValue(proto.getNumber());
-      return suite;
-    }
   }
   
   public static AclEntryProto.FsActionProto convert(FsAction v) {

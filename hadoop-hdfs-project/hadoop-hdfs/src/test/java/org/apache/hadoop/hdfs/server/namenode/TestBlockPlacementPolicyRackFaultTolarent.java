@@ -108,7 +108,7 @@ public class TestBlockPlacementPolicyRackFaultTolarent {
         // Create the file with client machine
         HdfsFileStatus fileStatus = namesystem.startFile(src, perm,
             clientMachine, clientMachine, EnumSet.of(CreateFlag.CREATE), true,
-            replication, DEFAULT_BLOCK_SIZE);
+            replication, DEFAULT_BLOCK_SIZE, null);
 
         //test chooseTarget for new file
         LocatedBlock locatedBlock = nameNodeRpc.addBlock(src, clientMachine,
@@ -138,7 +138,7 @@ public class TestBlockPlacementPolicyRackFaultTolarent {
     // Create the file with client machine
     HdfsFileStatus fileStatus = namesystem.startFile(src, perm,
         clientMachine, clientMachine, EnumSet.of(CreateFlag.CREATE), true,
-        (short) 20, DEFAULT_BLOCK_SIZE);
+        (short) 20, DEFAULT_BLOCK_SIZE, null);
 
     //test chooseTarget for new file
     LocatedBlock locatedBlock = nameNodeRpc.addBlock(src, clientMachine,

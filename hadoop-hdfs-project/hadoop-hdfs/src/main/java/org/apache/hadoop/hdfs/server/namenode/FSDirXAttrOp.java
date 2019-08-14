@@ -34,6 +34,10 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
+import org.apache.hadoop.hdfs.protocolPB.PBHelper;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.CRYPTO_XATTR_ENCRYPTION_ZONE;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.CRYPTO_XATTR_FILE_ENCRYPTION_INFO;
 
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
 
@@ -41,6 +45,10 @@ class FSDirXAttrOp {
   private static final XAttr UNREADABLE_BY_SUPERUSER_XATTR =
       XAttrHelper.buildXAttr(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER, null);
 
+  public static final XAttr XATTR_ENCRYPTION_ZONE =
+       XAttrHelper.buildXAttr(CRYPTO_XATTR_ENCRYPTION_ZONE, null);
+  public static final XAttr XATTR_FILE_ENCRYPTION_INFO =
+       XAttrHelper.buildXAttr(CRYPTO_XATTR_FILE_ENCRYPTION_INFO, null);
   /**
    * Set xattr for a file or directory.
    *
@@ -53,15 +61,13 @@ class FSDirXAttrOp {
    * @throws IOException
    */
   static HdfsFileStatus setXAttr(
-      FSDirectory fsd, String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag,
+      FSDirectory fsd, String srcArg, String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag,
       boolean logRetryCache)
       throws IOException {
     checkXAttrsConfigFlag(fsd);
     checkXAttrSize(fsd, xAttr);
     FSPermissionChecker pc = fsd.getPermissionChecker();
-    XAttrPermissionFilter.checkPermissionForApi(pc, xAttr);
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
-    src = FSDirectory.resolvePath(src, pathComponents, fsd);
+    XAttrPermissionFilter.checkPermissionForApi(pc, xAttr, FSDirectory.isReservedRawName(srcArg));
     final INodesInPath iip = fsd.getINodesInPath4Write(src);
     checkXAttrChangeAccess(fsd, iip, xAttr, pc);
     List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
@@ -70,16 +76,15 @@ class FSDirXAttrOp {
     return fsd.getAuditFileInfo(fsd.getINodesInPath(src, false));
   }
 
-  static List<XAttr> getXAttrs(FSDirectory fsd, final String srcArg,
+  static List<XAttr> getXAttrs(FSDirectory fsd, final String srcArg, final String src,
                                List<XAttr> xAttrs)
       throws IOException {
-  
-    String src = srcArg;
+    final boolean isRawPath = FSDirectory.isReservedRawName(srcArg);
     checkXAttrsConfigFlag(fsd);
     FSPermissionChecker pc = fsd.getPermissionChecker();
     boolean getAll = xAttrs == null || xAttrs.isEmpty();
     if (!getAll) {
-      XAttrPermissionFilter.checkPermissionForApi(pc, xAttrs);
+      XAttrPermissionFilter.checkPermissionForApi(pc, xAttrs, isRawPath);
     }
     
     final INodesInPath iip = fsd.getINodesInPath(src, true);
@@ -88,7 +93,7 @@ class FSDirXAttrOp {
     }
     List<XAttr> all = getXAttrsInt(fsd, src, xAttrs);
     List<XAttr> filteredAll = XAttrPermissionFilter.
-        filterXAttrsForApi(pc, all);
+        filterXAttrsForApi(pc, all, isRawPath);
   
     if (getAll) {
       return filteredAll;
@@ -118,7 +123,7 @@ class FSDirXAttrOp {
   }
 
   static List<XAttr> listXAttrs(
-      FSDirectory fsd, String src) throws IOException {
+      FSDirectory fsd, String srcArg, String src) throws IOException {
     checkXAttrsConfigFlag(fsd);
     final FSPermissionChecker pc = fsd.getPermissionChecker();
     final INodesInPath iip = fsd.getINodesInPath(src, true);
@@ -128,7 +133,7 @@ class FSDirXAttrOp {
     }
     final List<XAttr> all = getXAttrsInt(fsd, src);
     final List<XAttr> filteredAll = XAttrPermissionFilter.
-        filterXAttrsForApi(pc, all);
+        filterXAttrsForApi(pc, all, FSDirectory.isReservedRawName(srcArg));
     return filteredAll;
   }
 
@@ -142,13 +147,12 @@ class FSDirXAttrOp {
    * @throws IOException
    */
   static HdfsFileStatus removeXAttr(
-      FSDirectory fsd, String src, XAttr xAttr, boolean logRetryCache)
+      FSDirectory fsd,String srcArg, String src, XAttr xAttr, boolean logRetryCache)
       throws IOException {
   
     checkXAttrsConfigFlag(fsd);
     FSPermissionChecker pc = fsd.getPermissionChecker();
-    XAttrPermissionFilter.checkPermissionForApi(pc, xAttr);
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
+    XAttrPermissionFilter.checkPermissionForApi(pc, xAttr, FSDirectory.isReservedRawName(srcArg));
     INodesInPath iip = fsd.getINodesInPath4Write(src);
     checkXAttrChangeAccess(fsd, iip, xAttr, pc);
     List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
@@ -274,6 +278,20 @@ class FSDirXAttrOp {
       incrementXAttrs(fsd, inode, xAttr, exists);
       
       final String xaName = XAttrHelper.getPrefixName(xAttr);
+      
+      /*
+       * If we're adding the encryption zone xattr, then add src to the list
+       * of encryption zones.
+       */
+      if (CRYPTO_XATTR_ENCRYPTION_ZONE.equals(xaName)) {
+        final HdfsProtos.ZoneEncryptionInfoProto ezProto =
+            HdfsProtos.ZoneEncryptionInfoProto.parseFrom(xAttr.getValue());
+        fsd.ezManager.addEncryptionZone(inode.getId(),
+                                        PBHelper.convert(ezProto.getSuite()),
+                                        PBHelper.convert(
+                                            ezProto.getCryptoProtocolVersion()),
+                                        ezProto.getKeyName());
+      }
       if (!inode.isFile() && SECURITY_XATTR_UNREADABLE_BY_SUPERUSER.equals(xaName)) {
         throw new IOException("Can only set '" +
             SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file.");
