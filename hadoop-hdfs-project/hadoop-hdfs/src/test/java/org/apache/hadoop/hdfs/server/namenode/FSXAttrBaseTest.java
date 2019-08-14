@@ -58,10 +58,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Tests NameNode interaction for all XAttr APIs.
- * This test suite covers restarting the NN, saving new a checkpoint. 
+ * This test suite covers restarting the NN, saving a new checkpoint. 
  */
 public class FSXAttrBaseTest {
 
@@ -81,12 +82,13 @@ public class FSXAttrBaseTest {
   protected static final byte[] value2 = {0x37, 0x38, 0x39};
   protected static final String name3 = "user.a3";
   protected static final String name4 = "user.a4";
-  
+  protected static final String raw1 = "raw.a1";
+  protected static final String raw2 = "raw.a2";
   protected static final String security1 =
       SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
-  
+
   private static final int MAX_SIZE = security1.length();
-  
+
   protected FileSystem fs;
 
   private static final UserGroupInformation BRUCE =
@@ -136,51 +138,72 @@ public class FSXAttrBaseTest {
    */
   @Test(timeout = 120000)
   public void testCreateXAttr() throws Exception {
-    FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short)0750));
-    fs.setXAttr(path, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
-    
-    Map<String, byte[]> xattrs = fs.getXAttrs(path);
+    Map<String, byte[]> expectedXAttrs = Maps.newHashMap();
+    expectedXAttrs.put(name1, value1);
+    expectedXAttrs.put(name2, null);
+    expectedXAttrs.put(security1, null);
+    doTestCreateXAttr(filePath, expectedXAttrs);
+    expectedXAttrs.put(raw1, value1);
+    doTestCreateXAttr(rawFilePath, expectedXAttrs);
+  }
+
+  private void doTestCreateXAttr(Path usePath, Map<String,
+      byte[]> expectedXAttrs) throws Exception {
+    DFSTestUtil.createFile(fs, usePath, 8192, (short) 1, 0xFEED);
+    fs.setXAttr(usePath, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
+
+    Map<String, byte[]> xattrs = fs.getXAttrs(usePath);
     Assert.assertEquals(xattrs.size(), 1);
     Assert.assertArrayEquals(value1, xattrs.get(name1));
     
-    fs.removeXAttr(path, name1);
+    fs.removeXAttr(usePath, name1);
     
-    xattrs = fs.getXAttrs(path);
+    xattrs = fs.getXAttrs(usePath);
     Assert.assertEquals(xattrs.size(), 0);
     
     // Create xattr which already exists.
-    fs.setXAttr(path, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
+    fs.setXAttr(usePath, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
     try {
-      fs.setXAttr(path, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
+      fs.setXAttr(usePath, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
       Assert.fail("Creating xattr which already exists should fail.");
     } catch (IOException e) {
     }
-    fs.removeXAttr(path, name1);
+    fs.removeXAttr(usePath, name1);
     
-    // Create two xattrs
-    fs.setXAttr(path, name1, value1, EnumSet.of(XAttrSetFlag.CREATE));
-    fs.setXAttr(path, name2, null, EnumSet.of(XAttrSetFlag.CREATE));
-    xattrs = fs.getXAttrs(path);
-    Assert.assertEquals(xattrs.size(), 2);
-    Assert.assertArrayEquals(value1, xattrs.get(name1));
-    Assert.assertArrayEquals(new byte[0], xattrs.get(name2));
+    // Create the xattrs
+    for (Map.Entry<String, byte[]> ent : expectedXAttrs.entrySet()) {
+      fs.setXAttr(usePath, ent.getKey(), ent.getValue(),
+          EnumSet.of(XAttrSetFlag.CREATE));
+    }
+    xattrs = fs.getXAttrs(usePath);
+    Assert.assertEquals(xattrs.size(), expectedXAttrs.size());
+    for (Map.Entry<String, byte[]> ent : expectedXAttrs.entrySet()) {
+      final byte[] val =
+          (ent.getValue() == null) ? new byte[0] : ent.getValue();
+      Assert.assertArrayEquals(val, xattrs.get(ent.getKey()));
+    }
     
     restart(false);
     initFileSystem();
-    xattrs = fs.getXAttrs(path);
-    Assert.assertEquals(xattrs.size(), 2);
-    Assert.assertArrayEquals(value1, xattrs.get(name1));
-    Assert.assertArrayEquals(new byte[0], xattrs.get(name2));
+    xattrs = fs.getXAttrs(usePath);
+    Assert.assertEquals(xattrs.size(), expectedXAttrs.size());
+    for (Map.Entry<String, byte[]> ent : expectedXAttrs.entrySet()) {
+      final byte[] val =
+          (ent.getValue() == null) ? new byte[0] : ent.getValue();
+      Assert.assertArrayEquals(val, xattrs.get(ent.getKey()));
+    }
     
     restart(true);
     initFileSystem();
-    xattrs = fs.getXAttrs(path);
-    Assert.assertEquals(xattrs.size(), 2);
-    Assert.assertArrayEquals(value1, xattrs.get(name1));
-    Assert.assertArrayEquals(new byte[0], xattrs.get(name2));
-    
-    fs.removeXAttr(path, name1);
-    fs.removeXAttr(path, name2);
+    xattrs = fs.getXAttrs(usePath);
+    Assert.assertEquals(xattrs.size(), expectedXAttrs.size());
+    for (Map.Entry<String, byte[]> ent : expectedXAttrs.entrySet()) {
+      final byte[] val =
+          (ent.getValue() == null) ? new byte[0] : ent.getValue();
+      Assert.assertArrayEquals(val, xattrs.get(ent.getKey()));
+    }
+
+    fs.delete(usePath, false);
   }
   
   /**
@@ -406,7 +429,8 @@ public class FSXAttrBaseTest {
       Assert.fail("expected IOException");
     } catch (Exception e) {
       GenericTestUtils.assertExceptionContains
-          ("An XAttr name must be prefixed with user/trusted/security/system, " +
+          ("An XAttr name must be prefixed with " +
+           "user/trusted/security/system/raw, " +
            "followed by a '.'",
           e);
     }
@@ -593,7 +617,7 @@ public class FSXAttrBaseTest {
 
     /* Unknown namespace should throw an exception. */
     final String expectedExceptionString = "An XAttr name must be prefixed " +
-        "with user/trusted/security/system, followed by a '.'";
+        "with user/trusted/security/system/raw, followed by a '.'";
     try {
       fs.removeXAttr(path, "wackynamespace.foo");
       Assert.fail("expected IOException");
@@ -929,6 +953,176 @@ public class FSXAttrBaseTest {
     fsAsDiana.removeXAttr(path, name2);
   }
   
+  @Test(timeout = 120000)
+  public void testRawXAttrs() throws Exception {
+    final UserGroupInformation user = UserGroupInformation.
+      createUserForTesting("user", new String[] {"mygroup"});
+
+    FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 0750));
+    fs.setXAttr(rawPath, raw1, value1, EnumSet.of(XAttrSetFlag.CREATE,
+        XAttrSetFlag.REPLACE));
+
+    {
+      // getXAttr
+      final byte[] value = fs.getXAttr(rawPath, raw1);
+      Assert.assertArrayEquals(value, value1);
+    }
+
+    {
+      // getXAttrs
+      final Map<String, byte[]> xattrs = fs.getXAttrs(rawPath);
+      Assert.assertEquals(xattrs.size(), 1);
+      Assert.assertArrayEquals(value1, xattrs.get(raw1));
+      fs.removeXAttr(rawPath, raw1);
+    }
+
+    {
+      // replace and re-get
+      fs.setXAttr(rawPath, raw1, value1, EnumSet.of(XAttrSetFlag.CREATE));
+      fs.setXAttr(rawPath, raw1, newValue1, EnumSet.of(XAttrSetFlag.CREATE,
+          XAttrSetFlag.REPLACE));
+
+      final Map<String,byte[]> xattrs = fs.getXAttrs(rawPath);
+      Assert.assertEquals(xattrs.size(), 1);
+      Assert.assertArrayEquals(newValue1, xattrs.get(raw1));
+
+      fs.removeXAttr(rawPath, raw1);
+    }
+
+    {
+      // listXAttrs on rawPath ensuring raw.* xattrs are returned
+      fs.setXAttr(rawPath, raw1, value1, EnumSet.of(XAttrSetFlag.CREATE));
+      fs.setXAttr(rawPath, raw2, value2, EnumSet.of(XAttrSetFlag.CREATE));
+
+      final List<String> xattrNames = fs.listXAttrs(rawPath);
+      assertTrue(xattrNames.contains(raw1));
+      assertTrue(xattrNames.contains(raw2));
+      assertTrue(xattrNames.size() == 2);
+      fs.removeXAttr(rawPath, raw1);
+      fs.removeXAttr(rawPath, raw2);
+    }
+
+    {
+      // listXAttrs on non-rawPath ensuring no raw.* xattrs returned
+      fs.setXAttr(rawPath, raw1, value1, EnumSet.of(XAttrSetFlag.CREATE));
+      fs.setXAttr(rawPath, raw2, value2, EnumSet.of(XAttrSetFlag.CREATE));
+
+      final List<String> xattrNames = fs.listXAttrs(path);
+      assertTrue(xattrNames.size() == 0);
+      fs.removeXAttr(rawPath, raw1);
+      fs.removeXAttr(rawPath, raw2);
+    }
+
+    {
+      /*
+       * Test non-root user operations in the "raw.*" namespace.
+       */
+      user.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          final FileSystem userFs = dfsCluster.getFileSystem();
+          // Test that non-root can not set xattrs in the "raw.*" namespace
+          try {
+            // non-raw path
+            userFs.setXAttr(path, raw1, value1);
+            fail("setXAttr should have thrown");
+          } catch (AccessControlException e) {
+            // ignore
+          }
+
+          try {
+            // raw path
+            userFs.setXAttr(rawPath, raw1, value1);
+            fail("setXAttr should have thrown");
+          } catch (AccessControlException e) {
+            // ignore
+          }
+
+          // Test that non-root can not do getXAttrs in the "raw.*" namespace
+          try {
+            // non-raw path
+            userFs.getXAttrs(rawPath);
+            fail("getXAttrs should have thrown");
+          } catch (AccessControlException e) {
+            // ignore
+          }
+
+          try {
+            // raw path
+            userFs.getXAttrs(path);
+            fail("getXAttrs should have thrown");
+          } catch (AccessControlException e) {
+            // ignore
+          }
+
+          // Test that non-root can not do getXAttr in the "raw.*" namespace
+          try {
+            // non-raw path
+            userFs.getXAttr(rawPath, raw1);
+            fail("getXAttr should have thrown");
+          } catch (AccessControlException e) {
+            // ignore
+          }
+
+          try {
+            // raw path
+            userFs.getXAttr(path, raw1);
+            fail("getXAttr should have thrown");
+          } catch (AccessControlException e) {
+            // ignore
+          }
+          return null;
+        }
+        });
+    }
+
+    {
+      /*
+       * Test that non-root can not do getXAttr in the "raw.*" namespace
+       */
+      fs.setXAttr(rawPath, raw1, value1);
+      user.doAs(new PrivilegedExceptionAction<Object>() {
+          @Override
+          public Object run() throws Exception {
+            final FileSystem userFs = dfsCluster.getFileSystem();
+            try {
+              // non-raw path
+              userFs.getXAttr(rawPath, raw1);
+              fail("getXAttr should have thrown");
+            } catch (AccessControlException e) {
+              // ignore
+            }
+
+            try {
+              // raw path
+              userFs.getXAttr(path, raw1);
+              fail("getXAttr should have thrown");
+            } catch (AccessControlException e) {
+              // ignore
+            }
+
+            /*
+             * Test that only root can see raw.* xattrs returned from listXAttr
+             * and non-root can't do listXAttrs on /.reserved/raw.
+             */
+            // non-raw path
+            final List<String> xattrNames = userFs.listXAttrs(path);
+            assertTrue(xattrNames.size() == 0);
+            try {
+              // raw path
+              userFs.listXAttrs(rawPath);
+              fail("listXAttrs on raw path should have thrown");
+            } catch (AccessControlException e) {
+              // ignore
+            }
+
+            return null;
+          }
+        });
+      fs.removeXAttr(rawPath, raw1);
+    }
+  }
+
   /**
    * This tests the "unreadable by superuser" xattr which denies access to a
    * file for the superuser. See HDFS-6705 for details.
@@ -937,7 +1131,7 @@ public class FSXAttrBaseTest {
   public void testUnreadableBySuperuserXAttr() throws Exception {
     // Run tests as superuser...
     doTestUnreadableBySuperuserXAttr(fs, true);
-    
+
     // ...and again as non-superuser
     final UserGroupInformation user = UserGroupInformation.
         createUserForTesting("user", new String[] { "mygroup" });
@@ -950,10 +1144,10 @@ public class FSXAttrBaseTest {
       }
     });
   }
-  
+
   private void doTestUnreadableBySuperuserXAttr(FileSystem userFs,
       boolean expectOpenFailure) throws Exception {
-    
+
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 0777));
     DFSTestUtil.createFile(userFs, filePath, 8192, (short) 1, 0xFEED);
     try {
@@ -964,10 +1158,10 @@ public class FSXAttrBaseTest {
       fs.delete(path, true);
     }
   }
-  
+
   private void doTUBSXAInt(FileSystem userFs, boolean expectOpenFailure)
       throws Exception {
-    
+
     // Test that xattr can't be set on a dir
     try {
       userFs.setXAttr(path, security1, null, EnumSet.of(XAttrSetFlag.CREATE));
@@ -976,15 +1170,15 @@ public class FSXAttrBaseTest {
       GenericTestUtils.assertExceptionContains("Can only set '" +
           SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file", e);
     }
-    
+
     // Test that xattr can actually be set. Repeatedly.
     userFs.setXAttr(filePath, security1, null,
-        EnumSet.of(XAttrSetFlag.CREATE));
+      EnumSet.of(XAttrSetFlag.CREATE));
     verifySecurityXAttrExists(userFs);
     userFs.setXAttr(filePath, security1, null, EnumSet.of(XAttrSetFlag.CREATE,
         XAttrSetFlag.REPLACE));
     verifySecurityXAttrExists(userFs);
-    
+
     // Test that the xattr can't be deleted by anyone.
     try {
       userFs.removeXAttr(filePath, security1);
@@ -993,10 +1187,10 @@ public class FSXAttrBaseTest {
       GenericTestUtils.assertExceptionContains("The xattr '" +
           SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' can not be deleted.", e);
     }
-    
+
     // Test that xattr can be read.
     verifySecurityXAttrExists(userFs);
-    
+
     // Test that a value can't be set for the xattr.
     try {
       userFs.setXAttr(filePath, security1,
@@ -1005,21 +1199,21 @@ public class FSXAttrBaseTest {
     } catch (AccessControlException e) {
       GenericTestUtils.assertExceptionContains("Values are not allowed", e);
     }
-    
+
     // Test that unreadable by superuser xattr appears in listXAttrs results
     // (for superuser and non-superuser)
     final List<String> xattrNames = userFs.listXAttrs(filePath);
     assertTrue(xattrNames.contains(security1));
     assertTrue(xattrNames.size() == 1);
-    
+
     verifyFileAccess(userFs, expectOpenFailure);
-    
+
     // Rename of the file is allowed by anyone.
     Path toPath = new Path(filePath.toString() + "x");
     userFs.rename(filePath, toPath);
     userFs.rename(toPath, filePath);
   }
-  
+
   private void verifySecurityXAttrExists(FileSystem userFs) throws Exception {
     try {
       final Map<String, byte[]> xattrs = userFs.getXAttrs(filePath);
@@ -1027,12 +1221,12 @@ public class FSXAttrBaseTest {
       Assert.assertNotNull(xattrs.get(security1));
       Assert.assertArrayEquals("expected empty byte[] from getXAttr",
           new byte[0], userFs.getXAttr(filePath, security1));
-      
+
     } catch (AccessControlException e) {
       fail("getXAttrs failed but expected it to succeed");
     }
   }
-  
+
   private void verifyFileAccess(FileSystem userFs, boolean expectOpenFailure)
       throws Exception {
     // Test that a file with the xattr can or can't be opened.
@@ -1043,7 +1237,7 @@ public class FSXAttrBaseTest {
       assertTrue("open failed but expected it to succeed", expectOpenFailure);
     }
   }
-  
+
   /**
    * Creates a FileSystem for the super-user.
    *

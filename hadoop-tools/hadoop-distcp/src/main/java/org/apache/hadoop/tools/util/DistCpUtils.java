@@ -226,14 +226,14 @@ public class DistCpUtils {
 
     final boolean preserveXAttrs = attributes.contains(FileAttribute.XATTR);
     if (preserveXAttrs || preserveRawXattrs) {
-//      final String rawNS =
-//          StringUtils.toLowerCase(XAttr.NameSpace.RAW.name());
+      final String rawNS =
+          StringUtils.toLowerCase(XAttr.NameSpace.RAW.name());
       Map<String, byte[]> srcXAttrs = srcFileStatus.getXAttrs();
       Map<String, byte[]> targetXAttrs = getXAttrs(targetFS, path);
       if (srcXAttrs != null && !srcXAttrs.equals(targetXAttrs)) {
         for (Entry<String, byte[]> entry : srcXAttrs.entrySet()) {
           String xattrName = entry.getKey();
-          if (/*xattrName.startsWith(rawNS) ||*/ preserveXAttrs) {
+          if (xattrName.startsWith(rawNS) || preserveXAttrs) {
             targetFS.setXAttr(path, xattrName, entry.getValue());
           }
         }
@@ -415,17 +415,17 @@ public class DistCpUtils {
          copyListingFileStatus.setXAttrs(srcXAttrs);
       } else {
         Map<String, byte[]> trgXAttrs = Maps.newHashMap();
-//        final String rawNS =
-//            StringUtils.toLowerCase(XAttr.NameSpace.RAW.name());
+        final String rawNS =
+            StringUtils.toLowerCase(XAttr.NameSpace.RAW.name());
         for (Map.Entry<String, byte[]> ent : srcXAttrs.entrySet()) {
           final String xattrName = ent.getKey();
-//          if (xattrName.startsWith(rawNS)) {
-//            if (preserveRawXAttrs) {
-//              trgXAttrs.put(xattrName, ent.getValue());
-//            }
-//          } else if (preserveXAttrs) {
+          if (xattrName.startsWith(rawNS)) {
+            if (preserveRawXAttrs) {
+              trgXAttrs.put(xattrName, ent.getValue());
+            }
+          } else if (preserveXAttrs) {
             trgXAttrs.put(xattrName, ent.getValue());
-//          }
+          }
         }
         copyListingFileStatus.setXAttrs(trgXAttrs);
       }

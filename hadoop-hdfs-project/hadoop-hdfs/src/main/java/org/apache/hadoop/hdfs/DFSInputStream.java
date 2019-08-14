@@ -54,6 +54,7 @@ import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.InvalidEncryptionKeyException;
@@ -111,6 +112,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
   ////
   private LocatedBlocks locatedBlocks = null;
   private long lastBlockBeingWrittenLength = 0;
+  private FileEncryptionInfo fileEncryptionInfo = null;
   private CachingStrategy cachingStrategy;
   ////
 
@@ -336,6 +338,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
         lastBlockBeingWrittenLength = len; 
       }
     }
+
+    fileEncryptionInfo = locatedBlocks.getFileEncryptionInfo();
 
     return lastBlockBeingWrittenLength;
   }
@@ -1623,6 +1627,10 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
     }
   }
 
+  public synchronized FileEncryptionInfo getFileEncryptionInfo() {
+    return fileEncryptionInfo;
+  }
+  
   private void closeCurrentBlockReader() {
     if (blockReader == null) return;
     // Close the current block reader so that the new caching settings can 

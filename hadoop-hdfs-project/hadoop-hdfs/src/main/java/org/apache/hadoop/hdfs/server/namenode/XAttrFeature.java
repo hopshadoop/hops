@@ -62,7 +62,7 @@ public class XAttrFeature implements INode.Feature {
       throws StorageException, TransactionContextException {
     List<XAttr> storedAttrs = Lists.newArrayList();
     for(XAttr attr : attrs){
-      StoredXAttr storedXAttr = EntityManager.find(StoredXAttr.Finder.ByPrimaryKey,
+      StoredXAttr storedXAttr = EntityManager.find(StoredXAttr.Finder.ByPrimaryKeyLocal,
           getPrimaryKey(inodeId, attr));
       if(storedXAttr != null){
         storedAttrs.add(convertStoredtoXAttr(storedXAttr));
@@ -86,7 +86,7 @@ public class XAttrFeature implements INode.Feature {
   public ImmutableList<XAttr> getXAttrs()
       throws TransactionContextException, StorageException {
     Collection<StoredXAttr> extendedAttributes =
-        EntityManager.findList(StoredXAttr.Finder.ByInodeId, inodeId);
+        EntityManager.findList(StoredXAttr.Finder.ByInodeIdLocal, inodeId);
     
     if(extendedAttributes == null)
       return EMPTY_ENTRY_LIST;

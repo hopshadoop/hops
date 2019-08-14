@@ -32,6 +32,7 @@ import "hdfs.proto";
 
 import "acl.proto";
 import "xattr.proto";
+import "encryption.proto";
 
 import "ActiveNode.proto";
 /**
@@ -106,7 +107,7 @@ message CreateRequestProto {
   required bool createParent = 5;
   required uint32 replication = 6; // Short: Only 16 bits used
   required uint64 blockSize = 7;
-  //repeated CryptoProtocolVersionProto cryptoProtocolVersion = 8;
+  repeated CryptoProtocolVersionProto cryptoProtocolVersion = 8;
 
   //hopsfs
   optional EncodingPolicyProto policy = 9; // Policy used for erasure coding if required
@@ -911,5 +912,11 @@ service ClientNamenodeProtocol {
   rpc invCachesGroupRemoved (InvCachesGroupRemovedRequestProto) returns (InvCachesGroupRemovedResponseProto);
   rpc invCachesUserRemovedFromGroup (InvCachesUserRemovedFromGroupRequestProto) returns (InvCachesUserRemovedFromGroupResponseProto);
   rpc invCachesUserAddedToGroup (InvCachesUserAddedToGroupRequestProto) returns (InvCachesUserAddedToGroupResponseProto);
+  rpc createEncryptionZone(CreateEncryptionZoneRequestProto)
+      returns(CreateEncryptionZoneResponseProto);
+  rpc listEncryptionZones(ListEncryptionZonesRequestProto)
+      returns(ListEncryptionZonesResponseProto);
+  rpc getEZForPath(GetEZForPathRequestProto)
+      returns(GetEZForPathResponseProto);
 }
 

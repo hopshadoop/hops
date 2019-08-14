@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -49,15 +50,27 @@ import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_
  * <br>
  * SYSTEM - extended system attributes: these are used by the HDFS
  * core and are not available through admin/user API.
+ * <br>
+ * RAW - extended system attributes: these are used for internal system
+ *   attributes that sometimes need to be exposed. Like SYSTEM namespace
+ *   attributes they are not visible to the user except when getXAttr/getXAttrs
+ *   is called on a file or directory in the /.reserved/raw HDFS directory
+ *   hierarchy. These attributes can only be accessed by the superuser.
+ * </br>
  */
 @InterfaceAudience.Private
 public class XAttrPermissionFilter {
   
-  static void checkPermissionForApi(FSPermissionChecker pc, XAttr xAttr) 
+  static void checkPermissionForApi(FSPermissionChecker pc, XAttr xAttr,
+      boolean isRawPath)
       throws AccessControlException {
+    final boolean isSuperUser = pc.isSuperUser();
     if (xAttr.getNameSpace() == XAttr.NameSpace.USER || 
-        (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && 
-        pc.isSuperUser())) {
+        (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && isSuperUser)) {
+      return;
+    }
+    if (xAttr.getNameSpace() == XAttr.NameSpace.RAW &&
+        isRawPath && isSuperUser) {
       return;
     }
     if (XAttrHelper.getPrefixName(xAttr).
@@ -72,32 +85,36 @@ public class XAttrPermissionFilter {
     throw new AccessControlException("User doesn't have permission for xattr: "
         + XAttrHelper.getPrefixName(xAttr));
   }
-
+  
   static void checkPermissionForApi(FSPermissionChecker pc,
-                                    List<XAttr> xAttrs) throws AccessControlException {
+      List<XAttr> xAttrs, boolean isRawPath) throws AccessControlException {
     Preconditions.checkArgument(xAttrs != null);
     if (xAttrs.isEmpty()) {
       return;
     }
 
     for (XAttr xAttr : xAttrs) {
-      checkPermissionForApi(pc, xAttr);
+      checkPermissionForApi(pc, xAttr, isRawPath);
     }
   }
 
-  static List<XAttr> filterXAttrsForApi(FSPermissionChecker pc,
-      List<XAttr> xAttrs) {
+  static List<XAttr> filterXAttrsForApi(FSPermissionChecker pc, 
+      List<XAttr> xAttrs, boolean isRawPath) {
     assert xAttrs != null : "xAttrs can not be null";
     if (xAttrs == null || xAttrs.isEmpty()) {
       return xAttrs;
     }
     
     List<XAttr> filteredXAttrs = Lists.newArrayListWithCapacity(xAttrs.size());
+    final boolean isSuperUser = pc.isSuperUser();
     for (XAttr xAttr : xAttrs) {
       if (xAttr.getNameSpace() == XAttr.NameSpace.USER) {
         filteredXAttrs.add(xAttr);
       } else if (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && 
-          pc.isSuperUser()) {
+          isSuperUser) {
+        filteredXAttrs.add(xAttr);
+      } else if (xAttr.getNameSpace() == XAttr.NameSpace.RAW &&
+          isSuperUser && isRawPath) {
         filteredXAttrs.add(xAttr);
       }else if (XAttrHelper.getPrefixName(xAttr).
           equals(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER)) {

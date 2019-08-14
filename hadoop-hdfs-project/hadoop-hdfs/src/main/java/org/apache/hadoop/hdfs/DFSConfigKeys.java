@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdfs;
 
 import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
@@ -583,6 +584,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DATA_TRANSFER_PROTECTION_KEY = "dfs.data.transfer.protection";
   public static final String DFS_DATA_TRANSFER_PROTECTION_DEFAULT = "";
   public static final String DFS_DATA_TRANSFER_SASL_PROPS_RESOLVER_CLASS_KEY = "dfs.data.transfer.saslproperties.resolver.class";
+  public static final int    DFS_NAMENODE_LIST_ENCRYPTION_ZONES_NUM_RESPONSES_DEFAULT = 100;
+  public static final String DFS_NAMENODE_LIST_ENCRYPTION_ZONES_NUM_RESPONSES = "dfs.namenode.list.encryption.zones.num.responses";
+  public static final String DFS_ENCRYPTION_KEY_PROVIDER_URI = "dfs.encryption.key.provider.uri";
   
   // Hash bucket config
   public static final String DFS_NUM_BUCKETS_KEY = "dfs.blockreport.numbuckets";
@@ -688,6 +692,12 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean DFS_PIPELINE_ECN_ENABLED_DEFAULT = false;
 
   // Key Provider Cache Expiry
+  public static final String DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_MS =
+      "dfs.client.key.provider.cache.expiry";
+  // 10 days
+  public static final long DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
+      TimeUnit.DAYS.toMillis(10);
+  
   public static final String  DFS_DATANODE_BLOCK_PINNING_ENABLED = 
     "dfs.datanode.block-pinning.enabled";
   public static final boolean DFS_DATANODE_BLOCK_PINNING_ENABLED_DEFAULT =
@@ -968,9 +978,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_KEY =
       "dfs.client.slow.io.warning.threshold.ms";
   public static final long    DFS_CLIENT_SLOW_IO_WARNING_THRESHOLD_DEFAULT = 30000;
-  public static final long    DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
-      TimeUnit.DAYS.toMillis(10); // 10 days
-  
   //Availability zones
   public static final String  DFS_LOCATION_DOMAIN_ID = "dfs.locationDomainId";
   public static final byte    DFS_LOCATION_DOMAIN_ID_DEFAULT = 0;

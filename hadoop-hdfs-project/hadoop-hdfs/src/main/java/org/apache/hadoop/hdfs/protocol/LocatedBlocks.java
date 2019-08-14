@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -36,6 +37,7 @@ public class LocatedBlocks {
   private final boolean underConstruction;
   private final LocatedBlock lastLocatedBlock;
   private final boolean isLastBlockComplete;
+  private FileEncryptionInfo fileEncryptionInfo = null;
 
   public LocatedBlocks() {
     fileLength = 0;
@@ -45,17 +47,15 @@ public class LocatedBlocks {
     isLastBlockComplete = false;
   }
 
-  /**
-   * public Constructor
-   */
   public LocatedBlocks(long flength, boolean isUnderConstuction,
-      List<LocatedBlock> blks, LocatedBlock lastBlock,
-      boolean isLastBlockCompleted) {
+    List<LocatedBlock> blks, LocatedBlock lastBlock,
+    boolean isLastBlockCompleted, FileEncryptionInfo feInfo) {
     fileLength = flength;
     blocks = blks;
     underConstruction = isUnderConstuction;
     this.lastLocatedBlock = lastBlock;
     this.isLastBlockComplete = isLastBlockCompleted;
+    this.fileEncryptionInfo = feInfo;
   }
 
   public byte[] getDataStoredInDB() throws IOException {
@@ -127,11 +127,18 @@ public class LocatedBlocks {
   }
 
   /**
-   * Return ture if file was under construction when
-   * this LocatedBlocks was constructed, false otherwise.
+   * Return true if file was under construction when this LocatedBlocks was
+   * constructed, false otherwise.
    */
   public boolean isUnderConstruction() {
     return underConstruction;
+  }
+
+  /**
+   * @return the FileEncryptionInfo for the LocatedBlocks
+   */
+  public FileEncryptionInfo getFileEncryptionInfo() {
+    return fileEncryptionInfo;
   }
 
   /**

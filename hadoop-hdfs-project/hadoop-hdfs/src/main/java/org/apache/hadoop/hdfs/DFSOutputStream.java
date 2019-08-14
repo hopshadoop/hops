@@ -24,17 +24,20 @@ import java.nio.channels.ClosedChannelException;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.CanSetDropBehind;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSOutputSummer;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream.SyncFlag;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -45,6 +48,8 @@ import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
+import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
+import org.apache.hadoop.hdfs.server.namenode.RetryStartFileException;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.util.ByteArrayManager;
 import org.apache.hadoop.io.EnumSetWritable;
@@ -60,6 +65,7 @@ import io.hops.erasure_coding.Codec;
 import io.hops.exception.OutOfDBExtentsException;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import java.util.Collection;
+import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.StreamCapabilities;
@@ -87,6 +93,16 @@ public class DFSOutputStream extends FSOutputSummer
 
   public static final Log LOG = LogFactory.getLog(DFSOutputStream.class);
   
+  /**
+   * Number of times to retry creating a file when there are transient 
+   * errors (typically related to encryption zones and KeyProvider operations).
+   */
+  @VisibleForTesting
+  static final int CREATE_RETRY_COUNT = 10;
+  @VisibleForTesting
+  static CryptoProtocolVersion[] SUPPORTED_CRYPTO_VERSIONS =
+      CryptoProtocolVersion.supported();
+  
   protected final DFSClient dfsClient;
   protected final ByteArrayManager byteArrayManager;
   // closed is accessed by different threads under different locks.
@@ -106,6 +122,7 @@ public class DFSOutputStream extends FSOutputSummer
   private final short blockReplication; // replication factor of file
   protected boolean shouldSyncBlock = false; // force blocks to disk upon close
   protected final AtomicReference<CachingStrategy> cachingStrategy;
+  private FileEncryptionInfo fileEncryptionInfo;
   
   private boolean singleBlock = false;
   
@@ -163,6 +180,7 @@ public class DFSOutputStream extends FSOutputSummer
     this.fileId = stat.getFileId();
     this.blockSize = stat.getBlockSize();
     this.blockReplication = stat.getReplication();
+    this.fileEncryptionInfo = stat.getFileEncryptionInfo();
     this.cachingStrategy = new AtomicReference<CachingStrategy>(
         dfsClient.getDefaultWriteCachingStrategy());       
     if ((progress != null) && DFSClient.LOG.isDebugEnabled()) {
@@ -217,18 +235,44 @@ public class DFSOutputStream extends FSOutputSummer
     TraceScope scope =
       dfsClient.newPathTraceScope("newStreamForCreate", src);
     try{
-      final HdfsFileStatus stat;
+      HdfsFileStatus stat = null;
+
+      // Retry the create if we get a RetryStartFileException up to a maximum
+      // number of times
+      boolean shouldRetry = true;
+      int retryCount = CREATE_RETRY_COUNT;
+      while (shouldRetry) {
+        shouldRetry = false;
         try {
           stat = dfsClient.namenode.create(src, masked, dfsClient.clientName,
               new EnumSetWritable<CreateFlag>(flag), createParent, replication,
-              blockSize, policy);
+              blockSize, SUPPORTED_CRYPTO_VERSIONS, policy);
+          break;
         } catch (RemoteException re) {
-          throw re.unwrapRemoteException(AccessControlException.class,
-            DSQuotaExceededException.class, FileAlreadyExistsException.class,
-            FileNotFoundException.class, ParentNotDirectoryException.class,
-            NSQuotaExceededException.class, SafeModeException.class,
-            UnresolvedPathException.class);
+          IOException e = re.unwrapRemoteException(
+              AccessControlException.class,
+              DSQuotaExceededException.class,
+              FileAlreadyExistsException.class,
+              FileNotFoundException.class,
+              ParentNotDirectoryException.class,
+              NSQuotaExceededException.class,
+              RetryStartFileException.class,
+              SafeModeException.class,
+              UnresolvedPathException.class,
+              UnknownCryptoProtocolVersionException.class);
+          if (e instanceof RetryStartFileException) {
+            if (retryCount > 0) {
+              shouldRetry = true;
+              retryCount--;
+            } else {
+              throw new IOException("Too many retries because of encryption" + " zone operations", e);
+            }
+          } else {
+            throw e;
+          }
         }
+      }
+      Preconditions.checkNotNull(stat, "HdfsFileStatus should not be null!");
       final DFSOutputStream out = new DFSOutputStream(dfsClient, src, stat,
           flag, progress, checksum, favoredNodes, policy, dbFileMaxSize, forceClientToWriteSFToDisk);
       out.start();
@@ -238,16 +282,6 @@ public class DFSOutputStream extends FSOutputSummer
     }
   }
 
-  static DFSOutputStream newStreamForCreate(DFSClient dfsClient, String src,
-                                            FsPermission masked, EnumSet<CreateFlag> flag, boolean createParent,
-                                            short replication, long blockSize, Progressable progress, int buffersize,
-                                            DataChecksum checksum, final int dbFileMaxSize,
-                                            boolean forceClientToWriteSFToDisk) throws IOException {
-    return newStreamForCreate(dfsClient, src, masked, flag, createParent,
-            replication, blockSize, progress, buffersize, checksum, null, null,
-            dbFileMaxSize, forceClientToWriteSFToDisk);
-  }
-  
   /** Construct a new output stream for append. */
   private DFSOutputStream(DFSClient dfsClient, String src,
       EnumSet<CreateFlag> flags, Progressable progress, LocatedBlock lastBlock,
@@ -283,6 +317,7 @@ public class DFSOutputStream extends FSOutputSummer
       }
     }
     streamer.setFileStoredInDB(stat.isFileStoredInDB());
+    this.fileEncryptionInfo = stat.getFileEncryptionInfo();
   }
 
   private void adjustPacketChunkSize(HdfsFileStatus stat) throws IOException{
@@ -957,6 +992,13 @@ public class DFSOutputStream extends FSOutputSummer
    */
   public long getInitialLen() {
     return initialFileSize;
+  }
+
+  /**
+   * @return the FileEncryptionInfo for this stream, or null if not encrypted.
+   */
+  public FileEncryptionInfo getFileEncryptionInfo() {
+    return fileEncryptionInfo;
   }
 
   /**

@@ -33,7 +33,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.collect.Maps;
-import org.junit.Ignore;
 
 /**
  * Tests distcp in combination with HDFS raw.* XAttrs.
@@ -77,7 +76,6 @@ public class TestDistCpWithRawXAttrs {
   }
 
   /* Test that XAttrs and raw.* XAttrs are preserved when appropriate. */
-  @Ignore //until we add raw to hopsfs
   @Test
   public void testPreserveRawXAttrs1() throws Exception {
     final String relSrc = "/./.reserved/../.reserved/raw/../raw/src/../src";
@@ -96,20 +94,17 @@ public class TestDistCpWithRawXAttrs {
   }
 
   /* Test that XAttrs are not preserved and raw.* are when appropriate. */
-  @Ignore //until we add raw to hopsfs
   @Test
   public void testPreserveRawXAttrs2() throws Exception {
     doTestStandardPreserveRawXAttrs("-p", false);
   }
 
   /* Test that XAttrs are not preserved and raw.* are when appropriate. */
-  @Ignore //until we add raw to hopsfs
   @Test
   public void testPreserveRawXAttrs3() throws Exception {
     doTestStandardPreserveRawXAttrs(null, false);
   }
 
-  @Ignore //until we add raw to hopsfs
   @Test
   public void testPreserveRawXAttrs4() throws Exception {
     doTestStandardPreserveRawXAttrs("-update -delete", false);

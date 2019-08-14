@@ -1005,7 +1005,7 @@ public class TestINodeFile {
       final Path dir = new Path("/dir");
       hdfs.mkdirs(dir);
       INode dirNode = getINode(dir.toString(), fsdir, cluster);
-      INode dirNodeFromNode = fsdir.getInode(dirNode.getId());
+      INode dirNodeFromNode = fsdir.getInodeTX(dirNode.getId());
       assertEquals(dirNode, dirNodeFromNode);
 
       // set quota to dir, which leads to node replacement
@@ -1014,14 +1014,14 @@ public class TestINodeFile {
       assertTrue(dirNode instanceof INodeDirectory);
       assertTrue(((INodeDirectory) dirNode).isWithQuota());
       // the inode in inodeMap should also be replaced
-      dirNodeFromNode = fsdir.getInode(dirNode.getId());
+      dirNodeFromNode = fsdir.getInodeTX(dirNode.getId());
       assertEquals(dirNode, dirNodeFromNode);
 
       hdfs.setQuota(dir, -1, -1);
       dirNode = getINode(dir.toString(), fsdir, cluster);
       assertTrue(dirNode instanceof INodeDirectory);
       // the inode in inodeMap should also be replaced
-      dirNodeFromNode = fsdir.getInode(dirNode.getId());
+      dirNodeFromNode = fsdir.getInodeTX(dirNode.getId());
       assertEquals(dirNode, dirNodeFromNode);
     } finally {
       if (cluster != null) {

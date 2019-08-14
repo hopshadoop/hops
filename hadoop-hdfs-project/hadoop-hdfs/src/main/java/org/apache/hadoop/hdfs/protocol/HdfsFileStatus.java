@@ -19,12 +19,12 @@ package org.apache.hadoop.hdfs.protocol;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 
-import java.io.IOException;
 import java.net.URI;
 
 /**
@@ -47,6 +47,8 @@ public class HdfsFileStatus {
   private String group;
   private long fileId;
   
+  private final FileEncryptionInfo feInfo;
+  
   // Used by dir, not including dot and dotdot. Always zero for a regular file.
   private int childrenNum;
   
@@ -58,33 +60,24 @@ public class HdfsFileStatus {
   /**
    * Constructor
    *
-   * @param length
-   *     the number of bytes the file has
-   * @param isdir
-   *     if the path is a directory
-   * @param block_replication
-   *     the replication factor
-   * @param blocksize
-   *     the block size
-   * @param modification_time
-   *     modification time
-   * @param access_time
-   *     access time
-   * @param permission
-   *     permission
-   * @param owner
-   *     the owner of the path
-   * @param group
-   *     the group of the path
-   * @param path
-   *     the local name in java UTF8 encoding the same as that in-memory
-   * @param fileid
-   *    the inode id of the file
+   * @param length the number of bytes the file has
+   * @param isdir if the path is a directory
+   * @param block_replication the replication factor
+   * @param blocksize the block size
+   * @param modification_time modification time
+   * @param access_time access time
+   * @param permission permission
+   * @param owner the owner of the path
+   * @param group the group of the path
+   * @param path the local name in java UTF8 encoding the same as that in-memory
+   * @param fileid the inode id of the file
+   * @param feInfo the file's encryption info
    */
   public HdfsFileStatus(long length, boolean isdir, int block_replication,
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
-      byte[] path, long fileId, int childrenNum, boolean isFileStoredInDB, byte storagePolicy) {
+      byte[] path, long fileId, int childrenNum, FileEncryptionInfo feInfo, 
+      boolean isFileStoredInDB, byte storagePolicy) {
     this.length = length;
     this.isdir = isdir;
     this.block_replication = (short) block_replication;
@@ -102,6 +95,7 @@ public class HdfsFileStatus {
     this.isFileStoredInDB = isFileStoredInDB;
     this.storagePolicy = storagePolicy;
     this.childrenNum = childrenNum;
+    this.feInfo = feInfo;
   }
 
   /**
@@ -274,6 +268,10 @@ public class HdfsFileStatus {
     return fileId; 
   }
   
+  public final FileEncryptionInfo getFileEncryptionInfo() {
+    return feInfo;
+  }
+
   public final int getChildrenNum() {
     return childrenNum;
   }

@@ -27,6 +27,10 @@ import static org.apache.hadoop.util.Time.now;
 
 import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
+import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
@@ -52,6 +56,7 @@ import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
@@ -507,7 +512,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
-      short replication, long blockSize) throws IOException {
+      short replication, long blockSize,
+          CryptoProtocolVersion[] supportedVersions) throws IOException {
     checkNNStartup();
     String clientMachine = getClientMachine();
     if (stateChangeLog.isDebugEnabled()) {
@@ -523,7 +529,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     HdfsFileStatus stat = namesystem.startFile(src, new PermissionStatus(
             getRemoteUser().getShortUserName(), null,
             masked), clientName, clientMachine, flag.get(), createParent,
-        replication, blockSize);
+        replication, blockSize, supportedVersions);
     metrics.incrFilesCreated();
     metrics.incrCreateFileOps();
     return stat;
@@ -1352,12 +1358,12 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag, boolean createParent,
-      short replication, long blockSize, EncodingPolicy policy)
+      short replication, long blockSize, CryptoProtocolVersion[] supportedVersions, EncodingPolicy policy)
       throws IOException {
     checkNNStartup();
     HdfsFileStatus stat =
         create(src, masked, clientName, flag, createParent, replication,
-            blockSize);
+            blockSize, supportedVersions);
     if (policy != null) {
       if (!namesystem.isErasureCodingEnabled()) {
         throw new IOException("Requesting encoding although erasure coding" +
@@ -1638,6 +1644,24 @@ class NameNodeRpcServer implements NamenodeProtocols {
     nn.tracerConfigurationManager.removeSpanReceiver(id);
   }
   
+  @Override
+  public void createEncryptionZone(String src, String keyName)
+    throws IOException {
+    namesystem.createEncryptionZone(src, keyName);
+  }
+
+  @Override
+  public EncryptionZone getEZForPath(String src)
+    throws IOException {
+    return namesystem.getEZForPath(src);
+  }
+
+  @Override
+  public BatchedEntries<EncryptionZone> listEncryptionZones(
+      long prevId) throws IOException {
+    return namesystem.listEncryptionZones(prevId);
+  }
+
   @Override
   public void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag)
       throws IOException {

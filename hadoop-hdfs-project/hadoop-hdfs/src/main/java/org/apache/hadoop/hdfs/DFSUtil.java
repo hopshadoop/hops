@@ -62,6 +62,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
@@ -1298,6 +1301,61 @@ public class DFSUtil {
           + ": unknown time unit " + relTime.charAt(relTime.length() - 1));
     }
     return ttl*1000;
+  }
+
+  /**
+   * Creates a new KeyProvider from the given Configuration.
+   *
+   * @param conf Configuration
+   * @return new KeyProvider, or null if no provider was found.
+   * @throws IOException if the KeyProvider is improperly specified in
+   *                             the Configuration
+   */
+  public static KeyProvider createKeyProvider(
+      final Configuration conf) throws IOException {
+    final String providerUriStr =
+        conf.get(DFSConfigKeys.DFS_ENCRYPTION_KEY_PROVIDER_URI, null);
+    // No provider set in conf
+    if (providerUriStr == null) {
+      return null;
+    }
+    final URI providerUri;
+    try {
+      providerUri = new URI(providerUriStr);
+    } catch (URISyntaxException e) {
+      throw new IOException(e);
+    }
+    KeyProvider keyProvider = KeyProviderFactory.get(providerUri, conf);
+    if (keyProvider == null) {
+      throw new IOException("Could not instantiate KeyProvider from " + 
+          DFSConfigKeys.DFS_ENCRYPTION_KEY_PROVIDER_URI + " setting of '" + 
+          providerUriStr +"'");
+    }
+    if (keyProvider.isTransient()) {
+      throw new IOException("KeyProvider " + keyProvider.toString()
+          + " was found but it is a transient provider.");
+    }
+    return keyProvider;
+  }
+
+  /**
+   * Creates a new KeyProviderCryptoExtension by wrapping the
+   * KeyProvider specified in the given Configuration.
+   *
+   * @param conf Configuration
+   * @return new KeyProviderCryptoExtension, or null if no provider was found.
+   * @throws IOException if the KeyProvider is improperly specified in
+   *                             the Configuration
+   */
+  public static KeyProviderCryptoExtension createKeyProviderCryptoExtension(
+      final Configuration conf) throws IOException {
+    KeyProvider keyProvider = createKeyProvider(conf);
+    if (keyProvider == null) {
+      return null;
+    }
+    KeyProviderCryptoExtension cryptoProvider = KeyProviderCryptoExtension
+        .createKeyProviderCryptoExtension(keyProvider);
+    return cryptoProvider;
   }
 }
 

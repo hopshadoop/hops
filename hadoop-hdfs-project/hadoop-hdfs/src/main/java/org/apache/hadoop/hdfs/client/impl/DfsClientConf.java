@@ -546,7 +546,7 @@ public class DfsClientConf {
     private final long shortCircuitMmapCacheRetryTimeout;
     private final long shortCircuitCacheStaleThresholdMs;
 
-//    private final long keyProviderCacheExpiryMs;
+    private final long keyProviderCacheExpiryMs;
 
     @VisibleForTesting
     public BlockReaderFactory.FailureInjector brfFailureInjector =
@@ -618,9 +618,9 @@ public class DfsClientConf {
           DFSConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS,
           DFSConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS_DEFAULT);
 
-//      keyProviderCacheExpiryMs = conf.getLong(
-//          DFSConfigKeys.DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_MS,
-//          DFSConfigKeys.DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT);
+      keyProviderCacheExpiryMs = conf.getLong(
+          DFSConfigKeys.DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_MS,
+          DFSConfigKeys.DFS_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT);
     }
 
     /**
@@ -732,9 +732,9 @@ public class DfsClientConf {
     /**
      * @return the keyProviderCacheExpiryMs
      */
-//    public long getKeyProviderCacheExpiryMs() {
-//      return keyProviderCacheExpiryMs;
-//    }
+    public long getKeyProviderCacheExpiryMs() {
+      return keyProviderCacheExpiryMs;
+    }
 
     public String confAsString() {
       StringBuilder builder = new StringBuilder();
@@ -761,9 +761,9 @@ public class DfsClientConf {
         append(", domainSocketDataTraffic = ").
         append(domainSocketDataTraffic).
         append(", shortCircuitSharedMemoryWatcherInterruptCheckMs = ").
-        append(shortCircuitSharedMemoryWatcherInterruptCheckMs);
-//        append(", keyProviderCacheExpiryMs = ").
-//        append(keyProviderCacheExpiryMs);
+        append(shortCircuitSharedMemoryWatcherInterruptCheckMs).
+        append(", keyProviderCacheExpiryMs = ").
+        append(keyProviderCacheExpiryMs);
 
       return builder.toString();
     }

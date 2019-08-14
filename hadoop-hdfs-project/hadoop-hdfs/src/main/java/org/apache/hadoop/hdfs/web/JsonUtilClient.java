@@ -54,7 +54,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdfs.protocol.FsAclPermission;
+import org.apache.hadoop.hdfs.protocol.FsPermissionExtension;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 class JsonUtilClient {
@@ -92,7 +92,13 @@ class JsonUtilClient {
   static FsPermission toFsPermission(
       final String s, Boolean aclBit, Boolean encBit) {
     FsPermission perm = new FsPermission(Short.parseShort(s, 8));
-    return (aclBit != null && aclBit) ? new FsAclPermission(perm) : perm;
+    final boolean aBit = (aclBit != null) ? aclBit : false;
+    final boolean eBit = (encBit != null) ? encBit : false;
+    if (aBit || eBit) {
+      return new FsPermissionExtension(perm, aBit, eBit);
+    } else {
+      return perm;
+    }
   }
 
   /** Convert a Json map to a HdfsFileStatus object. */
@@ -127,7 +133,7 @@ class JsonUtilClient {
         BlockStoragePolicySuite.ID_UNSPECIFIED;
     return new HdfsFileStatus(len, type == WebHdfsConstants.PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group,
-        symlink, DFSUtil.string2Bytes(localName), fileId, childrenNum, isFileStoredInDB, 
+        symlink, DFSUtil.string2Bytes(localName), fileId, childrenNum, null, isFileStoredInDB, 
         storagePolicy);
   }
 
@@ -474,7 +480,7 @@ class JsonUtilClient {
         (Map<?, ?>) m.get("lastLocatedBlock"));
     final boolean isLastBlockComplete = (Boolean)m.get("isLastBlockComplete");
     return new LocatedBlocks(fileLength, isUnderConstruction, locatedBlocks,
-        lastLocatedBlock, isLastBlockComplete);
+        lastLocatedBlock, isLastBlockComplete, null);
   }
 
 }

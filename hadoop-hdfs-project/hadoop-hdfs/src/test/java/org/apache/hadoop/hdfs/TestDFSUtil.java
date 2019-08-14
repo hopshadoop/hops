@@ -29,6 +29,7 @@ import static org.junit.Assert.assertArrayEquals;
 import java.io.File;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -84,7 +85,7 @@ public class TestDFSUtil {
     l2.setCorrupt(true);
 
     List<LocatedBlock> ls = Arrays.asList(l1, l2);
-    LocatedBlocks lbs = new LocatedBlocks(10, false, ls, l2, true);
+    LocatedBlocks lbs = new LocatedBlocks(10, false, ls, l2, true, null);
 
     BlockLocation[] bs = DFSUtil.locatedBlocks2Locations(lbs);
 
@@ -219,8 +220,9 @@ public class TestDFSUtil {
         "target/test-dir"));
 
     Configuration conf = new Configuration();
+    final Path jksPath = new Path(testDir.toString(), "test.jks");
     final String ourUrl =
-    JavaKeyStoreProvider.SCHEME_NAME + "://file/" + testDir + "/test.jks";
+    JavaKeyStoreProvider.SCHEME_NAME + "://file" + jksPath.toUri();
 
     File file = new File(testDir, "test.jks");
     file.delete();

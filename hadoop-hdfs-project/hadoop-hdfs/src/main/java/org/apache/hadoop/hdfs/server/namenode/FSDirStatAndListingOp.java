@@ -24,6 +24,7 @@ import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.LockFactory.BLK;
+import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -46,17 +47,18 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.hadoop.hdfs.protocol.FsAclPermission;
+import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdfs.protocol.FsPermissionExtension;
 
 class FSDirStatAndListingOp {
   static DirectoryListing getListingInt(
       final FSDirectory fsd, final String srcArg, byte[] startAfterArg,
       final boolean needLocation)
     throws IOException {
-    
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     String startAfterString = new String(startAfterArg, Charsets.UTF_8);
-    final String src = fsd.resolvePath(srcArg, pathComponents);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
 
     // Get file name when startAfter is an INodePath
     if (FSDirectory.isReservedName(startAfterString)) {
@@ -89,11 +91,12 @@ class FSDirStatAndListingOp {
           locks.add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
         }
         locks.add(lf.getAcesLock());
+        locks.add(lf.getEZLock());
+        locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO, src));
       }
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         final INodesInPath iip = fsd.getINodesInPath(src, true);
         final boolean isSuperUser = pc.isSuperUser();
         if (fsd.isPermissionEnabled()) {
@@ -104,7 +107,7 @@ class FSDirStatAndListingOp {
           }
         }
 
-        return getListing(fsd, iip, src, startAfter, needLocation, isSuperUser);
+        return getListing(fsd, iip, srcArg, src, startAfter, needLocation, isSuperUser);
       }
     };
     return (DirectoryListing) getListingHandler.handle();
@@ -121,13 +124,14 @@ class FSDirStatAndListingOp {
    *         or null if file not found
    */
   static HdfsFileStatus getFileInfo(
-      final FSDirectory fsd, String srcArg, final boolean resolveLink)
+      final FSDirectory fsd, final String srcArg, final boolean resolveLink)
       throws IOException {
     if (!DFSUtil.isValidName(srcArg)) {
       throw new InvalidPathException("Invalid file name: " + srcArg);
     }
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents, fsd);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (HdfsFileStatus) new HopsTransactionalRequestHandler(HDFSOperationType.GET_FILE_INFO,
             src) {
           @Override
@@ -139,19 +143,20 @@ class FSDirStatAndListingOp {
                     .skipReadingQuotaAttr(true);
             locks.add(il);
             locks.add(lf.getAcesLock());
+            locks.add(lf.getEZLock());
+            locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
           }
 
           @Override
           public Object performTask() throws IOException {
             HdfsFileStatus stat;
-            FSPermissionChecker pc = fsd.getPermissionChecker();
             final INodesInPath iip = fsd.getINodesInPath(src, resolveLink);
             boolean isSuperUser = true;
             if (fsd.isPermissionEnabled()) {
               fsd.checkPermission(pc, iip, false, null, null, null, null, false);
               isSuperUser = pc.isSuperUser();
             }
-            return getFileInfo(fsd, src, resolveLink, isSuperUser);
+            return getFileInfo(fsd, src, resolveLink, FSDirectory.isReservedRawName(srcArg), isSuperUser);
           }
         }.handle();
   }
@@ -160,9 +165,9 @@ class FSDirStatAndListingOp {
    * Returns true if the file is closed
    */
   static boolean isFileClosed(final FSDirectory fsd, String srcArg) throws IOException {
-    
+    final FSPermissionChecker pc = fsd.getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final String src = fsd.resolvePath(srcArg, pathComponents, fsd);
+    final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (boolean) new HopsTransactionalRequestHandler(
         HDFSOperationType.GET_FILE_INFO,
         src) {
@@ -177,7 +182,6 @@ class FSDirStatAndListingOp {
 
       @Override
       public Object performTask() throws IOException {
-        FSPermissionChecker pc = fsd.getPermissionChecker();
         final INodesInPath iip = fsd.getINodesInPath(src, true);
         if (fsd.isPermissionEnabled()) {
           fsd.checkTraverse(pc, iip);
@@ -215,10 +219,11 @@ class FSDirStatAndListingOp {
    * @return a partial listing starting after startAfter
    */
   private static DirectoryListing getListing(FSDirectory fsd, INodesInPath iip,
-      String src, byte[] startAfter, boolean needLocation,boolean isSuperUser)
+      String srcArg, String src, byte[] startAfter, boolean needLocation,boolean isSuperUser)
       throws IOException {
     String srcs = FSDirectory.normalizePath(src);
-
+    final boolean isRawPath = fsd.isReservedRawName(srcArg);
+    
       final INode targetNode = iip.getLastINode();
       if (targetNode == null)
         return null;
@@ -229,8 +234,8 @@ class FSDirStatAndListingOp {
       if (!targetNode.isDirectory()) {
         return new DirectoryListing(
             new HdfsFileStatus[]{createFileStatus(fsd,
-                HdfsFileStatus.EMPTY_NAME, targetNode, needLocation,
-                parentStoragePolicy, iip)}, 0);
+                HdfsFileStatus.EMPTY_NAME, targetNode, needLocation, 
+                parentStoragePolicy, isRawPath, iip)}, 0);
       }
 
       final INodeDirectory dirInode = targetNode.asDirectory();
@@ -248,7 +253,7 @@ class FSDirStatAndListingOp {
             cur.getLocalStoragePolicyID():
             BlockStoragePolicySuite.ID_UNSPECIFIED;
         listing[i] = createFileStatus(fsd, cur.getLocalNameBytes(), cur,
-            needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy), iip);
+            needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy), isRawPath, iip);
         listingCnt++;
         if (needLocation) {
             // Once we  hit lsLimit locations, stop.
@@ -276,7 +281,7 @@ class FSDirStatAndListingOp {
    *         or null if file not found
    */
   static HdfsFileStatus getFileInfo(
-      FSDirectory fsd, INodesInPath src,
+      FSDirectory fsd, INodesInPath src, boolean isRawPath,
       boolean includeStoragePolicy)
       throws IOException {
 
@@ -284,17 +289,17 @@ class FSDirStatAndListingOp {
     byte policyId = includeStoragePolicy && i != null && !i.isSymlink() ? i.getStoragePolicyID()
         : BlockStoragePolicySuite.ID_UNSPECIFIED;
     return i == null ? null : createFileStatus(
-        fsd, HdfsFileStatus.EMPTY_NAME, i, policyId,
+        fsd, HdfsFileStatus.EMPTY_NAME, i, policyId, isRawPath,
         src);
   }
   
   static HdfsFileStatus getFileInfo(
-      FSDirectory fsd, String src, boolean resolveLink,
+      FSDirectory fsd, String src, boolean resolveLink, boolean isRawPath,
       boolean includeStoragePolicy)
     throws IOException {
     String srcs = FSDirectory.normalizePath(src);
     final INodesInPath iip = fsd.getINodesInPath(srcs, resolveLink);
-    return getFileInfo(fsd, iip, includeStoragePolicy);
+    return getFileInfo(fsd, iip, isRawPath, includeStoragePolicy);
   }
 
   /**
@@ -311,12 +316,12 @@ class FSDirStatAndListingOp {
    */
   static HdfsFileStatus createFileStatus(
       FSDirectory fsd, byte[] path, INode node, boolean needLocation,
-      byte storagePolicy, INodesInPath iip)
+      byte storagePolicy, boolean isRawPath, INodesInPath iip)
       throws IOException {
     if (needLocation) {
-      return createLocatedFileStatus(fsd, path, node, storagePolicy, iip);
+      return createLocatedFileStatus(fsd, path, node, storagePolicy, isRawPath, iip);
     } else {
-      return createFileStatus(fsd, path, node, storagePolicy, iip);
+      return createFileStatus(fsd, path, node, storagePolicy, isRawPath, iip);
     }
   }
 
@@ -324,11 +329,16 @@ class FSDirStatAndListingOp {
    * Create FileStatus by file INode
    */
   static HdfsFileStatus createFileStatus(
-      FSDirectory fsd, byte[] path, INode node, byte storagePolicy, INodesInPath iip) throws IOException {
+      FSDirectory fsd, byte[] path, INode node, byte storagePolicy, boolean isRawPath, INodesInPath iip) throws
+      IOException {
      long size = 0;     // length is zero for directories
      short replication = 0;
      long blocksize = 0;
      boolean isStoredInDB = false;
+     final boolean isEncrypted;
+
+     final FileEncryptionInfo feInfo = isRawPath ? null :
+         fsd.getFileEncryptionInfo(node, iip);
      
      if (node.isFile()) {
        final INodeFile fileNode = node.asFile();
@@ -336,7 +346,11 @@ class FSDirStatAndListingOp {
        size = fileNode.getSize();
        replication = fileNode.getBlockReplication();
        blocksize = fileNode.getPreferredBlockSize();
-     } 
+       isEncrypted = (feInfo != null) ||
+           (isRawPath && fsd.isInAnEZ(INodesInPath.fromINode(node)));
+     } else {
+       isEncrypted = fsd.isInAnEZ(INodesInPath.fromINode(node));
+     }
 
      int childrenNum = node.isDirectory() ?
          node.asDirectory().getChildrenNum() : 0;
@@ -348,13 +362,14 @@ class FSDirStatAndListingOp {
         blocksize,
         node.getModificationTime(),
         node.getAccessTime(),
-        getPermissionForFileStatus(node),
+        getPermissionForFileStatus(node, isEncrypted),
         node.getUserName(),
         node.getGroupName(),
         node.isSymlink() ? node.asSymlink().getSymlink() : null,
         path,
         node.getId(),
         childrenNum,
+        feInfo,
         isStoredInDB,
         storagePolicy);
   }
@@ -363,13 +378,16 @@ class FSDirStatAndListingOp {
    * Create FileStatus with location info by file INode
    */
   private static HdfsLocatedFileStatus createLocatedFileStatus(
-      FSDirectory fsd, byte[] path, INode node, byte storagePolicy,
+      FSDirectory fsd, byte[] path, INode node, byte storagePolicy, boolean isRawPath,
       INodesInPath iip) throws IOException {
     long size = 0; // length is zero for directories
     short replication = 0;
     long blocksize = 0;
     LocatedBlocks loc = null;
     boolean isStoredInDB = false;
+    final boolean isEncrypted;
+    final FileEncryptionInfo feInfo = isRawPath ? null :
+        fsd.getFileEncryptionInfo(node, iip);
     if (node.isFile()) {
       final INodeFile fileNode = node.asFile();
       isStoredInDB = fileNode.isFileStoredInDB();     
@@ -386,15 +404,19 @@ class FSDirStatAndListingOp {
           fileNode.computeFileSizeNotIncludingLastUcBlock() : size;
 
       if (isStoredInDB) {
-        loc = fsd.getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,isUc,false);
+        loc = fsd.getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,isUc,false, feInfo);
       } else {
-      loc = fsd.getFSNamesystem().getBlockManager().createLocatedBlocks(
-          fileNode.getBlocks(), fileSize, isUc, 0L, size, false);
+        loc = fsd.getFSNamesystem().getBlockManager().createLocatedBlocks(
+          fileNode.getBlocks(), fileSize, isUc, 0L, size, false, feInfo);
       }
       if (loc == null) {
         loc = new LocatedBlocks();
       }
-    } 
+      isEncrypted = (feInfo != null) ||
+          (isRawPath && fsd.isInAnEZ(INodesInPath.fromINode(node)));
+    } else {
+      isEncrypted = fsd.isInAnEZ(INodesInPath.fromINode(node));
+    }
     int childrenNum = node.isDirectory() ?
         node.asDirectory().getChildrenNum() : 0;
 
@@ -402,10 +424,10 @@ class FSDirStatAndListingOp {
         new HdfsLocatedFileStatus(size, node.isDirectory(), replication,
           blocksize, node.getModificationTime(),
           node.getAccessTime(),
-          getPermissionForFileStatus(node),
+          getPermissionForFileStatus(node, isEncrypted),
           node.getUserName(), node.getGroupName(),
           node.isSymlink() ? node.asSymlink().getSymlink() : null, path,
-          node.getId(), loc, childrenNum, isStoredInDB, storagePolicy);
+          node.getId(), loc, childrenNum, feInfo, isStoredInDB, storagePolicy);
     // Set caching information for the located blocks.
     if (loc != null) {
       CacheManager cacheManager = fsd.getFSNamesystem().getCacheManager();
@@ -422,26 +444,25 @@ class FSDirStatAndListingOp {
    * return an FsPermissionExtension.
    *
    * @param node INode to check
-   * @param snapshot int snapshot ID
    * @param isEncrypted boolean true if the file/dir is encrypted
    * @return FsPermission from inode, with ACL bit on if the inode has an ACL
    * and encrypted bit on if it represents an encrypted file/dir.
    */
   private static FsPermission getPermissionForFileStatus(
-      INode node) throws IOException {
+      INode node, boolean isEncrypted) throws IOException {
     FsPermission perm = node.getFsPermission();
     boolean hasAcl = node.getAclFeature() != null;
-    if (hasAcl) {
-      perm = new FsAclPermission(perm);
+    if (hasAcl || isEncrypted) {
+      perm = new FsPermissionExtension(perm, hasAcl, isEncrypted);
     }
     return perm;
   }
 
   private static ContentSummary getContentSummaryInt(FSDirectory fsd, 
       String src) throws IOException {
-
+    
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
-    src = fsd.resolvePath(src, pathComponents, fsd);
+    src = fsd.resolvePath(fsd.getPermissionChecker(), src, pathComponents);
     PathInformation pathInfo = fsd.getFSNamesystem().getPathExistingINodesFromDB(src,
         false, null, null, null, null);
     if (pathInfo.getINodesInPath().getLastINode() == null) {

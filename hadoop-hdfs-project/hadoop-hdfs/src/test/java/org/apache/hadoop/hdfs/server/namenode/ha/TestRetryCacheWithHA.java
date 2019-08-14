@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -147,7 +148,7 @@ public class TestRetryCacheWithHA {
     abstract Object getResult();
   }
 
-
+  
   /** addCacheDirective */
   class AddCacheDirectiveInfoOp extends AtMostOnceOp {
     private CacheDirectiveInfo directive;

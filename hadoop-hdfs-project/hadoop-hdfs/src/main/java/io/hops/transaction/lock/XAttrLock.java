@@ -17,6 +17,8 @@
  */
 package io.hops.transaction.lock;
 
+import io.hops.exception.StorageException;
+import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.StoredXAttr;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
@@ -31,44 +33,64 @@ import java.util.List;
 public class XAttrLock extends Lock{
   
   private final List<XAttr> attrs;
+  private final String path;
   
   public XAttrLock(List<XAttr> attrs){
+    this(attrs, null);
+  }
+  
+  public XAttrLock(List<XAttr> attrs, String path){
     this.attrs = attrs;
+    this.path = path;
   }
   
   public XAttrLock(XAttr attr){
+    this(attr, null);
+  }
+  
+  public XAttrLock(XAttr attr, String path){
     if(attr != null) {
       this.attrs = new ArrayList<>();
       this.attrs.add(attr);
     }else{
       this.attrs = null;
     }
+    this.path = path;
   }
   
   public XAttrLock(){
     this.attrs = null;
+    this.path = null;
   }
   
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     BaseINodeLock inodeLock = (BaseINodeLock) locks.getLock(Type.INode);
     for(INode inode : inodeLock.getTargetINodes()){
-      
-      if(attrs == null || attrs.isEmpty()) {
+      acquire(inode);
+    }
+    if(path!=null){
+      for(INode inode: inodeLock.getChildINodes(path)){
+        acquire(inode);
+      }
+    }
+  }
+  
+  private void acquire(INode inode) throws TransactionContextException, StorageException{
+    if(attrs == null || attrs.isEmpty()) {
         //read all xattrs
         //Skip if the inode doesn't have any xattrs
         if(!inode.hasXAttrs()){
           EntityManager.snapshotMaintenance
               (HdfsTransactionContextMaintenanceCmds.NoXAttrsAttached,
                   inode.getId());
-          continue;
+          return;
         }
         acquireLockList(DEFAULT_LOCK_TYPE, StoredXAttr.Finder.ByInodeId, inode.getId());
       }else{
         acquireLockList(DEFAULT_LOCK_TYPE, StoredXAttr.Finder.ByPrimaryKeyBatch,
             XAttrFeature.getPrimaryKeys(inode.getId(), attrs));
       }
-    }
   }
   
   @Override

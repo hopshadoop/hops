@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -34,9 +35,18 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
+import static org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.CRYPTO_XATTR_ENCRYPTION_ZONE;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.CRYPTO_XATTR_FILE_ENCRYPTION_INFO;
+
+import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.UnresolvedLinkException;
@@ -47,12 +57,15 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.MaxDirectoryItemsExceededException;
 import org.apache.hadoop.hdfs.protocol.FSLimitException.PathComponentTooLongException;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
+import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
@@ -77,7 +90,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-
 import org.apache.commons.io.Charsets;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
@@ -107,10 +119,12 @@ public class FSDirectory implements Closeable {
       + DOT_RESERVED_STRING;
   public final static byte[] DOT_RESERVED = 
       DFSUtil.string2Bytes(DOT_RESERVED_STRING);
+  private final static String RAW_STRING = "raw";
+  private final static byte[] RAW = DFSUtil.string2Bytes(RAW_STRING);
   public final static String DOT_INODES_STRING = ".inodes";
   public final static byte[] DOT_INODES = 
       DFSUtil.string2Bytes(DOT_INODES_STRING);
-  
+
   private final FSNamesystem namesystem;
   private final int maxComponentLength;
   private final int maxDirItems;
@@ -144,6 +158,9 @@ public class FSDirectory implements Closeable {
   private final String supergroup;
 
 
+
+  @VisibleForTesting
+  public final EncryptionZoneManager ezManager;
 
   /**
    * Caches frequently used file names used in {@link INode} to reuse
@@ -246,6 +263,7 @@ public class FSDirectory implements Closeable {
         .info("Caching file names occuring more than " + threshold + " times");
     nameCache = new NameCache<>(threshold);
     
+    ezManager = new EncryptionZoneManager(this, conf);
   }
 
   public FSNamesystem getFSNamesystem() {
@@ -426,8 +444,11 @@ public class FSDirectory implements Closeable {
    * @throws FileNotFoundException
    * @throws AccessControlException
    */
-  String resolvePath(String path, byte[][] pathComponents)
+  String resolvePath(FSPermissionChecker pc, String path, byte[][] pathComponents)
       throws FileNotFoundException, AccessControlException, IOException {
+    if (isReservedRawName(path) && isPermissionEnabled) {
+      pc.checkSuperuserPrivilege();
+    }
     return resolvePath(path, pathComponents, this);
   }
   
@@ -868,7 +889,9 @@ public class FSDirectory implements Closeable {
     if (!added) {
       updateCountNoQuotaCheck(existing, pos, counts.negation());
       return null;
-    } 
+    } else {
+      addToInodeMap(inode);
+    }
 
     INodesInPath iip = INodesInPath.append(existing, inode, inode.getLocalNameBytes());
     if (added) {
@@ -1142,10 +1165,110 @@ public class FSDirectory implements Closeable {
   void reset() throws IOException {
     createRoot(
         namesystem.createFsOwnerPermissions(new FsPermission((short) 0755)),
-        true);
+        true);    
+    // addToInodeMap(rootDir) is only adding encryption zones and no zone is created at this point.
     nameCache.reset();
   }  
 
+  boolean isInAnEZ(INodesInPath iip)
+      throws UnresolvedLinkException, TransactionContextException, StorageException, InvalidProtocolBufferException {
+    return ezManager.isInAnEZ(iip);
+  }
+
+  String getKeyName(INodesInPath iip) throws TransactionContextException, StorageException,
+      InvalidProtocolBufferException {
+    return ezManager.getKeyName(iip);
+  }
+
+  XAttr createEncryptionZone(String src, CipherSuite suite,
+      CryptoProtocolVersion version, String keyName)
+    throws IOException {
+    return ezManager.createEncryptionZone(src, suite, version, keyName);
+  }
+
+  EncryptionZone getEZForPath(INodesInPath iip) throws IOException {
+    return ezManager.getEZINodeForPath(iip);
+  }
+
+  BatchedListEntries<EncryptionZone> listEncryptionZones(long prevId)
+      throws IOException {
+    return ezManager.listEncryptionZones(prevId);
+  }
+
+  /**
+   * Set the FileEncryptionInfo for an INode.
+   */
+  void setFileEncryptionInfo(String src, FileEncryptionInfo info)
+      throws IOException {
+    // Make the PB for the xattr
+    final HdfsProtos.PerFileEncryptionInfoProto proto =
+        PBHelper.convertPerFileEncInfo(info);
+    final byte[] protoBytes = proto.toByteArray();
+    final XAttr fileEncryptionAttr =
+        XAttrHelper.buildXAttr(CRYPTO_XATTR_FILE_ENCRYPTION_INFO, protoBytes);
+    final List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
+    xAttrs.add(fileEncryptionAttr);
+
+    FSDirXAttrOp.unprotectedSetXAttrs(this, src, xAttrs, EnumSet.of(XAttrSetFlag.CREATE));
+  }
+
+  /**
+   * This function combines the per-file encryption info (obtained
+   * from the inode's XAttrs), and the encryption info from its zone, and
+   * returns a consolidated FileEncryptionInfo instance. Null is returned
+   * for non-encrypted files.
+   *
+   * @param inode inode of the file
+   * @param iip inodes in the path containing the file, passed in to
+   *            avoid obtaining the list of inodes again; if iip is
+   *            null then the list of inodes will be obtained again
+   * @return consolidated file encryption info; null for non-encrypted files
+   */
+  FileEncryptionInfo getFileEncryptionInfo(INode inode,
+                                           INodesInPath iip) throws IOException {
+    if (!inode.isFile()) {
+      return null;
+    }
+    if (iip == null) {
+      iip = getINodesInPath(inode.getFullPathName(), true);
+    }
+    EncryptionZone encryptionZone = getEZForPath(iip);
+    if (encryptionZone == null) {
+      // not an encrypted file
+      return null;
+    } else if(encryptionZone.getPath() == null
+        || encryptionZone.getPath().isEmpty()) {
+      if (NameNode.LOG.isDebugEnabled()) {
+        NameNode.LOG.debug("Encryption zone " + 
+            encryptionZone.getPath() + " does not have a valid path.");
+      }
+    }
+
+    final CryptoProtocolVersion version = encryptionZone.getVersion();
+    final CipherSuite suite = encryptionZone.getSuite();
+    final String keyName = encryptionZone.getKeyName();
+
+    XAttr fileXAttr = FSDirXAttrOp.unprotectedGetXAttrByName(inode,
+        CRYPTO_XATTR_FILE_ENCRYPTION_INFO);
+
+    if (fileXAttr == null) {
+      NameNode.LOG.warn("Could not find encryption XAttr for file " +
+          inode.getFullPathName() + " in encryption zone " +
+          encryptionZone.getPath());
+      return null;
+    }
+
+    try {
+      HdfsProtos.PerFileEncryptionInfoProto fileProto = 
+          HdfsProtos.PerFileEncryptionInfoProto.parseFrom(
+          fileXAttr.getValue());
+      return PBHelper.convert(fileProto, suite, version, keyName);
+    } catch (InvalidProtocolBufferException e) {
+      throw new IOException("Could not parse file encryption info for " + 
+          "inode " + inode, e);
+    }
+  }
+    
   /**
    * Caches frequently used file names to reuse file name objects and
    * reduce heap size.
@@ -1195,27 +1318,73 @@ public class FSDirectory implements Closeable {
     return src.startsWith(DOT_RESERVED_PATH_PREFIX + Path.SEPARATOR);
   }
   
+  static boolean isReservedRawName(String src) {
+    return src.startsWith(DOT_RESERVED_PATH_PREFIX +
+        Path.SEPARATOR + RAW_STRING);
+  }
+  
   /**
-   * Resolve the path of /.reserved/.inodes/<inodeid>/... to a regular path
+   * Resolve a /.reserved/... path to a non-reserved path.
+   * <p/>
+   * There are two special hierarchies under /.reserved/:
+   * <p/>
+   * /.reserved/.inodes/<inodeid> performs a path lookup by inodeid,
+   * <p/>
+   * /.reserved/raw/... returns the encrypted (raw) bytes of a file in an
+   * encryption zone. For instance, if /ezone is an encryption zone, then
+   * /ezone/a refers to the decrypted file and /.reserved/raw/ezone/a refers to
+   * the encrypted (raw) bytes of /ezone/a.
+   * <p/>
+   * Pathnames in the /.reserved/raw directory that resolve to files not in an
+   * encryption zone are equivalent to the corresponding non-raw path. Hence,
+   * if /a/b/c refers to a file that is not in an encryption zone, then
+   * /.reserved/raw/a/b/c is equivalent (they both refer to the same
+   * unencrypted file).
    *
    * @param src path that is being processed
    * @param pathComponents path components corresponding to the path
    * @param fsd FSDirectory
-   * @return if the path indicates an inode, return path after replacing upto
+   * @return if the path indicates an inode, return path after replacing up to
    * <inodeid> with the corresponding path of the inode, else the path
-   * in {@code src} as is.
+   * in {@code src} as is. If the path refers to a path in the "raw"
+   *         directory, return the non-raw pathname.
    * @throws FileNotFoundException if inodeid is invalid
    */
-  static String resolvePath(String src, byte[][] pathComponents, FSDirectory fsd)
-      throws FileNotFoundException, StorageException, TransactionContextException, IOException {
-    if (pathComponents == null || pathComponents.length <= 3) {
+  static String resolvePath(String src, byte[][] pathComponents, FSDirectory fsd) throws FileNotFoundException,
+      IOException {
+    final int nComponents = (pathComponents == null) ?
+        0 : pathComponents.length;
+    if (nComponents <= 2) {
       return src;
     }
-    // Not /.reserved/.inodes
-    if (!Arrays.equals(DOT_RESERVED, pathComponents[1])
-        || !Arrays.equals(DOT_INODES, pathComponents[2])) { // Not .inodes path
+    if (!Arrays.equals(DOT_RESERVED, pathComponents[1])) {
+      /* This is not a /.reserved/ path so do nothing. */
       return src;
     }
+
+    if (Arrays.equals(DOT_INODES, pathComponents[2])) {
+      /* It's a /.reserved/.inodes path. */
+      if (nComponents > 3) {
+        return resolveDotInodesPath(src, pathComponents, fsd);
+      } else {
+        return src;
+      }
+    } else if (Arrays.equals(RAW, pathComponents[2])) {
+      /* It's /.reserved/raw so strip off the /.reserved/raw prefix. */
+      if (nComponents == 3) {
+        return Path.SEPARATOR;
+      } else {
+        return constructRemainingPath("", pathComponents, 3);
+      }
+    } else {
+      /* It's some sort of /.reserved/<unknown> path. Ignore it. */
+      return src;
+    }
+  }
+
+  private static String resolveDotInodesPath(String src,
+      byte[][] pathComponents, FSDirectory fsd)
+      throws FileNotFoundException, IOException {
     final String inodeId = DFSUtil.bytes2String(pathComponents[3]);
     final int id;
     try {
@@ -1238,11 +1407,21 @@ public class FSDirectory implements Closeable {
         return fsd.getFullPathName(parent.getId(), src);
       }
     }
-    
-    StringBuilder path = id == INode.ROOT_INODE_ID ? new StringBuilder()
-        : new StringBuilder(fsd.getFullPathName(id, src));
-    for (int i = 4; i < pathComponents.length; i++) {
-      path.append(Path.SEPARATOR).append(DFSUtil.bytes2String(pathComponents[i]));
+
+    String path = "";
+    if (id != INode.ROOT_INODE_ID) {
+      path = fsd.getFullPathName(id, src);
+    }
+    return constructRemainingPath(path, pathComponents, 4);
+  }
+
+  private static String constructRemainingPath(String pathPrefix,
+      byte[][] pathComponents, int startAt) {
+
+    StringBuilder path = new StringBuilder(pathPrefix);
+    for (int i = startAt; i < pathComponents.length; i++) {
+      path.append(Path.SEPARATOR).append(
+          DFSUtil.bytes2String(pathComponents[i]));
     }
     if (NameNode.LOG.isDebugEnabled()) {
       NameNode.LOG.debug("Resolved path is " + path);
@@ -1333,7 +1512,56 @@ public class FSDirectory implements Closeable {
     return (INode) getParentHandler.handle();
   }
   
-  INode getInode(final long id) throws IOException {
+  /**
+   * We kept the name from apache hadoop for meging simplification but the only purpose of this
+   * function is to add the encryptionZones as the InodeMap is the DB
+   */
+  public final void addToInodeMap(INode inode) throws TransactionContextException, StorageException {
+    if (inode instanceof INodeWithAdditionalFields) {
+      if (!inode.isSymlink()) {
+        final XAttrFeature xaf = inode.getXAttrFeature();
+        if (xaf != null) {
+          final List<XAttr> xattrs = xaf.getXAttrs();
+          for (XAttr xattr : xattrs) {
+            final String xaName = XAttrHelper.getPrefixName(xattr);
+            if (CRYPTO_XATTR_ENCRYPTION_ZONE.equals(xaName)) {
+              try {
+                final HdfsProtos.ZoneEncryptionInfoProto ezProto =
+                    HdfsProtos.ZoneEncryptionInfoProto.parseFrom(
+                        xattr.getValue());
+                ezManager.unprotectedAddEncryptionZone(inode.getId(),
+                    PBHelper.convert(ezProto.getSuite()),
+                    PBHelper.convert(ezProto.getCryptoProtocolVersion()),
+                    ezProto.getKeyName());
+              } catch (InvalidProtocolBufferException e) {
+                NameNode.LOG.warn("Error parsing protocol buffer of " +
+                    "EZ XAttr " + xattr.getName());
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * We kept the name from apache hadoop for meging simplification but the only purpose of this
+   * function is to remove the encryptionZones as the InodeMap is the DB.
+   */
+  public final void removeFromInodeMap(List<? extends INode> inodes) throws IOException {
+    if (inodes != null) {
+      for (INode inode : inodes) {
+        if (inode != null) {
+          inode.remove();
+          if (inode instanceof INodeWithAdditionalFields) {
+            ezManager.removeEncryptionZone(inode.getId());
+          }
+        }
+      }
+    }
+  }
+  
+  INode getInodeTX(final long id) throws IOException {
     HopsTransactionalRequestHandler getInodeHandler =
         new HopsTransactionalRequestHandler(
             HDFSOperationType.GET_INODE) {
@@ -1347,16 +1575,21 @@ public class FSDirectory implements Closeable {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier, true));
+            locks.add(lf.
+                getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier, true));
           }
 
           @Override
           public Object performTask() throws IOException {
-            return EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
+            return getInode(id);
             
           }
         };
     return (INode) getInodeHandler.handle();
+  }
+  
+  INode getInode(final long id) throws IOException {
+    return EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
   }
   
   static INode resolveLastINode(INodesInPath iip) throws FileNotFoundException {
@@ -1554,7 +1787,7 @@ public class FSDirectory implements Closeable {
   HdfsFileStatus getAuditFileInfo(INodesInPath iip)
     throws IOException {
     return (namesystem.isAuditEnabled() && namesystem.isExternalInvocation())
-      ? FSDirStatAndListingOp.getFileInfo(this, iip, false) : null;
+      ? FSDirStatAndListingOp.getFileInfo(this, iip, false, false) : null;
   }
   
   /**

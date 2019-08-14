@@ -28,6 +28,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.DFSInputStream;
+import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
@@ -100,10 +102,12 @@ public class Hdfs extends AbstractFileSystem {
       EnumSet<CreateFlag> createFlag, FsPermission absolutePermission,
       int bufferSize, short replication, long blockSize, Progressable progress,
       ChecksumOpt checksumOpt, boolean createParent) throws IOException {
-    return new HdfsDataOutputStream(
-        dfs.primitiveCreate(getUriPath(f), absolutePermission, createFlag,
+    final DFSOutputStream dfsos = dfs.primitiveCreate(getUriPath(f), absolutePermission, createFlag,
             createParent, replication, blockSize, progress, bufferSize,
-            checksumOpt), getStatistics());
+            checksumOpt);
+    
+    return dfs.createWrappedOutputStream(dfsos, statistics,
+        dfsos.getInitialLen());
   }
 
   @Override
@@ -332,8 +336,9 @@ public class Hdfs extends AbstractFileSystem {
   @Override
   public HdfsDataInputStream open(Path f, int bufferSize)
       throws IOException, UnresolvedLinkException {
-    return new DFSClient.DFSDataInputStream(
-        dfs.open(getUriPath(f), bufferSize, verifyChecksum));
+    final DFSInputStream dfsis = dfs.open(getUriPath(f),
+      bufferSize, verifyChecksum);
+    return dfs.createWrappedInputStream(dfsis);
   }
 
   @Override

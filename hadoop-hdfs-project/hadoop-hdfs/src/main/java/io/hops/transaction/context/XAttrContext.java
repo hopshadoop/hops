@@ -64,6 +64,8 @@ public class XAttrContext extends BaseEntityContext<StoredXAttr.PrimaryKey,
     switch (xfinder){
       case ByPrimaryKey:
         return findByPrimaryKey(xfinder, params);
+      case ByPrimaryKeyLocal:
+        return findByPrimaryKeyLocal(xfinder, params);
     }
     throw new RuntimeException(UNSUPPORTED_FINDER);
   }
@@ -75,6 +77,8 @@ public class XAttrContext extends BaseEntityContext<StoredXAttr.PrimaryKey,
     switch (xfinder){
       case ByInodeId:
         return findByInodeId(xfinder, params);
+      case ByInodeIdLocal:
+        return findByInodeIdLocal(xfinder, params);
       case ByPrimaryKeyBatch:
         return findByPrimaryKeyBatch(xfinder, params);
     }
@@ -99,6 +103,17 @@ public class XAttrContext extends BaseEntityContext<StoredXAttr.PrimaryKey,
     return result;
   }
   
+  private StoredXAttr findByPrimaryKeyLocal(StoredXAttr.Finder finder,
+      Object[] params) throws StorageException, StorageCallPreventedException {
+    final StoredXAttr.PrimaryKey pk = (StoredXAttr.PrimaryKey) params[0];
+    StoredXAttr result = null;
+    if(contains(pk)){
+      result = get(pk);
+      hit(finder, result, "pk", pk, "results", result);
+    }
+    return result;
+  }
+  
   private Collection<StoredXAttr> findByInodeId(StoredXAttr.Finder finder,
       Object[] params) throws StorageException, StorageCallPreventedException {
     final long inodeId = (Long) params[0];
@@ -112,6 +127,17 @@ public class XAttrContext extends BaseEntityContext<StoredXAttr.PrimaryKey,
       gotFromDB(results);
       xAttrsByInodeId.put(inodeId, results);
       miss(finder, results, "inodeId", inodeId, "results", results);
+    }
+    return results;
+  }
+  
+  private Collection<StoredXAttr> findByInodeIdLocal(StoredXAttr.Finder finder,
+      Object[] params) throws StorageException, StorageCallPreventedException {
+    final long inodeId = (Long) params[0];
+    Collection<StoredXAttr> results = null;
+    if(xAttrsByInodeId.containsKey(inodeId)){
+      results = xAttrsByInodeId.get(inodeId);
+      hit(finder, results, "inodeId", inodeId, "results", results);
     }
     return results;
   }
@@ -136,11 +162,18 @@ public class XAttrContext extends BaseEntityContext<StoredXAttr.PrimaryKey,
     Set<StoredXAttr.PrimaryKey> notFoundPks = Sets.newHashSet(pks);
     for(StoredXAttr attr : results){
       gotFromDB(attr);
+      if(!xAttrsByInodeId.containsKey(attr.getInodeId())){
+        xAttrsByInodeId.put(attr.getInodeId(), new ArrayList<StoredXAttr>());
+      }
+      xAttrsByInodeId.get(attr.getInodeId()).add(attr);
       notFoundPks.remove(attr.getPrimaryKey());
     }
     
     for(StoredXAttr.PrimaryKey pk : notFoundPks){
       gotFromDB(pk, null);
+      if(!xAttrsByInodeId.containsKey(pk.getInodeId())){
+        xAttrsByInodeId.put(pk.getInodeId(), null);
+      }
     }
   }
   
@@ -176,5 +209,24 @@ public class XAttrContext extends BaseEntityContext<StoredXAttr.PrimaryKey,
   public void clear() throws TransactionContextException {
     super.clear();
     xAttrsByInodeId.clear();
+  }
+  
+  @Override
+  public void add(StoredXAttr attr) throws TransactionContextException {
+    if (!xAttrsByInodeId.containsKey(attr.getInodeId()) || xAttrsByInodeId.get(attr.getInodeId()) == null) {
+      xAttrsByInodeId.put(attr.getInodeId(), new ArrayList<StoredXAttr>());
+    }
+    StoredXAttr toRemove = null;
+    for (StoredXAttr sattr : xAttrsByInodeId.get(attr.getInodeId())) {
+      if (sattr.getPrimaryKey().equals(attr.getPrimaryKey())) {
+        toRemove = sattr;
+        break;
+      }
+    }
+    if (toRemove != null) {
+      xAttrsByInodeId.remove(attr);
+    }
+    xAttrsByInodeId.get(attr.getInodeId()).add(attr);
+    super.add(attr);
   }
 }
