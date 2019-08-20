@@ -129,8 +129,8 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
 
   public final static long ROOT_INODE_ID = 1;
   
-  private byte numXAttrs;
-  
+  private byte numUserXAttrs;
+  private byte numSysXAttrs;
   /**
    * To check if the request id is the same as saved id. Don't check fileId
    * with GRANDFATHER_INODE_ID for backward compatibility.
@@ -859,10 +859,10 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
     
     cleanParity(node);
     
-    if(node.getNumXAttrs() > 0){
+    if(node.hasXAttrs()){
       
       if(node.getXAttrFeature() != null) {
-        node.getXAttrFeature().remove(node.getNumXAttrs());
+        node.getXAttrFeature().remove(node.getNumUserXAttrs() + node.getNumSysXAttrs());
         node.removeXAttrFeature();
       }
     }
@@ -1127,23 +1127,47 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   public interface Feature {
   }
   
-  public byte getNumXAttrs() {
-    return numXAttrs;
+  public byte getNumUserXAttrs() {
+    return numUserXAttrs;
   }
   
-  public void incrementXAttrs()
+  public void incrementUserXAttrs()
       throws TransactionContextException, StorageException {
-    this.numXAttrs++;
+    this.numUserXAttrs++;
     save();
   }
   
-  public void decrementXAttrs()
+  public void decrementUserXAttrs()
       throws TransactionContextException, StorageException {
-    this.numXAttrs--;
+    this.numUserXAttrs--;
     save();
   }
   
-  public void setNumXAttrsNoPersistence(byte numXAttrs) {
-    this.numXAttrs = numXAttrs;
+  public void setNumUserXAttrsNoPersistence(byte numUserXAttrs) {
+    this.numUserXAttrs = numUserXAttrs;
+  }
+  
+  public byte getNumSysXAttrs() {
+    return numSysXAttrs;
+  }
+  
+  public void incrementSysXAttrs()
+      throws TransactionContextException, StorageException {
+    this.numSysXAttrs++;
+    save();
+  }
+  
+  public void decrementSysXAttrs()
+      throws TransactionContextException, StorageException {
+    this.numSysXAttrs--;
+    save();
+  }
+  
+  public void setNumSysXAttrsNoPersistence(byte numSysXAttrs) {
+    this.numSysXAttrs = numSysXAttrs;
+  }
+  
+  public boolean hasXAttrs(){
+    return getNumUserXAttrs() > 0 || getNumSysXAttrs() > 0;
   }
 }
