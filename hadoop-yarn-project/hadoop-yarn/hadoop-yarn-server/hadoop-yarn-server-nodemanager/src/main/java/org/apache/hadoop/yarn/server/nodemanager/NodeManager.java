@@ -476,6 +476,17 @@ public class NodeManager extends CompositeService
     addService(nodeResourceMonitor);
     ((NMContext) context).setNodeResourceMonitor(nodeResourceMonitor);
 
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)
+        || conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED,
+        YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.NM);
+      CertificateLocalizationCtx.getInstance().setCertificateLocalization
+          (certificateLocalizationService);
+      addService(certificateLocalizationService);
+      ((NMContext) context).setCertificateLocalizationService(certificateLocalizationService);
+    }
+    
     containerManager =
         createContainerManager(context, exec, del, nodeStatusUpdater,
         this.aclsManager, dirsHandler);
@@ -510,17 +521,6 @@ public class NodeManager extends CompositeService
     if (YarnConfiguration.timelineServiceV2Enabled(conf)) {
       this.nmCollectorService = createNMCollectorService(context);
       addService(nmCollectorService);
-    }
-
-    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)
-        || conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED,
-        YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
-      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.NM);
-      CertificateLocalizationCtx.getInstance().setCertificateLocalization
-          (certificateLocalizationService);
-      addService(certificateLocalizationService);
-      ((NMContext) context).setCertificateLocalizationService(certificateLocalizationService);
     }
     
     // StatusUpdater should be added last so that it get started last 
