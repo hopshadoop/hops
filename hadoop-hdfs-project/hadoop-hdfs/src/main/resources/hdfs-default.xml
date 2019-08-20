@@ -2000,7 +2000,7 @@
     <value>32</value>
     <description>
       Maximum number of extended attributes per inode. The maximum allowed
-      number is 255 extended attributes per inode.
+      number is 127 extended attributes per inode.
     </description>
   </property>
 

@@ -21,7 +21,6 @@ import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.entity.INode;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
-import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
 import io.hops.security.GroupNotFoundException;
 import io.hops.security.UserNotFoundException;
@@ -252,7 +251,8 @@ public class INodeDALAdaptor
       }
       hopINode.setHeader(inode.getHeader());
       hopINode.setNumAces(inode.getNumAces());
-      hopINode.setNumXAttrs(inode.getNumXAttrs());
+      hopINode.setNumUserXAttrs(inode.getNumUserXAttrs());
+      hopINode.setNumSysXAttrs(inode.getNumSysXAttrs());
     }
     return hopINode;
   }
@@ -321,9 +321,10 @@ public class INodeDALAdaptor
         inode.setLogicalTimeNoPersistance(hopINode.getLogicalTime());
         inode.setBlockStoragePolicyIDNoPersistance(hopINode.getStoragePolicyID());
         inode.setNumAcesNoPersistence(hopINode.getNumAces());
-        inode.setNumXAttrsNoPersistence(hopINode.getNumXAttrs());
+        inode.setNumUserXAttrsNoPersistence(hopINode.getNumUserXAttrs());
+        inode.setNumSysXAttrsNoPersistence(hopINode.getNumSysXAttrs());
         
-        if(inode.getNumXAttrs() > 0 ){
+        if(inode.hasXAttrs()){
           ((INodeWithAdditionalFields) inode).addXAttrFeature(new XAttrFeature(hopINode.getId()));
         }
         
