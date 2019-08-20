@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.SortedActiveNodeListPBImpl;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -1304,7 +1303,7 @@ public class TestINodeFile {
         
         XAttrFeature f = new XAttrFeature(xAttrs, iNodeFile.getId());
         inf.addXAttrFeature(f);
-        inf.incrementXAttrs();
+        inf.incrementUserXAttrs();
         return null;
       }
     }.handle();
@@ -1349,7 +1348,7 @@ public class TestINodeFile {
             iNodeFile.getId());
   
         inf.getXAttrFeature().removeXAttr(xAttr);
-        inf.decrementXAttrs();
+        inf.decrementUserXAttrs();
         return null;
       }
     }.handle();

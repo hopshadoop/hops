@@ -57,7 +57,7 @@ public class XAttrLock extends Lock{
       if(attrs == null || attrs.isEmpty()) {
         //read all xattrs
         //Skip if the inode doesn't have any xattrs
-        if(inode.getNumXAttrs() == 0){
+        if(!inode.hasXAttrs()){
           EntityManager.snapshotMaintenance
               (HdfsTransactionContextMaintenanceCmds.NoXAttrsAttached,
                   inode.getId());

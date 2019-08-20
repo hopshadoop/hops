@@ -73,7 +73,6 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
@@ -1477,7 +1476,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           .getName(), node.getLogicalTime(), operation);
       EntityManager.add(logEntry);
   
-      if(node.getNumXAttrs() > 0){
+      if(node.getNumUserXAttrs() > 0){
         node.incrementLogicalTime();
         XAttrMetadataLogEntry xattrLogEntry =
             new XAttrMetadataLogEntry(dataSetDir.getId(), node.getId(),

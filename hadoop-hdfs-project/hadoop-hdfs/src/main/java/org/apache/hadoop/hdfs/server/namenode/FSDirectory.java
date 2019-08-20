@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
@@ -78,7 +77,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
+
 import org.apache.commons.io.Charsets;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_DEFAULT;
@@ -211,8 +210,8 @@ public class FSDirectory implements Closeable {
         "Cannot set a negative limit on the number of xattrs per inode (%s).",
         DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_KEY);
     
-    if(inodeXAttrs > XAttrStorage.getMaxNumberOfXAttrPerInode()){
-      inodeXAttrs = XAttrStorage.getMaxNumberOfXAttrPerInode();
+    if(inodeXAttrs > XAttrStorage.getMaxNumberOfUserXAttrPerInode()){
+      inodeXAttrs = XAttrStorage.getMaxNumberOfUserXAttrPerInode();
     }
     
     this.inodeXAttrsLimit = inodeXAttrs;
@@ -1564,7 +1563,7 @@ public class FSDirectory implements Closeable {
     XAttr attr = XAttrStorage.readINodeXAttr(inode, xAttr);
     if(attr != null){
       XAttrStorage.removeINodeXAttr(inode, xAttr);
-      inode.decrementXAttrs();
+      decrementXAttrs(inode, xAttr);
       return xAttr;
     }
     return null;
@@ -1580,19 +1579,64 @@ public class FSDirectory implements Closeable {
       EnumSet<XAttrSetFlag> flag) throws IOException {
     INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
     INode inode = resolveLastINode(iip);
-    XAttr attr = XAttrStorage.readINodeXAttr(inode, xAttr);
-    XAttrSetFlag.validate(xAttr.getName(), attr != null, flag);
-    
-    XAttrStorage.updateINodeXAttr(inode, xAttr, attr != null);
-    
-    if (inode.getNumXAttrs() > inodeXAttrsLimit) {
-      throw new IOException("Cannot add additional XAttr to inode, "
-          + "would exceed limit of " + inodeXAttrsLimit);
-    }
-    
-    inode.incrementXAttrs();
+    XAttr storedXAtttr = setINodeXAttr(inode, xAttr, flag);
+    XAttrStorage.updateINodeXAttr(inode, xAttr, storedXAtttr != null);
+  
   }
   
+  XAttr setINodeXAttr(INode inode, XAttr xAttr,
+      EnumSet<XAttrSetFlag> flag) throws QuotaExceededException, IOException {
+  
+    XAttr storedXAtttr = XAttrStorage.readINodeXAttr(inode, xAttr);
+    XAttrSetFlag.validate(xAttr.getName(), storedXAtttr != null, flag);
+    
+    incrementXAttrs(inode, xAttr, storedXAtttr != null);
+    
+    if(isUserVisible(xAttr)) {
+      if (inode.getNumUserXAttrs() > inodeXAttrsLimit) {
+        throw new IOException("Cannot add additional XAttr to inode, "
+            + "would exceed limit of " + inodeXAttrsLimit);
+      }
+    }else {
+      if (inode.getNumSysXAttrs() >
+          XAttrStorage.getMaxNumberOfSysXAttrPerInode()) {
+        throw new IOException("Cannot add additional System XAttr to inode, "
+            + "would exceed limit of " +
+            XAttrStorage.getMaxNumberOfSysXAttrPerInode());
+      }
+    }
+    
+    return storedXAtttr;
+  }
+  
+  private boolean isUserVisible(XAttr xAttr) {
+    if (xAttr.getNameSpace() == XAttr.NameSpace.USER ||
+        xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED) {
+      return true;
+    }
+    return false;
+  }
+  
+  private void incrementXAttrs(INode inode, XAttr xAttr, boolean xAttrExists)
+      throws TransactionContextException, StorageException {
+    if(xAttrExists)
+      return;
+    
+    if(isUserVisible(xAttr)) {
+      inode.incrementUserXAttrs();
+    }else {
+      inode.incrementSysXAttrs();
+    }
+  }
+  
+  private void decrementXAttrs(INode inode, XAttr xAttr)
+      throws TransactionContextException, StorageException {
+    if(isUserVisible(xAttr)) {
+      inode.decrementUserXAttrs();
+    }else {
+      inode.decrementSysXAttrs();
+    }
+  }
   
   List<XAttr> getXAttrs(String src, List<XAttr> xAttrs) throws IOException {
     INodesInPath iip = getINodesInPath(normalizePath(src), true);

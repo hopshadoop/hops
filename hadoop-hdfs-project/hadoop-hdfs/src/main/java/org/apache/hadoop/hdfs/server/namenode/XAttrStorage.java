@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.util.EnumSet;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -30,7 +29,6 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.XAttr;
-import org.apache.hadoop.fs.XAttrSetFlag;
 
 /**
  * XAttrStorage is used to read and set xattrs for an inode.
@@ -109,8 +107,12 @@ public class XAttrStorage {
     return f;
   }
   
-  public static int getMaxNumberOfXAttrPerInode(){
-    return StoredXAttr.MAX_NUM_XATTRS_PER_INODE;
+  public static int getMaxNumberOfUserXAttrPerInode(){
+    return StoredXAttr.MAX_NUM_USER_XATTRS_PER_INODE;
+  }
+  
+  public static int getMaxNumberOfSysXAttrPerInode(){
+    return StoredXAttr.MAX_NUM_SYS_XATTRS_PER_INODE;
   }
   
   public static int getMaxXAttrSize(){
