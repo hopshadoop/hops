@@ -8009,8 +8009,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       dir.checkOwner(pc, iip);
       dir.checkPathAccess(pc, iip, FsAction.WRITE);
     }
-    
-    dir.setXAttr(src, xAttr, flag);
+  
+    List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
+    xAttrs.add(xAttr);
+    dir.setXAttrs(src, xAttrs, flag);
     resultingStat = dir.getAuditFileInfo(dir.getINodesInPath(src, false));
     
     logAuditEvent(true, "setXAttr", src, null, resultingStat);
@@ -8138,8 +8140,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             dir.checkOwner(pc, iip);
             dir.checkPathAccess(pc, iip, FsAction.WRITE);
           }
-    
-          dir.removeXAttr(src, xAttr);
+  
+          List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
+          xAttrs.add(xAttr);
+          List<XAttr> removedXAttrs = dir.removeXAttrs(src, xAttrs);
           resultingStat = dir.getAuditFileInfo(dir.getINodesInPath(src,
               false));
         } catch (AccessControlException e) {

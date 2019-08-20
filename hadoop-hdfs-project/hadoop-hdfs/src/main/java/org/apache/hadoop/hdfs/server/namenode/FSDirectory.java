@@ -77,6 +77,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.ListIterator;
 
 import org.apache.commons.io.Charsets;
 
@@ -1546,67 +1547,70 @@ public class FSDirectory implements Closeable {
     }
   }
   
-  
-  void removeXAttr(String src, XAttr xAttr) throws IOException {
-    XAttr removedXAttr = unprotectedRemoveXAttr(src, xAttr);
-    if (removedXAttr == null) {
-      NameNode.stateChangeLog.info("DIR* FSDirectory.removeXAttr: XAttr " +
-          XAttrHelper.getPrefixName(xAttr) +
-          " does not exist on the path " + src);
-    }
+  /**
+   * Removes a list of XAttrs from an inode at a path.
+   *
+   * @param src path of inode
+   * @param toRemove XAttrs to be removed
+   * @return List of XAttrs that were removed
+   * @throws IOException if the inode does not exist, if quota is exceeded
+   */
+  List<XAttr> removeXAttrs(final String src, final List<XAttr> toRemove)
+      throws IOException {
+    return unprotectedRemoveXAttrs(src, toRemove);
   }
   
-  private XAttr unprotectedRemoveXAttr(String src,
-      XAttr xAttr) throws IOException {
+  List<XAttr> unprotectedRemoveXAttrs(final String src,
+      final List<XAttr> toRemove) throws IOException {
     INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
     INode inode = resolveLastINode(iip);
-    XAttr attr = XAttrStorage.readINodeXAttr(inode, xAttr);
-    if(attr != null){
+    List<XAttr> storedXAttrs = XAttrStorage.readINodeXAttrs(inode, toRemove);
+    
+    for(XAttr xAttr : storedXAttrs){
       XAttrStorage.removeINodeXAttr(inode, xAttr);
       decrementXAttrs(inode, xAttr);
-      return xAttr;
     }
+    
+    if(!storedXAttrs.isEmpty())
+      return storedXAttrs;
     return null;
   }
   
   
-  void setXAttr(String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag)
-      throws IOException {
-      unprotectedSetXAttr(src, xAttr, flag);
+  void setXAttrs(final String src, final List<XAttr> xAttrs,
+      final EnumSet<XAttrSetFlag> flag) throws IOException {
+      unprotectedSetXAttrs(src, xAttrs, flag);
   }
   
-  void unprotectedSetXAttr(String src, XAttr xAttr,
-      EnumSet<XAttrSetFlag> flag) throws IOException {
+  void unprotectedSetXAttrs(final String src, final List<XAttr> xAttrs,
+      final EnumSet<XAttrSetFlag> flag)
+      throws QuotaExceededException, IOException {
     INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
     INode inode = resolveLastINode(iip);
-    XAttr storedXAtttr = setINodeXAttr(inode, xAttr, flag);
-    XAttrStorage.updateINodeXAttr(inode, xAttr, storedXAtttr != null);
-  
+    setINodeXAttrs(inode, xAttrs, flag);
   }
   
-  XAttr setINodeXAttr(INode inode, XAttr xAttr,
-      EnumSet<XAttrSetFlag> flag) throws QuotaExceededException, IOException {
-  
-    XAttr storedXAtttr = XAttrStorage.readINodeXAttr(inode, xAttr);
-    XAttrSetFlag.validate(xAttr.getName(), storedXAtttr != null, flag);
+  void setINodeXAttrs(INode inode, final List<XAttr> toSet,
+      final EnumSet<XAttrSetFlag> flag) throws IOException {
     
-    incrementXAttrs(inode, xAttr, storedXAtttr != null);
-    
-    if(isUserVisible(xAttr)) {
-      if (inode.getNumUserXAttrs() > inodeXAttrsLimit) {
-        throw new IOException("Cannot add additional XAttr to inode, "
-            + "would exceed limit of " + inodeXAttrsLimit);
-      }
-    }else {
-      if (inode.getNumSysXAttrs() >
-          XAttrStorage.getMaxNumberOfSysXAttrPerInode()) {
-        throw new IOException("Cannot add additional System XAttr to inode, "
-            + "would exceed limit of " +
-            XAttrStorage.getMaxNumberOfSysXAttrPerInode());
+    // Check for duplicate XAttrs in toSet
+    // We need to use a custom comparator, so using a HashSet is not suitable
+    for (int i = 0; i < toSet.size(); i++) {
+      for (int j = i + 1; j < toSet.size(); j++) {
+        if (toSet.get(i).equalsIgnoreValue(toSet.get(j))) {
+          throw new IOException("Cannot specify the same XAttr to be set " +
+              "more than once");
+        }
       }
     }
     
-    return storedXAtttr;
+    // Check if the XAttr already exists to validate with the provided flag
+    for (XAttr xAttr: toSet) {
+      boolean exists = XAttrStorage.readINodeXAttr(inode, xAttr) != null;
+      XAttrSetFlag.validate(xAttr.getName(), exists, flag);
+      incrementXAttrs(inode, xAttr, exists);
+      XAttrStorage.updateINodeXAttr(inode, xAttr, exists);
+    }
   }
   
   private boolean isUserVisible(XAttr xAttr) {
@@ -1618,14 +1622,34 @@ public class FSDirectory implements Closeable {
   }
   
   private void incrementXAttrs(INode inode, XAttr xAttr, boolean xAttrExists)
-      throws TransactionContextException, StorageException {
+      throws IOException {
     if(xAttrExists)
       return;
     
+    boolean limitsExceeded = false;
+    String message = "Cannot add additional %sXAttr to inode, would exceed " +
+        "limit of %d";
+    
     if(isUserVisible(xAttr)) {
-      inode.incrementUserXAttrs();
+      if(inode.getNumUserXAttrs()== XAttrStorage.getMaxNumberOfUserXAttrPerInode()){
+        limitsExceeded = true;
+      }else {
+        inode.incrementUserXAttrs();
+        limitsExceeded = inode.getNumUserXAttrs() > inodeXAttrsLimit;
+      }
+      message = String.format(message, "", inodeXAttrsLimit);
     }else {
-      inode.incrementSysXAttrs();
+      if(inode.getNumSysXAttrs() == XAttrStorage.getMaxNumberOfSysXAttrPerInode()){
+        limitsExceeded = true;
+        message = String.format(message, "System ",
+            XAttrStorage.getMaxNumberOfSysXAttrPerInode());
+      }else{
+        inode.incrementSysXAttrs();
+      }
+    }
+    
+    if(limitsExceeded){
+      throw new IOException(message);
     }
   }
   

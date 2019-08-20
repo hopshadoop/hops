@@ -2119,6 +2119,9 @@ public class PBHelper {
   
   public static List<XAttrProto> convertXAttrProto(
       List<XAttr> xAttrSpec) {
+    if (xAttrSpec == null) {
+      return Lists.newArrayListWithCapacity(0);
+    }
     ArrayList<XAttrProto> xAttrs = Lists.newArrayListWithCapacity(
         xAttrSpec.size());
     for (XAttr a : xAttrSpec) {
