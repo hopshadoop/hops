@@ -31,11 +31,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.ByteString;
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
@@ -422,7 +425,7 @@ public class ApplicationImpl implements Application {
   }
 
   static ContainerManagerApplicationProto buildAppProto(ApplicationImpl app)
-      throws IOException {
+      throws IOException, InterruptedException {
     ContainerManagerApplicationProto.Builder builder =
         ContainerManagerApplicationProto.newBuilder();
     builder.setId(((ApplicationIdPBImpl) app.appId).getProto());
@@ -465,6 +468,35 @@ public class ApplicationImpl implements Application {
       builder.setFlowContext(fcp);
     }
 
+    if (((NodeManager.NMContext) app.context).isHopsTLSEnabled()) {
+      X509SecurityMaterial x509SecurityMaterial = app.context.getCertificateLocalizationService()
+          .getX509MaterialLocation(app.getUser(), app.getAppId().toString());
+      ByteBuffer keyStore = x509SecurityMaterial.getKeyStoreMem();
+      if (keyStore != null) {
+        builder.setKeyStore(ProtoUtils.convertToProtoFormat(keyStore));
+        builder.setKeyStorePassword(String.valueOf(x509SecurityMaterial.getKeyStorePass()));
+      }
+      ByteBuffer trustStore = x509SecurityMaterial.getTrustStoreMem();
+      if (trustStore != null) {
+        builder.setTrustStore(ProtoUtils.convertToProtoFormat(trustStore));
+        builder.setTrustStorePassword(String.valueOf(x509SecurityMaterial.getTrustStorePass()));
+      }
+      builder.setCryptoVersion(app.getX509Version());
+    }
+
+    if (((NodeManager.NMContext) app.context).isJWTEnabled()) {
+      JWTSecurityMaterial jwtSecurityMaterial = app.context.getCertificateLocalizationService()
+          .getJWTMaterialLocation(app.getUser(), app.getAppId().toString());
+      String jwt = jwtSecurityMaterial.getToken();
+      if (jwt != null) {
+        builder.setJwt(jwt);
+      }
+      if (app.getJWTExpiration() != -1L) {
+        builder.setJwtExpiration(app.getJWTExpiration());
+      }
+    }
+    
+    
     return builder.build();
   }
 
