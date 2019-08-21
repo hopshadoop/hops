@@ -8027,6 +8027,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .skipReadingQuotaAttr(!dir.isQuotaEnabled());
         locks.add(il);
         locks.add(lf.getXAttrLock(xAttrs));
+        locks.add(lf.getAcesLock());
       }
       
       @Override
