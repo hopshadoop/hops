@@ -302,15 +302,21 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
       String timeUnitStr = FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT;
       long trustStoreReloadInterval = FileBasedKeyStoresFactory.DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL;
       if (sslClientConf != null) {
-        keyStoreReloadInterval = sslClientConf.getLong(FileBasedKeyStoresFactory.resolvePropertyName(
-            SSLFactory.Mode.CLIENT, FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
-            FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL);
-        timeUnitStr = sslClientConf.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.CLIENT,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY),
-            FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT);
-        trustStoreReloadInterval = sslClientConf.getLong(FileBasedKeyStoresFactory.resolvePropertyName(
-            SSLFactory.Mode.CLIENT, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
-            FileBasedKeyStoresFactory.DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL);
+        try {
+          keyStoreReloadInterval = sslClientConf.getLong(FileBasedKeyStoresFactory.resolvePropertyName(
+              SSLFactory.Mode.CLIENT, FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
+              FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL);
+          timeUnitStr = sslClientConf.get(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.CLIENT,
+              FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY),
+              FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_TIMEUNIT);
+          trustStoreReloadInterval = sslClientConf.getLong(FileBasedKeyStoresFactory.resolvePropertyName(
+              SSLFactory.Mode.CLIENT, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
+              FileBasedKeyStoresFactory.DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL);
+        } catch (RuntimeException ex) {
+          // RuntimeException will be thrown if configuration file exists but we can't read it
+          // In that case just fall back to default values
+          LOG.warn("ssl-client.xml exists but we can't read it, falling back to default configuration");
+        }
       }
       TimeUnit timeUnit = TimeUnit.valueOf(timeUnitStr);
       sslCtx.init(createKeyManagers(keyStoreReloadInterval, timeUnit), createTrustManagers(trustStoreReloadInterval),
