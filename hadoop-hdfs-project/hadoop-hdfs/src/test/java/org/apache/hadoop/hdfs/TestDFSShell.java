@@ -1958,40 +1958,40 @@ public class TestDFSShell {
       }
     }
   }
-
+  
   /**
-   * HDFS-6374 setXAttr should require the user to be the owner of the file
-   * or directory.
+   * Test to make sure that user namespace xattrs can be set only if path has
+   * access and for sticky directorries, only owner/privileged user can write.
+      * Trusted namespace xattrs can be set only with privileged users.
+      *
+      * As user1: Create a directory (/foo) as user1, chown it to user1 (and
+   * user1's group), grant rwx to "other".
+      *
+      * As user2: Set an xattr (should pass with path access).
+      *
+      * As user1: Set an xattr (should pass).
+      *
+      * As user2: Read the xattr (should pass). Remove the xattr (should pass with
+      * path access).
+      *
+      * As user1: Read the xattr (should pass). Remove the xattr (should pass).
+      *
+      * As user1: Change permissions only to owner
    *
-   * Test to make sure that only the owner of a file or directory can set
-   * or remove the xattrs.
+       * As User2: Set an Xattr (Should fail set with no path access) Remove an
+   * Xattr (Should fail with no path access)
    *
-   * As user1:
-   * Create a directory (/foo) as user1, chown it to user1 (and user1's group),
-   * grant rwx to "other".
-   *
-   * As user2:
-   * Set an xattr (should fail).
-   *
-   * As user1:
-   * Set an xattr (should pass).
-   *
-   * As user2:
-   * Read the xattr (should pass).
-   * Remove the xattr (should fail).
-   *
-   * As user1:
-   * Read the xattr (should pass).
-   * Remove the xattr (should pass).
+       * As SuperUser: Set an Xattr with Trusted (Should pass)
    */
   @Test (timeout = 30000)
   public void testSetXAttrPermissionAsDifferentOwner() throws Exception {
     final String USER1 = "user1";
-    final String GROUP1 = "mygroup1";
+    final String GROUP1 = "supergroup";
     final UserGroupInformation user1 = UserGroupInformation.
         createUserForTesting(USER1, new String[] {GROUP1});
     final UserGroupInformation user2 = UserGroupInformation.
         createUserForTesting("user2", new String[] {"mygroup2"});
+    final UserGroupInformation SUPERUSER = UserGroupInformation.getCurrentUser();
     MiniDFSCluster cluster = null;
     PrintStream bak = null;
     try {
@@ -2006,8 +2006,8 @@ public class TestDFSShell {
       final FsShell fshell = new FsShell(conf);
       final ByteArrayOutputStream out = new ByteArrayOutputStream();
       System.setErr(new PrintStream(out));
-
-      // mkdir foo as user1
+  
+      //Test 1.  Let user1 be owner for /foo
       user1.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {
@@ -2018,7 +2018,8 @@ public class TestDFSShell {
           return null;
         }
       });
-
+      
+      //Test 2. Give access to others
       user1.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {
@@ -2030,24 +2031,22 @@ public class TestDFSShell {
           return null;
         }
       });
-
-      // No permission to write xattr for non-owning user (user2).
+  
+      // Test 3. Should be allowed to write xattr if there is a path access to
+      // user (user2).
       user2.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {
           final int ret = ToolRunner.run(fshell, new String[]{
               "-setfattr", "-n", "user.a1", "-v", "1234", "/foo"});
-          assertEquals("Returned should be 1", 1, ret);
-          final String str = out.toString();
-          assertTrue("Permission denied printed",
-              str.indexOf("Permission denied") != -1);
+          assertEquals("Returned should be 0", 0, ret);
           out.reset();
           return null;
         }
       });
-
-      // But there should be permission to write xattr for
-      // the owning user.
+  
+      //Test 4. There should be permission to write xattr for
+      // the owning user with write permissions.
       user1.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {
@@ -2058,20 +2057,56 @@ public class TestDFSShell {
           return null;
         }
       });
-
-      // There should be permission to read,but not to remove for
-      // non-owning user (user2).
+  
+      // Test 5. There should be permission to read non-owning user (user2) if
+      // there is path access to that user and also can remove.
       user2.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {
           // Read
-          int ret = ToolRunner.run(fshell, new String[]{
-              "-getfattr", "-n", "user.a1", "/foo"});
+          int ret = ToolRunner.run(fshell, new String[] { "-getfattr", "-n",
+              "user.a1", "/foo" });
           assertEquals("Returned should be 0", 0, ret);
           out.reset();
           // Remove
-          ret = ToolRunner.run(fshell, new String[]{
-              "-setfattr", "-x", "user.a1", "/foo"});
+          ret = ToolRunner.run(fshell, new String[] { "-setfattr", "-x",
+              "user.a1", "/foo" });
+          assertEquals("Returned should be 0", 0, ret);
+          out.reset();
+          return null;
+        }
+      });
+  
+      // Test 6. There should be permission to read/remove for
+      // the owning user with path access.
+      user1.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          return null;
+        }
+      });
+  
+      // Test 7. Change permission to have path access only to owner(user1)
+      user1.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          // Give access to "other"
+          final int ret = ToolRunner.run(fshell, new String[]{
+              "-chmod", "700", "/foo"});
+          assertEquals("Return should be 0", 0, ret);
+          out.reset();
+          return null;
+        }
+      });
+  
+      // Test 8. There should be no permissions to set for
+      // the non-owning user with no path access.
+      user2.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          // set
+          int ret = ToolRunner.run(fshell, new String[] { "-setfattr", "-n",
+              "user.a2", "/foo" });
           assertEquals("Returned should be 1", 1, ret);
           final String str = out.toString();
           assertTrue("Permission denied printed",
@@ -2080,20 +2115,31 @@ public class TestDFSShell {
           return null;
         }
       });
-
-      // But there should be permission to read/remove for
-      // the owning user.
-      user1.doAs(new PrivilegedExceptionAction<Object>() {
+  
+      // Test 9. There should be no permissions to remove for
+      // the non-owning user with no path access.
+      user2.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {
-          // Read
-          int ret = ToolRunner.run(fshell, new String[]{
-              "-getfattr", "-n", "user.a1", "/foo"});
-          assertEquals("Returned should be 0", 0, ret);
+          // set
+          int ret = ToolRunner.run(fshell, new String[] { "-setfattr", "-x",
+              "user.a2", "/foo" });
+          assertEquals("Returned should be 1", 1, ret);
+          final String str = out.toString();
+          assertTrue("Permission denied printed",
+              str.indexOf("Permission denied") != -1);
           out.reset();
-          // Remove
-          ret = ToolRunner.run(fshell, new String[]{
-              "-setfattr", "-x", "user.a1", "/foo"});
+          return null;
+        }
+      });
+  
+      // Test 10. Superuser should be allowed to set with trusted namespace
+      SUPERUSER.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          // set
+          int ret = ToolRunner.run(fshell, new String[] { "-setfattr", "-n",
+              "trusted.a3", "/foo" });
           assertEquals("Returned should be 0", 0, ret);
           out.reset();
           return null;
