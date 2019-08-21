@@ -118,7 +118,7 @@ public class XAttrFeature implements INode.Feature {
     XAttr.Builder builder = new XAttr.Builder();
     builder.setName(attr.getName());
     builder.setNameSpace(XAttr.NameSpace.valueOf(attr.getNamespace()));
-    builder.setValue(attr.getValueBytes());
+    builder.setValue(attr.getValue());
     return builder.build();
   }
   
