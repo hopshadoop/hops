@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.http.client;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -31,10 +32,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.fs.XAttrCodec;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.lib.wsrs.EnumSetParam;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -46,6 +50,12 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -94,6 +104,10 @@ public class HttpFSFileSystem extends FileSystem
   public static final String GROUP_PARAM = "group";
   public static final String MODIFICATION_TIME_PARAM = "modificationtime";
   public static final String ACCESS_TIME_PARAM = "accesstime";
+  public static final String XATTR_NAME_PARAM = "xattr.name";
+  public static final String XATTR_VALUE_PARAM = "xattr.value";
+  public static final String XATTR_SET_FLAG_PARAM = "flag";
+  public static final String XATTR_ENCODING_PARAM = "encoding";
   public static final String NEW_LENGTH_PARAM = "newlength";
 
   public static final Short DEFAULT_PERMISSION = 0755;
@@ -143,6 +157,10 @@ public class HttpFSFileSystem extends FileSystem
   public static final String MODIFICATION_TIME_JSON = "modificationTime";
   public static final String BLOCK_SIZE_JSON = "blockSize";
   public static final String REPLICATION_JSON = "replication";
+  public static final String XATTRS_JSON = "XAttrs";
+  public static final String XATTR_NAME_JSON = "name";
+  public static final String XATTR_VALUE_JSON = "value";
+  public static final String XATTRNAMES_JSON = "XAttrNames";
 
   public static final String FILE_CHECKSUM_JSON = "FileChecksum";
   public static final String CHECKSUM_ALGORITHM_JSON = "algorithm";
@@ -185,7 +203,8 @@ public class HttpFSFileSystem extends FileSystem
     SETPERMISSION(HTTP_PUT), SETREPLICATION(HTTP_PUT), SETTIMES(HTTP_PUT),
     MODIFYACLENTRIES(HTTP_PUT), REMOVEACLENTRIES(HTTP_PUT),
     REMOVEDEFAULTACL(HTTP_PUT), REMOVEACL(HTTP_PUT), SETACL(HTTP_PUT),
-    DELETE(HTTP_DELETE);
+    DELETE(HTTP_DELETE), SETXATTR(HTTP_PUT), GETXATTRS(HTTP_GET),
+    REMOVEXATTR(HTTP_PUT), LISTXATTRS(HTTP_GET);
 
     private String httpMethod;
 
@@ -229,10 +248,35 @@ public class HttpFSFileSystem extends FileSystem
   private HttpURLConnection getConnection(final String method,
       Map<String, String> params, Path path, boolean makeQualified)
       throws IOException {
+    return getConnection(method, params, null, path, makeQualified);
+  }
+  
+  /**
+   * Convenience method that creates a <code>HttpURLConnection</code> for the
+   * HttpFSServer file system operations.
+   * <p/>
+   * This methods performs and injects any needed authentication credentials
+   * via the {@link #getConnection(URL, String)} method
+   *
+   * @param method the HTTP method.
+   * @param params the query string parameters.
+   * @param multiValuedParams multi valued parameters of the query string
+   * @param path the file path
+   * @param makeQualified if the path should be 'makeQualified'
+   *
+   * @return HttpURLConnection a <code>HttpURLConnection</code> for the
+   *         HttpFSServer server, authenticated and ready to use for the
+   *         specified path and file system operation.
+   *
+   * @throws IOException thrown if an IO error occurrs.
+   */
+  private HttpURLConnection getConnection(final String method,
+      Map<String, String> params, Map<String, List<String>> multiValuedParams,
+      Path path, boolean makeQualified) throws IOException {
     if (makeQualified) {
       path = makeQualified(path);
     }
-    final URL url = HttpFSUtils.createURL(path, params);
+    final URL url = HttpFSUtils.createURL(path, params, multiValuedParams);
     try {
       return UserGroupInformation.getCurrentUser().doAs(
           new PrivilegedExceptionAction<HttpURLConnection>() {
@@ -1077,5 +1121,114 @@ public class HttpFSFileSystem extends FileSystem
   @SuppressWarnings("unchecked")
   public <T extends TokenIdentifier> void setDelegationToken(Token<T> token) {
     //TODO : for renewer
+  }
+  
+  @Override
+  public void setXAttr(Path f, String name, byte[] value,
+      EnumSet<XAttrSetFlag> flag) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    params.put(OP_PARAM, Operation.SETXATTR.toString());
+    params.put(XATTR_NAME_PARAM, name);
+    if (value != null) {
+      params.put(XATTR_VALUE_PARAM,
+          XAttrCodec.encodeValue(value, XAttrCodec.HEX));
+    }
+    params.put(XATTR_SET_FLAG_PARAM, EnumSetParam.toString(flag));
+    HttpURLConnection conn = getConnection(Operation.SETXATTR.getMethod(),
+        params, f, true);
+    HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
+  }
+  
+  @Override
+  public byte[] getXAttr(Path f, String name) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    params.put(OP_PARAM, Operation.GETXATTRS.toString());
+    params.put(XATTR_NAME_PARAM, name);
+    HttpURLConnection conn = getConnection(Operation.GETXATTRS.getMethod(),
+        params, f, true);
+    HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
+    JSONObject json = (JSONObject) HttpFSUtils.jsonParse(conn);
+    Map<String, byte[]> xAttrs = createXAttrMap(
+        (JSONArray) json.get(XATTRS_JSON));
+    return xAttrs != null ? xAttrs.get(name) : null;
+  }
+  
+  /** Convert xAttrs json to xAttrs map */
+  private Map<String, byte[]> createXAttrMap(JSONArray jsonArray)
+      throws IOException {
+    Map<String, byte[]> xAttrs = Maps.newHashMap();
+    for (Object obj : jsonArray) {
+      JSONObject jsonObj = (JSONObject) obj;
+      final String name = (String)jsonObj.get(XATTR_NAME_JSON);
+      final byte[] value = XAttrCodec.decodeValue(
+          (String)jsonObj.get(XATTR_VALUE_JSON));
+      xAttrs.put(name, value);
+    }
+    
+    return xAttrs;
+  }
+  
+  /** Convert xAttr names json to names list */
+  private List<String> createXAttrNames(String xattrNamesStr) throws IOException {
+    JSONParser parser = new JSONParser();
+    JSONArray jsonArray;
+    try {
+      jsonArray = (JSONArray)parser.parse(xattrNamesStr);
+      List<String> names = Lists.newArrayListWithCapacity(jsonArray.size());
+      for (Object name : jsonArray) {
+        names.add((String) name);
+      }
+      return names;
+    } catch (ParseException e) {
+      throw new IOException("JSON parser error, " + e.getMessage(), e);
+    }
+  }
+  
+  @Override
+  public Map<String, byte[]> getXAttrs(Path f) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    params.put(OP_PARAM, Operation.GETXATTRS.toString());
+    HttpURLConnection conn = getConnection(Operation.GETXATTRS.getMethod(),
+        params, f, true);
+    HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
+    JSONObject json = (JSONObject) HttpFSUtils.jsonParse(conn);
+    return createXAttrMap((JSONArray) json.get(XATTRS_JSON));
+  }
+  
+  @Override
+  public Map<String, byte[]> getXAttrs(Path f, List<String> names)
+      throws IOException {
+    Preconditions.checkArgument(names != null && !names.isEmpty(),
+        "XAttr names cannot be null or empty.");
+    Map<String, String> params = new HashMap<String, String>();
+    params.put(OP_PARAM, Operation.GETXATTRS.toString());
+    Map<String, List<String>> multiValuedParams = Maps.newHashMap();
+    multiValuedParams.put(XATTR_NAME_PARAM, names);
+    HttpURLConnection conn = getConnection(Operation.GETXATTRS.getMethod(),
+        params, multiValuedParams, f, true);
+    HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
+    JSONObject json = (JSONObject) HttpFSUtils.jsonParse(conn);
+    return createXAttrMap((JSONArray) json.get(XATTRS_JSON));
+  }
+  
+  @Override
+  public List<String> listXAttrs(Path f) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    params.put(OP_PARAM, Operation.LISTXATTRS.toString());
+    HttpURLConnection conn = getConnection(Operation.LISTXATTRS.getMethod(),
+        params, f, true);
+    HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
+    JSONObject json = (JSONObject) HttpFSUtils.jsonParse(conn);
+    return createXAttrNames((String) json.get(XATTRNAMES_JSON));
+  }
+  
+  @Override
+  public void removeXAttr(Path f, String name) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    params.put(OP_PARAM, Operation.REMOVEXATTR.toString());
+    params.put(XATTR_NAME_PARAM, name);
+    HttpURLConnection conn = getConnection(Operation.REMOVEXATTR.getMethod(),
+        params, f, true);
+    HttpFSUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
   }
 }

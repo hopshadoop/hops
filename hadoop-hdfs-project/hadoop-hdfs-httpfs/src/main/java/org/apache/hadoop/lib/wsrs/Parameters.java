@@ -31,7 +31,7 @@ import java.util.Map;
  */
 @InterfaceAudience.Private
 public class Parameters {
-  private Map<String, Param<?>> params;
+  private Map<String, List<Param<?>>> params;
 
   /**
    * Constructor that receives the request parsed parameters.
@@ -39,7 +39,7 @@ public class Parameters {
    * @param params
    *     the request parsed parameters.
    */
-  public Parameters(Map<String, Param<?>> params) {
+  public Parameters(Map<String, List<Param<?>>> params) {
     this.params = params;
   }
 
@@ -54,7 +54,11 @@ public class Parameters {
    */
   @SuppressWarnings("unchecked")
   public <V, T extends Param<V>> V get(String name, Class<T> klass) {
-    return ((T) params.get(name)).value();
+    List<Param<?>> multiParams = (List<Param<?>>)params.get(name);
+    if (multiParams != null && multiParams.size() > 0) {
+      return ((T) multiParams.get(0)).value(); // Return first value;
+    }
+    return null;
   }
 
   /**

@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.lib.server.Service;
 import org.apache.hadoop.lib.server.ServiceException;
 import org.apache.hadoop.lib.service.Groups;
@@ -60,6 +61,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
@@ -68,6 +70,8 @@ import org.apache.hadoop.security.authentication.util.StringSignerSecretProvider
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.json.simple.JSONArray;
+
+import com.google.common.collect.Maps;
 
 public class TestHttpFSServer extends HFSTestCase {
 
@@ -144,6 +148,7 @@ public class TestHttpFSServer extends HFSTestCase {
     Configuration conf = new Configuration(false);
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, fsDefaultName);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
     File hdfsSite = new File(hadoopConfDir, "hdfs-site.xml");
     OutputStream os = new FileOutputStream(hdfsSite);
     conf.writeXml(os);
@@ -402,6 +407,90 @@ public class TestHttpFSServer extends HFSTestCase {
     createWithHttp("/perm/p-321", "321");
     statusJson = getStatus("/perm/p-321", "GETFILESTATUS");
     Assert.assertTrue("321".equals(getPerms(statusJson)));
+  }
+  
+  /**
+   * Parse xAttrs from JSON result of GETXATTRS call, return xAttrs Map.
+   * @param statusJson JSON from GETXATTRS
+   * @return Map<String, byte[]> xAttrs Map
+   * @throws Exception
+   */
+  private Map<String, byte[]> getXAttrs(String statusJson) throws Exception {
+    Map<String, byte[]> xAttrs = Maps.newHashMap();
+    JSONParser parser = new JSONParser();
+    JSONObject jsonObject = (JSONObject) parser.parse(statusJson);
+    JSONArray jsonXAttrs = (JSONArray) jsonObject.get("XAttrs");
+    if (jsonXAttrs != null) {
+      for (Object a : jsonXAttrs) {
+        String name = (String) ((JSONObject)a).get("name");
+        String value = (String) ((JSONObject)a).get("value");
+        xAttrs.put(name, decodeXAttrValue(value));
+      }
+    }
+    return xAttrs;
+  }
+  
+  /** Decode xattr value from string */
+  private byte[] decodeXAttrValue(String value) throws IOException {
+    if (value != null) {
+      return XAttrCodec.decodeValue(value);
+    } else {
+      return new byte[0];
+    }
+  }
+  
+  /**
+   * Validate XAttr get/set/remove calls.
+   */
+  @Test
+  @TestDir
+  @TestJetty
+  @TestHdfs
+  public void testXAttrs() throws Exception {
+    final String name1 = "user.a1";
+    final byte[] value1 = new byte[]{0x31, 0x32, 0x33};
+    final String name2 = "user.a2";
+    final byte[] value2 = new byte[]{0x41, 0x42, 0x43};
+    final String dir = "/xattrTest";
+    final String path = dir + "/file";
+    
+    createHttpFSServer(false);
+    
+    FileSystem fs = FileSystem.get(TestHdfsHelper.getHdfsConf());
+    fs.mkdirs(new Path(dir));
+    
+    createWithHttp(path,null);
+    String statusJson = getStatus(path, "GETXATTRS");
+    Map<String, byte[]> xAttrs = getXAttrs(statusJson);
+    Assert.assertEquals(0, xAttrs.size());
+    
+    // Set two xattrs
+    putCmd(path, "SETXATTR", setXAttrParam(name1, value1));
+    putCmd(path, "SETXATTR", setXAttrParam(name2, value2));
+    statusJson = getStatus(path, "GETXATTRS");
+    xAttrs = getXAttrs(statusJson);
+    Assert.assertEquals(2, xAttrs.size());
+    Assert.assertArrayEquals(value1, xAttrs.get(name1));
+    Assert.assertArrayEquals(value2, xAttrs.get(name2));
+    
+    // Remove one xattr
+    putCmd(path, "REMOVEXATTR", "xattr.name=" + name1);
+    statusJson = getStatus(path, "GETXATTRS");
+    xAttrs = getXAttrs(statusJson);
+    Assert.assertEquals(1, xAttrs.size());
+    Assert.assertArrayEquals(value2, xAttrs.get(name2));
+    
+    // Remove another xattr, then there is no xattr
+    putCmd(path, "REMOVEXATTR", "xattr.name=" + name2);
+    statusJson = getStatus(path, "GETXATTRS");
+    xAttrs = getXAttrs(statusJson);
+    Assert.assertEquals(0, xAttrs.size());
+  }
+  
+  /** Params for setting an xAttr */
+  public static String setXAttrParam(String name, byte[] value) throws IOException {
+    return "xattr.name=" + name + "&xattr.value=" + XAttrCodec.encodeValue(
+        value, XAttrCodec.HEX) + "&encoding=hex&flag=create";
   }
 
   /**

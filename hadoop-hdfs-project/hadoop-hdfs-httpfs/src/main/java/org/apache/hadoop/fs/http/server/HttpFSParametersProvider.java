@@ -18,10 +18,13 @@
 package org.apache.hadoop.fs.http.server;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.XAttrCodec;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem.Operation;
 import org.apache.hadoop.lib.wsrs.BooleanParam;
 import org.apache.hadoop.lib.wsrs.EnumParam;
+import org.apache.hadoop.lib.wsrs.EnumSetParam;
 import org.apache.hadoop.lib.wsrs.LongParam;
 import org.apache.hadoop.lib.wsrs.Param;
 import org.apache.hadoop.lib.wsrs.ParametersProvider;
@@ -34,7 +37,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT;
-import org.apache.hadoop.hdfs.web.resources.AclPermissionParam;
 
 /**
  * HttpFS ParametersProvider.
@@ -81,6 +83,14 @@ public class HttpFSParametersProvider extends ParametersProvider {
     PARAMS_DEF.put(Operation.REMOVEACLENTRIES,
         new Class[]{AclPermissionParam.class});
     PARAMS_DEF.put(Operation.REMOVEDEFAULTACL, new Class[]{});
+    PARAMS_DEF.put(Operation.SETXATTR,
+        new Class[]{XAttrNameParam.class, XAttrValueParam.class,
+            XAttrSetFlagParam.class});
+    PARAMS_DEF.put(Operation.REMOVEXATTR,
+        new Class[]{XAttrNameParam.class});
+    PARAMS_DEF.put(Operation.GETXATTRS,
+        new Class[]{XAttrNameParam.class, XAttrEncodingParam.class});
+    PARAMS_DEF.put(Operation.LISTXATTRS, new Class[]{});
   }
 
   public HttpFSParametersProvider() {
@@ -433,6 +443,81 @@ public class HttpFSParametersProvider extends ParametersProvider {
      */
     public DestinationParam() {
       super(NAME, null);
+    }
+  }
+  
+  /**
+   * Class for xattr parameter.
+   */
+  @InterfaceAudience.Private
+  public static class XAttrNameParam extends StringParam {
+    public static final String XATTR_NAME_REGX =
+        "^(user\\.|trusted\\.|system\\.|security\\.).+";
+    /**
+     * Parameter name.
+     */
+    public static final String NAME = HttpFSFileSystem.XATTR_NAME_PARAM;
+    private static final Pattern pattern = Pattern.compile(XATTR_NAME_REGX);
+    
+    /**
+     * Constructor.
+     */
+    public XAttrNameParam() {
+      super(NAME, null, pattern);
+    }
+  }
+  
+  /**
+   * Class for xattr parameter.
+   */
+  @InterfaceAudience.Private
+  public static class XAttrValueParam extends StringParam {
+    /**
+     * Parameter name.
+     */
+    public static final String NAME = HttpFSFileSystem.XATTR_VALUE_PARAM;
+    
+    /**
+     * Constructor.
+     */
+    public XAttrValueParam() {
+      super(NAME, null);
+    }
+  }
+  
+  /**
+   * Class for xattr parameter.
+   */
+  @InterfaceAudience.Private
+  public static class XAttrSetFlagParam extends EnumSetParam<XAttrSetFlag> {
+    /**
+     * Parameter name.
+     */
+    public static final String NAME = HttpFSFileSystem.XATTR_SET_FLAG_PARAM;
+    
+    /**
+     * Constructor.
+     */
+    public XAttrSetFlagParam() {
+      super(NAME, XAttrSetFlag.class, null);
+    }
+  }
+  
+  /**
+   * Class for xattr parameter.
+   */
+  @InterfaceAudience.Private
+  public static class XAttrEncodingParam extends EnumParam<XAttrCodec> {
+    /**
+     * Parameter name.
+     */
+    public static final String NAME = HttpFSFileSystem.XATTR_ENCODING_PARAM;
+    
+    /**
+     * Constructor.
+     */
+    public XAttrEncodingParam() {
+      super(NAME, XAttrCodec.class, null);
     }
   }
 }
