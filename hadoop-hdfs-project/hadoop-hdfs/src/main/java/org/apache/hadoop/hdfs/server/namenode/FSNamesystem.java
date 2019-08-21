@@ -8005,11 +8005,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkNameNodeSafeMode("Cannot set XAttr on " + src);
     src = FSDirectory.resolvePath(src, pathComponents, dir);
     INodesInPath iip = dir.getINodesInPath(src, true);
-    if (isPermissionEnabled) {
-      dir.checkOwner(pc, iip);
-      dir.checkPathAccess(pc, iip, FsAction.WRITE);
-    }
-  
+    checkXAttrChangeAccess(src, xAttr, pc);
     List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
     xAttrs.add(xAttr);
     dir.setXAttrs(src, xAttrs, flag);
@@ -8136,11 +8132,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         try {
           checkNameNodeSafeMode("Cannot remove XAttr entry on " + src);
           INodesInPath iip = dir.getINodesInPath(src, true);
-          if (isPermissionEnabled) {
-            dir.checkOwner(pc, iip);
-            dir.checkPathAccess(pc, iip, FsAction.WRITE);
-          }
-  
+          checkXAttrChangeAccess(src, xAttr, pc);
           List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
           xAttrs.add(xAttr);
           List<XAttr> removedXAttrs = dir.removeXAttrs(src, xAttrs);
@@ -8155,6 +8147,21 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
       
     }.handle();
+  }
+
+  private void checkXAttrChangeAccess(String src, XAttr xAttr,
+      FSPermissionChecker pc) throws IOException {
+    if (isPermissionEnabled && xAttr.getNameSpace() == XAttr.NameSpace.USER) {
+      final INodesInPath iip = dir.getINodesInPath(src, true);
+      final INode inode = iip.getLastINode();
+      if (inode.isDirectory() && inode.getFsPermission().getStickyBit()) {
+        if (!pc.isSuperUser()) {
+          dir.checkOwner(pc, iip);
+        }
+      } else {
+        dir.checkPathAccess(pc, iip, FsAction.WRITE);
+      }
+    }
   }
 
   /**
