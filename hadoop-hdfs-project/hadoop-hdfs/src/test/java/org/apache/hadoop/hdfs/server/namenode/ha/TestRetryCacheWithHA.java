@@ -601,4 +601,47 @@ public class TestRetryCacheWithHA {
     }
   }
   
+  /** removeXAttr */
+  class RemoveXAttrOp extends AtMostOnceOp {
+    private final String src;
+    
+    RemoveXAttrOp(DFSClient client, String src) {
+      super("removeXAttr", client);
+      this.src = src;
+    }
+    
+    @Override
+    void prepare() throws Exception {
+      Path p = new Path(src);
+      if (!dfs.exists(p)) {
+        DFSTestUtil.createFile(dfs, p, BlockSize, DataNodes, 0);
+        client.setXAttr(src, "user.key", "value".getBytes(),
+            EnumSet.of(XAttrSetFlag.CREATE));
+      }
+    }
+    
+    @Override
+    void invoke() throws Exception {
+      client.removeXAttr(src, "user.key");
+    }
+    
+    @Override
+    boolean checkNamenodeBeforeReturn() throws Exception {
+      for (int i = 0; i < CHECKTIMES; i++) {
+        Map<String, byte[]> iter = dfs.getXAttrs(new Path(src));
+        Set<String> keySet = iter.keySet();
+        if (!keySet.contains("user.key")) {
+          return true;
+        }
+        Thread.sleep(1000);
+      }
+      return false;
+    }
+    
+    @Override
+    Object getResult() {
+      return null;
+    }
+  }
+  
 }

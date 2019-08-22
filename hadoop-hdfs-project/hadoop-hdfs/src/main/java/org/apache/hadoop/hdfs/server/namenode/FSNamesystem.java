@@ -8067,11 +8067,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         nnConf.checkXAttrsConfigFlag();
         FSPermissionChecker pc = getPermissionChecker();
         boolean getAll = xAttrs == null || xAttrs.isEmpty();
-        List<XAttr> filteredXAttrs = null;
         if (!getAll) {
-          filteredXAttrs = XAttrPermissionFilter.filterXAttrsForApi(pc, xAttrs);
-          if (filteredXAttrs.isEmpty()) {
-            return filteredXAttrs;
+          try {
+            XAttrPermissionFilter.checkPermissionForApi(pc, xAttrs);
+          } catch (AccessControlException e) {
+            logAuditEvent(false, "getXAttrs", src);
+            throw e;
           }
         }
 
@@ -8080,15 +8081,34 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           if (isPermissionEnabled) {
             dir.checkPathAccess(pc, iip, FsAction.READ);
           }
-          List<XAttr> filteredAll = dir.getXAttrs(src, filteredXAttrs);
+          List<XAttr> all = dir.getXAttrs(src, xAttrs);
+          List<XAttr> filteredAll = XAttrPermissionFilter.
+              filterXAttrsForApi(pc, all);
           
           if (getAll) {
             return filteredAll;
           } else {
-            if (filteredAll == null || filteredAll.isEmpty()) {
+            if (filteredAll == null || !iip.getLastINode().hasXAttrs()) {
               return null;
             }
-            return filteredAll;
+  
+            List<XAttr> toGet = Lists.newArrayListWithCapacity(xAttrs.size());
+            for (XAttr xAttr : xAttrs) {
+              boolean foundIt = false;
+              for (XAttr a : filteredAll) {
+                if (xAttr.getNameSpace() == a.getNameSpace()
+                    && xAttr.getName().equals(a.getName())) {
+                  toGet.add(a);
+                  foundIt = true;
+                  break;
+                }
+              }
+              if (!foundIt) {
+                throw new IOException(
+                    "At least one of the attributes provided was not found.");
+              }
+            }
+            return toGet;
           }
         } catch (AccessControlException e) {
           logAuditEvent(false, "getXAttrs", src);
@@ -8135,6 +8155,18 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }.handle();
   }
   
+  /**
+   * Remove an xattr for a file or directory.
+   *
+   * @param src
+   *          - path to remove the xattr from
+   * @param xAttr
+   *          - xAttr to remove
+   * @throws AccessControlException
+   * @throws SafeModeException
+   * @throws UnresolvedLinkException
+   * @throws IOException
+   */
   void removeXAttr(final String src, final XAttr xAttr) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.GET_XATTRS){
       @Override
@@ -8148,40 +8180,59 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         locks.add(il);
         locks.add(lf.getXAttrLock(xAttr));
         locks.add(lf.getAcesLock());
+        if(isRetryCacheEnabled) {
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
+              Server.getCallId()));
+        }
       }
       
       @Override
       public Object performTask() throws IOException {
-        nnConf.checkXAttrsConfigFlag();
-        HdfsFileStatus resultingStat = null;
-        FSPermissionChecker pc = getPermissionChecker();
+        CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
+        if (cacheEntry != null && cacheEntry.isSuccess()) {
+          return null; // Return previous response
+        }
+        boolean success = false;
         try {
-          XAttrPermissionFilter.checkPermissionForApi(pc, xAttr);
+          removeXAttrInt(src, xAttr, cacheEntry != null);
+          success = true;
         } catch (AccessControlException e) {
           logAuditEvent(false, "removeXAttr", src);
           throw e;
+        } finally {
+          RetryCache.setState(cacheEntry, success);
         }
-        byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
-        try {
-          checkNameNodeSafeMode("Cannot remove XAttr entry on " + src);
-          INodesInPath iip = dir.getINodesInPath(src, true);
-          checkXAttrChangeAccess(src, xAttr, pc);
-          List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
-          xAttrs.add(xAttr);
-          List<XAttr> removedXAttrs = dir.removeXAttrs(src, xAttrs);
-          resultingStat = dir.getAuditFileInfo(dir.getINodesInPath(src,
-              false));
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "removeXAttr", src);
-          throw e;
-        }
-        logAuditEvent(true, "removeXAttr", src, null, resultingStat);
         return null;
       }
       
     }.handle();
   }
-
+  
+  void removeXAttrInt(String src, XAttr xAttr, boolean logRetryCache)
+      throws IOException {
+    nnConf.checkXAttrsConfigFlag();
+    HdfsFileStatus resultingStat = null;
+    FSPermissionChecker pc = getPermissionChecker();
+    XAttrPermissionFilter.checkPermissionForApi(pc, xAttr);
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(src);
+    
+    checkNameNodeSafeMode("Cannot remove XAttr entry on " + src);
+    INodesInPath iip = dir.getINodesInPath(src, true);
+    checkXAttrChangeAccess(src, xAttr, pc);
+    List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
+    xAttrs.add(xAttr);
+    List<XAttr> removedXAttrs = dir.removeXAttrs(src, xAttrs);
+    if (removedXAttrs != null && !removedXAttrs.isEmpty()) {
+       //
+    } else {
+      throw new IOException(
+            "No matching attributes found for remove operation");
+    }
+    resultingStat = dir.getAuditFileInfo(dir.getINodesInPath(src,
+          false));
+    logAuditEvent(true, "removeXAttr", src, null, resultingStat);
+  }
+  
   private void checkXAttrChangeAccess(String src, XAttr xAttr,
       FSPermissionChecker pc) throws IOException {
     if (isPermissionEnabled && xAttr.getNameSpace() == XAttr.NameSpace.USER) {

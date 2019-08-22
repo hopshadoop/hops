@@ -365,7 +365,7 @@ public class TestNamenodeRetryCache {
     FSNamesystem namesystem = cluster.getNamesystem();
     LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
         (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
-    assertEquals(21, cacheSet.size());
+    assertEquals(22, cacheSet.size());
     
     Map<CacheEntry, CacheEntry> oldEntries = 
         new HashMap<CacheEntry, CacheEntry>();
@@ -385,7 +385,7 @@ public class TestNamenodeRetryCache {
     fillCacheFromDB(oldEntries, namesystem);
     cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
         .getRetryCache().getCacheSet();
-    assertEquals(21, cacheSet.size());
+    assertEquals(22, cacheSet.size());
     iter = cacheSet.iterator();
     while (iter.hasNext()) {
       CacheEntry entry = iter.next();
@@ -420,7 +420,7 @@ public class TestNamenodeRetryCache {
     FSNamesystem namesystem = cluster.getNamesystem();
     LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
         (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
-    assertEquals(21, cacheSet.size());
+    assertEquals(22, cacheSet.size());
     
     Map<CacheEntry, CacheEntry> oldEntries = 
         new HashMap<CacheEntry, CacheEntry>();

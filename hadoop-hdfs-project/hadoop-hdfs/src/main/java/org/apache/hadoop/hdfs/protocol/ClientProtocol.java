@@ -1651,7 +1651,7 @@ public interface ClientProtocol {
    * @param xAttr <code>XAttr</code> to remove
    * @throws IOException
    */
-  @Idempotent
+  @AtMostOnce
   public void removeXAttr(String src, XAttr xAttr) throws IOException;
   
   /**
