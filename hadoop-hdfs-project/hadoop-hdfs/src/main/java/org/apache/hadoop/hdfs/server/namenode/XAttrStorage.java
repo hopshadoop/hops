@@ -71,7 +71,7 @@ public class XAttrStorage {
    * Update xattr of inode.
    * @param inode Inode to update.
    * @param xAttr the xAttr to update.
-   * @param exists
+   * @param xAttrExists
    */
   public static void updateINodeXAttr(INode inode, XAttr xAttr,
       boolean xAttrExists)
@@ -119,41 +119,6 @@ public class XAttrStorage {
     return StoredXAttr.MAX_XATTR_NAME_SIZE + StoredXAttr.MAX_XATTR_VALUE_SIZE;
   }
   
-  /**
-   * Verifies that the size of the name and value of an xattr is within
-   * the configured limit.
-   */
-  public static void checkXAttrSize(final XAttr xAttr,
-      final int xattrSizeLimit) {
-    
-    int nameSize = StoredXAttr.getXAttrBytes(xAttr.getName()).length;
-    int valueSize = 0;
-    if (xAttr.getValue() != null) {
-      valueSize = xAttr.getValue().length;
-    }
-    
-    if (nameSize > StoredXAttr.MAX_XATTR_NAME_SIZE) {
-      throw new HadoopIllegalArgumentException(
-          "The XAttr name is too big. The maximum  size of the"
-              + " name is " + StoredXAttr.MAX_XATTR_NAME_SIZE
-              + ", but the name size is " + nameSize);
-    }
-    
-    if (valueSize > StoredXAttr.MAX_XATTR_VALUE_SIZE) {
-      throw new HadoopIllegalArgumentException(
-          "The XAttr value is too big. The maximum  size of the"
-              + " value is " + StoredXAttr.MAX_XATTR_VALUE_SIZE
-              + ", but the value size is " + valueSize);
-    }
-    
-    int size = nameSize + valueSize;
-    if (size > xattrSizeLimit) {
-      throw new HadoopIllegalArgumentException(
-          "The XAttr is too big. The maximum combined size of the"
-              + " name and value is " + xattrSizeLimit
-              + ", but the total size is " + size);
-    }
-  }
   
   private static void logMetadataEvent(INode inode, XAttr attr,
       XAttrMetadataLogEntry.Operation operation)

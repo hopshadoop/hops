@@ -455,7 +455,7 @@ public class TestFSDirectory {
       
       @Override
       public Object performTask() throws IOException {
-        fsdir.unprotectedSetXAttrs(src, xAttrs, flag);
+        FSDirXAttrOp.unprotectedSetXAttrs(fsdir, src, xAttrs, flag);
         return null;
       }
     }.handle();
@@ -475,7 +475,7 @@ public class TestFSDirectory {
       
       @Override
       public Object performTask() throws IOException {
-        return fsdir.getXAttrs(src);
+        return FSDirXAttrOp.getXAttrs(fsdir.getINode(src));
       }
     }.handle();
   }
@@ -493,7 +493,7 @@ public class TestFSDirectory {
       
       @Override
       public Object performTask() throws IOException {
-        return fsdir.unprotectedRemoveXAttrs(src, xAttrs);
+        return FSDirXAttrOp.unprotectedRemoveXAttrs(fsdir, src, xAttrs);
       }
     }.handle();
   }

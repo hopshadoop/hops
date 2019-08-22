@@ -425,7 +425,8 @@ public class TestRetryCacheWithHA {
     if (cacheSets.get(0).size() < cacheSets.get(1).size()) {
       usedNN = 1;
     }
-    assertEquals(21, cacheSets.get(usedNN).size() + cacheSets.get(1-  usedNN).size());
+    assertEquals(22,
+        cacheSets.get(usedNN).size() + cacheSets.get(1-  usedNN).size());
     
     Map<CacheEntry, CacheEntry> oldEntries = new HashMap<CacheEntry, CacheEntry>();
     Iterator<CacheEntry> iter = cacheSets.get(usedNN).iterator();
@@ -444,7 +445,7 @@ public class TestRetryCacheWithHA {
 
     // 3. check the retry cache on the new active NN
     fillCacheFromDB(oldEntries, fsns.get(1 - usedNN));
-    assertEquals(21, cacheSets.get(1 - usedNN).size());
+    assertEquals(22, cacheSets.get(1 - usedNN).size());
     iter = cacheSets.get(1 - usedNN).iterator();
     
     while (iter.hasNext()) {

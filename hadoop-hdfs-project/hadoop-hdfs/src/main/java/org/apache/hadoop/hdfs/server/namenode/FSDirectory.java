@@ -77,7 +77,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.ListIterator;
 
 import org.apache.commons.io.Charsets;
 
@@ -87,7 +86,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENAB
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
-import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
 import static org.apache.hadoop.util.Time.now;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
 import org.apache.hadoop.hdfs.XAttrHelper;
@@ -113,9 +111,6 @@ public class FSDirectory implements Closeable {
   public final static byte[] DOT_INODES = 
       DFSUtil.string2Bytes(DOT_INODES_STRING);
   
-  private final XAttr UNREADABLE_BY_SUPERUSER_XATTR =
-      XAttrHelper.buildXAttr(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER, null);
-  
   private final FSNamesystem namesystem;
   private final int maxComponentLength;
   private final int maxDirItems;
@@ -123,6 +118,7 @@ public class FSDirectory implements Closeable {
   private final int contentCountLimit; // max content summary counts per run
   private final long contentSleepMicroSec;
   private long yieldCount = 0; // keep track of lock yield count.
+
   private final int inodeXAttrsLimit; //inode xattrs max limit
   
   private boolean quotaEnabled;
@@ -134,7 +130,9 @@ public class FSDirectory implements Closeable {
    * ACL-related operations.
    */
   private final boolean aclsEnabled;
-
+  private final boolean xattrsEnabled;
+  private final int xattrMaxSize;
+  
   // precision of access times.
   private final long accessTimePrecision;
   // whether setStoragePolicy is allowed.
@@ -175,6 +173,22 @@ public class FSDirectory implements Closeable {
         DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY,
         DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_DEFAULT);
     LOG.info("ACLs enabled? " + aclsEnabled);
+    this.xattrsEnabled = conf.getBoolean(
+        DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY,
+        DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_DEFAULT);
+    LOG.info("XAttrs enabled? " + xattrsEnabled);
+    int xattrMS = conf.getInt(
+        DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY,
+        DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_DEFAULT);
+    Preconditions.checkArgument(xattrMS >= 0,
+        "Cannot set a negative value for the maximum size of an xattr (%s).",
+        DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY);
+    if(xattrMS == 0 || xattrMS > XAttrStorage.getMaxXAttrSize()){
+      xattrMS = XAttrStorage.getMaxXAttrSize();
+    }
+    this.xattrMaxSize = xattrMS;
+    LOG.info("Maximum size of an xattr: " + xattrMaxSize );
+    
     int configuredLimit = conf.getInt(DFSConfigKeys.DFS_LIST_LIMIT,
         DFSConfigKeys.DFS_LIST_LIMIT_DEFAULT);
     this.lsLimit = configuredLimit > 0 ? configuredLimit :
@@ -262,11 +276,19 @@ public class FSDirectory implements Closeable {
   boolean isQuotaByStorageTypeEnabled() {
     return quotaByStorageTypeEnabled;
   }
+  boolean isXattrsEnabled() {
+    return xattrsEnabled;
+  }
+  int getXattrMaxSize() { return xattrMaxSize; }
 
   int getLsLimit() {
     return lsLimit;
   }
-
+  
+  int getInodeXAttrsLimit() {
+    return inodeXAttrsLimit;
+  }
+  
   int getContentCountLimit() {
     return contentCountLimit;
   }
@@ -1552,152 +1574,6 @@ public class FSDirectory implements Closeable {
             + parent);
       }
     }
-  }
-  
-  /**
-   * Removes a list of XAttrs from an inode at a path.
-   *
-   * @param src path of inode
-   * @param toRemove XAttrs to be removed
-   * @return List of XAttrs that were removed
-   * @throws IOException if the inode does not exist, if quota is exceeded
-   */
-  List<XAttr> removeXAttrs(final String src, final List<XAttr> toRemove)
-      throws IOException {
-    return unprotectedRemoveXAttrs(src, toRemove);
-  }
-  
-  List<XAttr> unprotectedRemoveXAttrs(final String src,
-      final List<XAttr> toRemove) throws IOException {
-    INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
-    INode inode = resolveLastINode(iip);
-    List<XAttr> storedXAttrs = XAttrStorage.readINodeXAttrs(inode, toRemove);
-    for(XAttr xAttr : toRemove){
-      if (UNREADABLE_BY_SUPERUSER_XATTR.equalsIgnoreValue(xAttr)) {
-        throw new AccessControlException("The xattr '" +
-            SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' can not be deleted.");
-      }
-    }
-    for(XAttr xAttr : storedXAttrs){
-      XAttrStorage.removeINodeXAttr(inode, xAttr);
-      decrementXAttrs(inode, xAttr);
-    }
-    
-    if(!storedXAttrs.isEmpty())
-      return storedXAttrs;
-    return null;
-  }
-  
-  
-  void setXAttrs(final String src, final List<XAttr> xAttrs,
-      final EnumSet<XAttrSetFlag> flag) throws IOException {
-      unprotectedSetXAttrs(src, xAttrs, flag);
-  }
-  
-  void unprotectedSetXAttrs(final String src, final List<XAttr> xAttrs,
-      final EnumSet<XAttrSetFlag> flag)
-      throws QuotaExceededException, IOException {
-    INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
-    INode inode = resolveLastINode(iip);
-    setINodeXAttrs(inode, xAttrs, flag);
-  }
-  
-  void setINodeXAttrs(INode inode, final List<XAttr> toSet,
-      final EnumSet<XAttrSetFlag> flag) throws IOException {
-    
-    // Check for duplicate XAttrs in toSet
-    // We need to use a custom comparator, so using a HashSet is not suitable
-    for (int i = 0; i < toSet.size(); i++) {
-      for (int j = i + 1; j < toSet.size(); j++) {
-        if (toSet.get(i).equalsIgnoreValue(toSet.get(j))) {
-          throw new IOException("Cannot specify the same XAttr to be set " +
-              "more than once");
-        }
-      }
-    }
-    
-    // Check if the XAttr already exists to validate with the provided flag
-    for (XAttr xAttr: toSet) {
-      boolean exists = XAttrStorage.readINodeXAttr(inode, xAttr) != null;
-      XAttrSetFlag.validate(xAttr.getName(), exists, flag);
-      incrementXAttrs(inode, xAttr, exists);
-  
-      final String xaName = XAttrHelper.getPrefixName(xAttr);
-      if (!inode.isFile() && SECURITY_XATTR_UNREADABLE_BY_SUPERUSER.equals(xaName)) {
-        throw new IOException("Can only set '" +
-            SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file.");
-      }
-      
-      XAttrStorage.updateINodeXAttr(inode, xAttr, exists);
-    }
-  }
-  
-  private boolean isUserVisible(XAttr xAttr) {
-    if (xAttr.getNameSpace() == XAttr.NameSpace.USER ||
-        xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED) {
-      return true;
-    }
-    return false;
-  }
-  
-  private void incrementXAttrs(INode inode, XAttr xAttr, boolean xAttrExists)
-      throws IOException {
-    if(xAttrExists)
-      return;
-    
-    boolean limitsExceeded = false;
-    String message = "Cannot add additional %sXAttr to inode, would exceed " +
-        "limit of %d";
-    
-    if(isUserVisible(xAttr)) {
-      if(inode.getNumUserXAttrs()== XAttrStorage.getMaxNumberOfUserXAttrPerInode()){
-        limitsExceeded = true;
-      }else {
-        inode.incrementUserXAttrs();
-        limitsExceeded = inode.getNumUserXAttrs() > inodeXAttrsLimit;
-      }
-      message = String.format(message, "", inodeXAttrsLimit);
-    }else {
-      if(inode.getNumSysXAttrs() == XAttrStorage.getMaxNumberOfSysXAttrPerInode()){
-        limitsExceeded = true;
-        message = String.format(message, "System ",
-            XAttrStorage.getMaxNumberOfSysXAttrPerInode());
-      }else{
-        inode.incrementSysXAttrs();
-      }
-    }
-    
-    if(limitsExceeded){
-      throw new IOException(message);
-    }
-  }
-  
-  private void decrementXAttrs(INode inode, XAttr xAttr)
-      throws TransactionContextException, StorageException {
-    if(isUserVisible(xAttr)) {
-      inode.decrementUserXAttrs();
-    }else {
-      inode.decrementSysXAttrs();
-    }
-  }
-  
-  List<XAttr> getXAttrs(String src, List<XAttr> xAttrs) throws IOException {
-    INodesInPath iip = getINodesInPath(normalizePath(src), true);
-    INode inode = resolveLastINode(iip);
-    return unprotectedGetXAttrs(inode, xAttrs);
-  }
-  
-  private List<XAttr> unprotectedGetXAttrs(INode inode, List<XAttr> xAttrs)
-      throws IOException {
-    return XAttrStorage.readINodeXAttrs(inode, xAttrs);
-  }
-  
-  List<XAttr> getXAttrs(INode inode) throws IOException {
-    return unprotectedGetXAttrs(inode, Collections.<XAttr>emptyList());
-  }
-  
-  List<XAttr> getXAttrs(String src) throws IOException {
-    return getXAttrs(src, Collections.<XAttr>emptyList());
   }
   
 }
