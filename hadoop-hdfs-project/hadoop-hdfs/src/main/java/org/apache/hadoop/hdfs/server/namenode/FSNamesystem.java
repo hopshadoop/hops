@@ -1121,7 +1121,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         locks.add(il).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
         locks.add(lf.getAcesLock());
-        locks.add(lf.getXAttrLock());
+        if(dir.getPermissionChecker().isSuperUser()) {
+          locks.add(lf.getXAttrLock());
+        }
       }
 
       @Override
@@ -1188,7 +1190,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
-        locks.add(lf.getXAttrLock());
+        if(dir.getPermissionChecker().isSuperUser()) {
+          locks.add(lf.getXAttrLock());
+        }
       }
 
       @Override
@@ -1300,13 +1304,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private void checkUnreadableBySuperuser(FSPermissionChecker pc,
       INode inode)
       throws IOException {
-    for (XAttr xattr : dir.getXAttrs(inode)) {
-      if (XAttrHelper.getPrefixName(xattr).
-          equals(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER)) {
-        if (pc.isSuperUser()) {
-          throw new AccessControlException("Access is denied for " +
-              pc.getUser() + " since the superuser is not allowed to " +
-              "perform this operation.");
+    if(pc.isSuperUser()) {
+      for (XAttr xattr : dir.getXAttrs(inode)) {
+        if (XAttrHelper.getPrefixName(xattr).
+            equals(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER)) {
+          if (pc.isSuperUser()) {
+            throw new AccessControlException("Access is denied for " +
+                pc.getUser() + " since the superuser is not allowed to " +
+                "perform this operation.");
+          }
         }
       }
     }
