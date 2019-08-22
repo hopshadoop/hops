@@ -87,6 +87,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENAB
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
 import static org.apache.hadoop.util.Time.now;
 import io.hops.metadata.hdfs.dal.DirectoryWithQuotaFeatureDataAccess;
 import org.apache.hadoop.hdfs.XAttrHelper;
@@ -111,6 +112,10 @@ public class FSDirectory implements Closeable {
   public final static String DOT_INODES_STRING = ".inodes";
   public final static byte[] DOT_INODES = 
       DFSUtil.string2Bytes(DOT_INODES_STRING);
+  
+  private final XAttr UNREADABLE_BY_SUPERUSER_XATTR =
+      XAttrHelper.buildXAttr(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER, null);
+  
   private final FSNamesystem namesystem;
   private final int maxComponentLength;
   private final int maxDirItems;
@@ -1567,7 +1572,12 @@ public class FSDirectory implements Closeable {
     INodesInPath iip = getINodesInPath4Write(normalizePath(src), true);
     INode inode = resolveLastINode(iip);
     List<XAttr> storedXAttrs = XAttrStorage.readINodeXAttrs(inode, toRemove);
-    
+    for(XAttr xAttr : toRemove){
+      if (UNREADABLE_BY_SUPERUSER_XATTR.equalsIgnoreValue(xAttr)) {
+        throw new AccessControlException("The xattr '" +
+            SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' can not be deleted.");
+      }
+    }
     for(XAttr xAttr : storedXAttrs){
       XAttrStorage.removeINodeXAttr(inode, xAttr);
       decrementXAttrs(inode, xAttr);
@@ -1611,6 +1621,13 @@ public class FSDirectory implements Closeable {
       boolean exists = XAttrStorage.readINodeXAttr(inode, xAttr) != null;
       XAttrSetFlag.validate(xAttr.getName(), exists, flag);
       incrementXAttrs(inode, xAttr, exists);
+  
+      final String xaName = XAttrHelper.getPrefixName(xAttr);
+      if (!inode.isFile() && SECURITY_XATTR_UNREADABLE_BY_SUPERUSER.equals(xaName)) {
+        throw new IOException("Can only set '" +
+            SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file.");
+      }
+      
       XAttrStorage.updateINodeXAttr(inode, xAttr, exists);
     }
   }
@@ -1667,10 +1684,20 @@ public class FSDirectory implements Closeable {
   List<XAttr> getXAttrs(String src, List<XAttr> xAttrs) throws IOException {
     INodesInPath iip = getINodesInPath(normalizePath(src), true);
     INode inode = resolveLastINode(iip);
+    return unprotectedGetXAttrs(inode, xAttrs);
+  }
+  
+  private List<XAttr> unprotectedGetXAttrs(INode inode, List<XAttr> xAttrs)
+      throws IOException {
     return XAttrStorage.readINodeXAttrs(inode, xAttrs);
+  }
+  
+  List<XAttr> getXAttrs(INode inode) throws IOException {
+    return unprotectedGetXAttrs(inode, Collections.<XAttr>emptyList());
   }
   
   List<XAttr> getXAttrs(String src) throws IOException {
     return getXAttrs(src, Collections.<XAttr>emptyList());
   }
+  
 }
