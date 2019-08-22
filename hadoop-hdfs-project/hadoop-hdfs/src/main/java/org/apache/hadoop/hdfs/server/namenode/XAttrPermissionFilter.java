@@ -28,6 +28,8 @@ import org.apache.hadoop.security.AccessControlException;
 import com.google.common.collect.Lists;
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
+
 /**
  * There are four types of extended attributes <XAttr> defined by the
  * following namespaces:
@@ -56,6 +58,15 @@ public class XAttrPermissionFilter {
     if (xAttr.getNameSpace() == XAttr.NameSpace.USER || 
         (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && 
         pc.isSuperUser())) {
+      return;
+    }
+    if (XAttrHelper.getPrefixName(xAttr).
+        equals(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER)) {
+      if (xAttr.getValue() != null) {
+        throw new AccessControlException("Attempt to set a value for '" +
+            SECURITY_XATTR_UNREADABLE_BY_SUPERUSER +
+            "'. Values are not allowed for this xattr.");
+      }
       return;
     }
     throw new AccessControlException("User doesn't have permission for xattr: "
@@ -87,6 +98,9 @@ public class XAttrPermissionFilter {
         filteredXAttrs.add(xAttr);
       } else if (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && 
           pc.isSuperUser()) {
+        filteredXAttrs.add(xAttr);
+      }else if (XAttrHelper.getPrefixName(xAttr).
+          equals(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER)) {
         filteredXAttrs.add(xAttr);
       }
     }
