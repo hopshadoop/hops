@@ -356,5 +356,7 @@ public final class HdfsServerConstants {
   public static final String NAMENODE_LEASE_HOLDER = "HDFS_NameNode";
   public static final int NAMENODE_LEASE_HOLDER_ID = Lease.getHolderId(NAMENODE_LEASE_HOLDER);
   public static final long NAMENODE_LEASE_RECHECK_INTERVAL = 2000;
+  public static final String SECURITY_XATTR_UNREADABLE_BY_SUPERUSER =
+      "security.hdfs.unreadable.by.superuser";
 }
 

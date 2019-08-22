@@ -45,7 +45,9 @@ import static org.apache.hadoop.fs.permission.AclEntryType.USER;
 import static org.apache.hadoop.fs.permission.FsAction.ALL;
 import static org.apache.hadoop.fs.permission.FsAction.READ;
 import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.After;
@@ -63,13 +65,14 @@ import com.google.common.collect.Lists;
  */
 public class FSXAttrBaseTest {
 
-  private static final int MAX_SIZE = 16;
-
   protected static MiniDFSCluster dfsCluster;
   protected static Configuration conf;
   private static int pathCount = 0;
   protected static Path path;
-  
+  protected static Path filePath;
+  protected static Path rawPath;
+  protected static Path rawFilePath;
+
   // XAttrs
   protected static final String name1 = "user.a1";
   protected static final byte[] value1 = {0x31, 0x32, 0x33};
@@ -78,7 +81,12 @@ public class FSXAttrBaseTest {
   protected static final byte[] value2 = {0x37, 0x38, 0x39};
   protected static final String name3 = "user.a3";
   protected static final String name4 = "user.a4";
-
+  
+  protected static final String security1 =
+      SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
+  
+  private static final int MAX_SIZE = security1.length();
+  
   protected FileSystem fs;
 
   private static final UserGroupInformation BRUCE =
@@ -107,6 +115,9 @@ public class FSXAttrBaseTest {
   public void setUp() throws Exception {
     pathCount += 1;
     path = new Path("/p" + pathCount);
+    filePath = new Path(path, "file");
+    rawPath = new Path("/.reserved/raw/p" + pathCount);
+    rawFilePath = new Path(rawPath, "file");
     initFileSystem();
   }
 
@@ -317,13 +328,13 @@ public class FSXAttrBaseTest {
     fs.removeXAttr(path, name3);
     
     // Name length exceeds max limit
-    String longName = "user.0123456789abcdefX";
+    String longName = "user.0123456789abcdefX0123456789abcdefX0123456789abcdef";
     try {
       fs.setXAttr(path, longName, null);
       Assert.fail("Setting xattr should fail if name is too long.");
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("XAttr is too big", e);
-      GenericTestUtils.assertExceptionContains("total size is 17", e);
+      GenericTestUtils.assertExceptionContains("total size is 50", e);
     }
 
     // Value length exceeds max limit
@@ -333,7 +344,7 @@ public class FSXAttrBaseTest {
       Assert.fail("Setting xattr should fail if value is too long.");
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("XAttr is too big", e);
-      GenericTestUtils.assertExceptionContains("total size is 17", e);
+      GenericTestUtils.assertExceptionContains("total size is 38", e);
     }
 
     // Name + value exactly equal the limit
@@ -916,6 +927,121 @@ public class FSXAttrBaseTest {
     Assert.assertArrayEquals(value2, fsAsDiana.getXAttrs(path).get(name2));
     fsAsDiana.removeXAttr(path, name1);
     fsAsDiana.removeXAttr(path, name2);
+  }
+  
+  /**
+   * This tests the "unreadable by superuser" xattr which denies access to a
+   * file for the superuser. See HDFS-6705 for details.
+   */
+  @Test(timeout = 120000)
+  public void testUnreadableBySuperuserXAttr() throws Exception {
+    // Run tests as superuser...
+    doTestUnreadableBySuperuserXAttr(fs, true);
+    
+    // ...and again as non-superuser
+    final UserGroupInformation user = UserGroupInformation.
+        createUserForTesting("user", new String[] { "mygroup" });
+    user.doAs(new PrivilegedExceptionAction<Object>() {
+      @Override
+      public Object run() throws Exception {
+        final FileSystem userFs = dfsCluster.getFileSystem();
+        doTestUnreadableBySuperuserXAttr(userFs, false);
+        return null;
+      }
+    });
+  }
+  
+  private void doTestUnreadableBySuperuserXAttr(FileSystem userFs,
+      boolean expectOpenFailure) throws Exception {
+    
+    FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 0777));
+    DFSTestUtil.createFile(userFs, filePath, 8192, (short) 1, 0xFEED);
+    try {
+      doTUBSXAInt(userFs, expectOpenFailure);
+      // Deleting the file is allowed.
+      userFs.delete(filePath, false);
+    } finally {
+      fs.delete(path, true);
+    }
+  }
+  
+  private void doTUBSXAInt(FileSystem userFs, boolean expectOpenFailure)
+      throws Exception {
+    
+    // Test that xattr can't be set on a dir
+    try {
+      userFs.setXAttr(path, security1, null, EnumSet.of(XAttrSetFlag.CREATE));
+    } catch (IOException e) {
+      // WebHDFS throws IOException instead of RemoteException
+      GenericTestUtils.assertExceptionContains("Can only set '" +
+          SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file", e);
+    }
+    
+    // Test that xattr can actually be set. Repeatedly.
+    userFs.setXAttr(filePath, security1, null,
+        EnumSet.of(XAttrSetFlag.CREATE));
+    verifySecurityXAttrExists(userFs);
+    userFs.setXAttr(filePath, security1, null, EnumSet.of(XAttrSetFlag.CREATE,
+        XAttrSetFlag.REPLACE));
+    verifySecurityXAttrExists(userFs);
+    
+    // Test that the xattr can't be deleted by anyone.
+    try {
+      userFs.removeXAttr(filePath, security1);
+      Assert.fail("Removing security xattr should fail.");
+    } catch (AccessControlException e) {
+      GenericTestUtils.assertExceptionContains("The xattr '" +
+          SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' can not be deleted.", e);
+    }
+    
+    // Test that xattr can be read.
+    verifySecurityXAttrExists(userFs);
+    
+    // Test that a value can't be set for the xattr.
+    try {
+      userFs.setXAttr(filePath, security1,
+          value1,EnumSet.of(XAttrSetFlag.REPLACE));
+      fail("Should have thrown on attempt to set value");
+    } catch (AccessControlException e) {
+      GenericTestUtils.assertExceptionContains("Values are not allowed", e);
+    }
+    
+    // Test that unreadable by superuser xattr appears in listXAttrs results
+    // (for superuser and non-superuser)
+    final List<String> xattrNames = userFs.listXAttrs(filePath);
+    assertTrue(xattrNames.contains(security1));
+    assertTrue(xattrNames.size() == 1);
+    
+    verifyFileAccess(userFs, expectOpenFailure);
+    
+    // Rename of the file is allowed by anyone.
+    Path toPath = new Path(filePath.toString() + "x");
+    userFs.rename(filePath, toPath);
+    userFs.rename(toPath, filePath);
+  }
+  
+  private void verifySecurityXAttrExists(FileSystem userFs) throws Exception {
+    try {
+      final Map<String, byte[]> xattrs = userFs.getXAttrs(filePath);
+      Assert.assertEquals(1, xattrs.size());
+      Assert.assertNotNull(xattrs.get(security1));
+      Assert.assertArrayEquals("expected empty byte[] from getXAttr",
+          new byte[0], userFs.getXAttr(filePath, security1));
+      
+    } catch (AccessControlException e) {
+      fail("getXAttrs failed but expected it to succeed");
+    }
+  }
+  
+  private void verifyFileAccess(FileSystem userFs, boolean expectOpenFailure)
+      throws Exception {
+    // Test that a file with the xattr can or can't be opened.
+    try {
+      userFs.open(filePath);
+      assertFalse("open succeeded but expected it to fail", expectOpenFailure);
+    } catch (AccessControlException e) {
+      assertTrue("open failed but expected it to succeed", expectOpenFailure);
+    }
   }
   
   /**

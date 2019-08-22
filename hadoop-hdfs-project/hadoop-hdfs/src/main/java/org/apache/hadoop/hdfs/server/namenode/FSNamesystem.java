@@ -70,6 +70,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -203,6 +204,7 @@ import org.apache.hadoop.ipc.RetryCacheDistributed.CacheEntryWithPayload;
 import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
 import static org.apache.hadoop.util.Time.now;
 import org.apache.hadoop.util.Timer;
 import org.apache.log4j.Appender;
@@ -1119,6 +1121,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         locks.add(il).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
         locks.add(lf.getAcesLock());
+        locks.add(lf.getXAttrLock());
       }
 
       @Override
@@ -1185,6 +1188,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
+        locks.add(lf.getXAttrLock());
       }
 
       @Override
@@ -1272,6 +1276,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     if (isPermissionEnabled) {
       dir.checkPathAccess(pc, iip, FsAction.READ);
+      checkUnreadableBySuperuser(pc, inode);
     }
 
     final long fileSize = inode.computeFileSizeNotIncludingLastUcBlock();
@@ -1291,7 +1296,21 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         && now > inode.getAccessTime() + getAccessTimePrecision();
     return new GetBlockLocationsResult(updateAccessTime ? iip : null, blocks);
   }
-
+  
+  private void checkUnreadableBySuperuser(FSPermissionChecker pc,
+      INode inode)
+      throws IOException {
+    for (XAttr xattr : dir.getXAttrs(inode)) {
+      if (XAttrHelper.getPrefixName(xattr).
+          equals(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER)) {
+        if (pc.isSuperUser()) {
+          throw new AccessControlException("Access is denied for " +
+              pc.getUser() + " since the superuser is not allowed to " +
+              "perform this operation.");
+        }
+      }
+    }
+  }
   /**
    * Moves all the blocks from srcs and appends them to trg
    * To avoid rollbacks we will verify validity of ALL of the args
@@ -8206,7 +8225,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if (isPermissionEnabled && xAttr.getNameSpace() == XAttr.NameSpace.USER) {
       final INodesInPath iip = dir.getINodesInPath(src, true);
       final INode inode = iip.getLastINode();
-      if (inode.isDirectory() && inode.getFsPermission().getStickyBit()) {
+      if (inode != null &&
+          inode.isDirectory() &&
+          inode.getFsPermission().getStickyBit()) {
         if (!pc.isSuperUser()) {
           dir.checkOwner(pc, iip);
         }
