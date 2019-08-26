@@ -214,7 +214,7 @@ public class TestDistributedShell {
     if (hdfsCluster != null) {
       try {
         hdfsCluster.shutdown();
-        HdfsStorageFactory.resetDALInitialized();
+        HdfsStorageFactory.reset();
       } finally {
         hdfsCluster = null;
       }

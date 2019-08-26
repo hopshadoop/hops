@@ -624,7 +624,7 @@ public class MiniDFSCluster {
 
       // Setting the configuration for Storage
       conf.set(DFSConfigKeys.DFS_NDC_ENABLED_KEY, "true");
-      HdfsStorageFactory.resetDALInitialized();
+      HdfsStorageFactory.reset();
       HdfsStorageFactory.setConfiguration(conf);
       if (format) {
         try {

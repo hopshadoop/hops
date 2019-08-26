@@ -27,6 +27,7 @@ public class IDsMonitor implements Runnable {
   private static final Log LOG = LogFactory.getLog(IDsMonitor.class);
   private static IDsMonitor instance = null;
   private Thread th = null;
+  private boolean isRunning = true;
 
   private int checkInterval;
   private IDsMonitor() {
@@ -39,6 +40,14 @@ public class IDsMonitor implements Runnable {
     return instance;
   }
 
+  public static void reset() {
+    IDsGeneratorFactory.reset();
+    if (instance != null) {
+      instance.stop();
+    }
+    instance=null;
+  }
+  
   public void setConfiguration(Configuration conf) {
     IDsGeneratorFactory.getInstance().setConfiguration(conf.getInt
             (DFSConfigKeys.DFS_NAMENODE_INODEID_BATCH_SIZE,
@@ -68,15 +77,20 @@ public class IDsMonitor implements Runnable {
 
 
   public void start() {
+    isRunning = true;
     getNewIds(); // Avoid race conditions between operations and the first acquisition of ids
     th = new Thread(this, "IDsMonitor");
     th.setDaemon(true);
     th.start();
   }
 
+  public void stop() {
+    isRunning=false;
+  }
+  
   @Override
   public void run() {
-    while (true) {
+    while (isRunning) {
       getNewIds();
     }
   }

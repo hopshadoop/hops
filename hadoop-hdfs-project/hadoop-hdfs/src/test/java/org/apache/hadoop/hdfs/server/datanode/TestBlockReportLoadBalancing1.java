@@ -60,7 +60,7 @@ public class TestBlockReportLoadBalancing1 {
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
 
@@ -121,7 +121,7 @@ public class TestBlockReportLoadBalancing1 {
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
 
@@ -202,7 +202,7 @@ public class TestBlockReportLoadBalancing1 {
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN, DFS_BR_LB_MAX_CONCURRENT_BLK_REPORTS_PER_NN);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_MAX_BR_PROCESSING_TIME, DFS_BR_LB_MAX_BR_PROCESSING_TIME);
     conf.setLong(DFSConfigKeys.DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD, DFS_BR_LB_DB_VAR_UPDATE_THRESHOLD);
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
 
