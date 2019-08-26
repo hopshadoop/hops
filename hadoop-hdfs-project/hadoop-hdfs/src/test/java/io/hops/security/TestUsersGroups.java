@@ -103,7 +103,7 @@ public class TestUsersGroups {
     Configuration conf = new Configuration();
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, Integer.toString(cacheTime));
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SIZE, Integer.toString(cacheSize));
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     UsersGroups.createSyncRow();
@@ -242,7 +242,7 @@ public class TestUsersGroups {
     Configuration conf = new Configuration();
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, Integer.toString(cacheTime));
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SIZE, Integer.toString(cacheSize));
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     UsersGroups.createSyncRow();
@@ -318,7 +318,7 @@ public class TestUsersGroups {
   @Test
   public void testGetUnixUserGroups() throws Exception {
     Configuration conf = new Configuration();
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     UsersGroups.createSyncRow();
@@ -350,7 +350,7 @@ public class TestUsersGroups {
     Configuration conf = new Configuration();
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, Integer.toString(cacheTime));
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SIZE, Integer.toString(cacheSize));
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     UsersGroups.createSyncRow();
@@ -518,7 +518,7 @@ public class TestUsersGroups {
   @Test
   public void testFKConstraintException() throws Exception {
     Configuration conf = new Configuration();
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     UsersGroups.createSyncRow();
@@ -765,7 +765,7 @@ public class TestUsersGroups {
     Configuration conf = new Configuration();
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SECS, Integer.toString(cacheTime));
     conf.set(CommonConfigurationKeys.HOPS_UG_CACHE_SIZE, Integer.toString(cacheSize));
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     UsersGroups.createSyncRow();

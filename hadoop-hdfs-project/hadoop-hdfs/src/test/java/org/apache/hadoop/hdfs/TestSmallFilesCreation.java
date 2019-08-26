@@ -1514,7 +1514,7 @@ public class TestSmallFilesCreation {
     String[] argv = {"-format", "-force"};
     ExitUtil.disableSystemExit();
     Configuration conf = new HdfsConfiguration();
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     UsersGroups.createSyncRow();
     try {

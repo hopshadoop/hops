@@ -1021,7 +1021,7 @@ public class TestBlockStoragePolicy {
 
   @Test
   public void testChooseTargetWithTopology() throws Exception {
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     BlockStoragePolicy policy1 = new BlockStoragePolicy((byte) 9, "TEST1",
         new StorageType[]{StorageType.SSD, StorageType.DISK,

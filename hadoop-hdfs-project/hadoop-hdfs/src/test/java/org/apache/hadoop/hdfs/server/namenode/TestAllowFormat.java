@@ -132,7 +132,7 @@ public class TestAllowFormat {
     LOG.info("Verifying format will succeed with allowformat true");
     config.setBoolean(DFS_NAMENODE_SUPPORT_ALLOW_FORMAT_KEY, true);
 
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     NameNode.format(config);
 
     LOG.info("Done verifying format will succeed with allowformat true");
