@@ -161,8 +161,9 @@ public class HdfsStorageFactory {
   }
 
   @VisibleForTesting
-  public static void resetDALInitialized() {
+  public static void reset() {
     isDALInitialized = false;
+    IDsMonitor.reset();
   }
 
   public static boolean isInitialized(){

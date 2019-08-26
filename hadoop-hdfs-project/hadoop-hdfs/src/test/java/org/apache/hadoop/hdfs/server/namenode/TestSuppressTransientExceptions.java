@@ -60,7 +60,7 @@ public class TestSuppressTransientExceptions {
       final int MAX_RETRY = 2;
       Configuration conf = new HdfsConfiguration();
       RequestHandler.setRetryCount(MAX_RETRY);
-      HdfsStorageFactory.resetDALInitialized();
+      HdfsStorageFactory.reset();
       HdfsStorageFactory.setConfiguration(conf);
       HdfsStorageFactory.formatStorage();
 

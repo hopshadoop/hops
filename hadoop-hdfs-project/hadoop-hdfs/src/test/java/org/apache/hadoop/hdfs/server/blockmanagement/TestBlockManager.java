@@ -132,7 +132,7 @@ public class TestBlockManager {
             DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT));
     fsn = Mockito.mock(FSNamesystem.class);
     Mockito.doReturn(subTreeOpsPool).when(fsn).getFSOperationsExecutor();
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     HdfsStorageFactory.setConfiguration(conf);
     formatStorage(conf);
     bm = new BlockManager(fsn, conf);
@@ -696,7 +696,7 @@ public class TestBlockManager {
       throws Exception {
     Configuration conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     formatStorage(conf);
     bm.maxReplicationStreams = 0;
     bm.replicationStreamsHardLimit = 1;
@@ -768,7 +768,7 @@ public class TestBlockManager {
   public void testFavorDecomUntilHardLimit() throws Exception {
     Configuration conf = new HdfsConfiguration();
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.resetDALInitialized();
+    HdfsStorageFactory.reset();
     formatStorage(conf);
     bm.maxReplicationStreams = 0;
     bm.replicationStreamsHardLimit = 1;

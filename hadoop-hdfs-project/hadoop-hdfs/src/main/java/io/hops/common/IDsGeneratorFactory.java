@@ -82,6 +82,10 @@ public class IDsGeneratorFactory {
     return factory;
   }
 
+  public static void reset() {
+    factory=null;
+  }
+  
   private List<IDsGenerator> iDsGenerators = Lists.newArrayList();
 
   Boolean isConfigured = false;
