@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -103,6 +104,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -245,10 +247,78 @@ public class TestApplicationMasterLauncher {
   
     MockAM am = rm.sendAMLaunched(appAttempt.getAppAttemptId());
     am.registerAppAttempt(true);
-    
     nm.nodeHeartbeat(true);
     Assert.assertTrue(testPass.get());
     rm.stop();
+  }
+  
+  @Test
+  public void testSecurityMaterialRevocationAMCleanupMultipleAppAttempts() throws Exception {
+    conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, 2);
+    conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
+    MyContainerManagerImpl containerManager = new MyContainerManagerImpl();
+    MockRM rm = new MockRMWithCustomAMLauncher(conf, containerManager);
+    rm.start();
+    MockNM nm = rm.registerNode("127.0.0.1:1234", 10 * 1024);
+    // Submit application
+    RMApp app = rm.submitApp(1024);
+    nm.nodeHeartbeat(true);
+  
+    int waitCount = 0;
+    while (containerManager.launched == false && waitCount++ < 20) {
+      LOG.info("Waiting for AM Launch to happen..");
+      Thread.sleep(1000);
+    }
+    Assert.assertTrue(containerManager.launched);
+    RMAppAttempt appAttempt1 = app.getCurrentAppAttempt();
+    MockAM am = new MockAM(rm.getRMContext(), rm.getApplicationMasterService(), appAttempt1.getAppAttemptId());
+    am.registerAppAttempt();
+    
+    nm.nodeHeartbeat(true);
+    
+    // Fail first attempt
+    nm.nodeHeartbeat(appAttempt1.getAppAttemptId(), 1, ContainerState.COMPLETE);
+    rm.waitForState(am.getApplicationAttemptId(), RMAppAttemptState.FAILED);
+    waitCount = 0;
+    while (containerManager.cleanedup == false && waitCount++ < 20) {
+      LOG.info("Waiting for AM Cleanup to happen..");
+      Thread.sleep(1000);
+    }
+    Assert.assertTrue(containerManager.cleanedup);
+    
+    containerManager.cleanedup = false;
+    TimeUnit.SECONDS.sleep(3);
+    JWTSecurityHandler jwtSecurityHandler = (JWTSecurityHandler) rm.getRMContext()
+        .getRMAppSecurityManager().getSecurityHandler(JWTSecurityHandler.class);
+    
+    // Security material should NOT be revoked, there is one more attempt
+    verify(jwtSecurityHandler, never()).revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class),
+        any(Boolean.class));
+  
+    rm.waitForState(app.getApplicationId(), RMAppState.ACCEPTED);
+    RMAppAttempt appAttempt2 = app.getCurrentAppAttempt();
+    nm.nodeHeartbeat(true);
+    am = new MockAM(rm.getRMContext(), rm.getApplicationMasterService(), appAttempt2.getAppAttemptId());
+    am.registerAppAttempt();
+    nm.nodeHeartbeat(true);
+    
+    rm.waitForState(appAttempt2.getAppAttemptId(), RMAppAttemptState.RUNNING);
+    nm.nodeHeartbeat(true);
+    
+    // Fail second attempt
+    nm.nodeHeartbeat(appAttempt2.getAppAttemptId(), 1, ContainerState.COMPLETE);
+    rm.waitForState(am.getApplicationAttemptId(), RMAppAttemptState.FAILED);
+    waitCount = 0;
+    while (containerManager.cleanedup == false && waitCount++ < 20) {
+      LOG.info("Waiting for AM Cleanup to happen..");
+      Thread.sleep(1000);
+    }
+    Assert.assertTrue(containerManager.cleanedup);
+    TimeUnit.SECONDS.sleep(3);
+    
+    // That was the final attempt, security material should have been revoked
+    verify(jwtSecurityHandler).revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class),
+        any(Boolean.class));
   }
   
   @Test
