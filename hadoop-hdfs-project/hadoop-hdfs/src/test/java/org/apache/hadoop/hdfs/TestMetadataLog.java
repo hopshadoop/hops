@@ -39,6 +39,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.junit.Test;
 
 import javax.annotation.Nullable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -111,6 +112,8 @@ public class TestMetadataLog extends TestCase {
       Path file = new Path(dataset, "file");
       dfs.mkdirs(dataset, FsPermission.getDefault());
       dfs.mkdirs(subdir);
+      assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
+          INodeMetadataLogEntry.Operation.Add));
       assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), subdir),
           INodeMetadataLogEntry.Operation.Add));
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
@@ -140,6 +143,8 @@ public class TestMetadataLog extends TestCase {
       dfs.mkdirs(dataset, FsPermission.getDefault());
       dfs.setMetaEnabled(dataset, true);
       dfs.mkdirs(subdir);
+      assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
+          INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), subdir),
           INodeMetadataLogEntry.Operation.Add));
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
@@ -147,8 +152,8 @@ public class TestMetadataLog extends TestCase {
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), file),
           INodeMetadataLogEntry.Operation.Add));
       
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{subdir,
-          file}, new int[]{1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          subdir, file}, new int[]{1, 1, 1});
       
     } finally {
       if (cluster != null) {
@@ -173,6 +178,8 @@ public class TestMetadataLog extends TestCase {
       dfs.mkdirs(dataset, FsPermission.getDefault());
       dfs.setMetaEnabled(dataset, true);
       dfs.mkdirs(subdir);
+      assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
+          INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), subdir),
           INodeMetadataLogEntry.Operation.Add));
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
@@ -180,8 +187,8 @@ public class TestMetadataLog extends TestCase {
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{subdir,
-          file}, new int[]{1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          subdir, file}, new int[]{1, 1, 1});
       
       dfs.append(file).close();
       dfs.append(file).close();
@@ -197,8 +204,8 @@ public class TestMetadataLog extends TestCase {
             INodeMetadataLogEntry.Operation.Add);
       }
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{subdir,
-          file}, new int[]{1, 3});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          subdir, file}, new int[]{1, 1, 3});
       
     } finally {
       if (cluster != null) {
@@ -222,15 +229,17 @@ public class TestMetadataLog extends TestCase {
       dfs.mkdirs(dataset, FsPermission.getDefault());
       dfs.setMetaEnabled(dataset, true);
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
+      assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
+          INodeMetadataLogEntry.Operation.Add));
       assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), file),
           INodeMetadataLogEntry.Operation.Add));
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file},
-          new int[]{0});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+              file}, new int[]{1, 0});
       out.close();
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), file),
           INodeMetadataLogEntry.Operation.Add));
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file},
-          new int[]{1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+              file}, new int[]{1, 1});
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -257,15 +266,19 @@ public class TestMetadataLog extends TestCase {
       out.close();
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
+      long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+      assertTrue(checkLog(datasetId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(folderId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder, file},
-          new int[]{1,1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+              folder, file}, new int[]{1,1,1});
       dfs.delete(folder, true);
       assertTrue(checkLog(folderId, INodeMetadataLogEntry.Operation.Delete));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Delete));
 
       checkLogicalTimeDeleteAfterAdd(new long[]{folderId, inodeId});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset},
+          new int[]{1});
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -275,45 +288,15 @@ public class TestMetadataLog extends TestCase {
 
   @Test
   public void testOldRename() throws Exception {
-    Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
-        .build();
-    try {
-      DistributedFileSystem dfs = cluster.getFileSystem();
-      Path projects = new Path("/projects");
-      Path project = new Path(projects, "project");
-      Path dataset0 = new Path(project, "dataset0");
-      Path dataset1 = new Path(project, "dataset1");
-      Path file0 = new Path(dataset0, "file");
-      Path file1 = new Path(dataset1, "file");
-      dfs.mkdirs(dataset0, FsPermission.getDefault());
-      dfs.mkdirs(dataset1, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset0, true);
-      dfs.setMetaEnabled(dataset1, true);
-      HdfsDataOutputStream out = TestFileCreation.create(dfs, file0, 1);
-      out.close();
-      long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file0);
-      long dataset1Id = TestUtil.getINodeId(cluster.getNameNode(), dataset1);
-      assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file0},
-          new int[]{1});
-      assertTrue(dfs.rename(file0, file1));
-      assertTrue(checkLog(dataset1Id, inodeId,
-          INodeMetadataLogEntry.Operation.Rename));
-      assertEquals(2, getMetadataLogEntries(inodeId).size());
-      checkLogicalTimeAddRename(inodeId);
-      
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file1},
-          new int[]{2});
-    } finally {
-      if (cluster != null) {
-        cluster.shutdown();
-      }
-    }
+    testRename(true);
   }
-
+  
+  @Test
   public void testRename() throws Exception {
+    testRename(false);
+  }
+  
+  public void testRename(boolean oldRename) throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
         .numDataNodes(2)
@@ -333,18 +316,28 @@ public class TestMetadataLog extends TestCase {
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file0, 1);
       out.close();
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file0);
+      long dataset0Id = TestUtil.getINodeId(cluster.getNameNode(), dataset0);
       long dataset1Id = TestUtil.getINodeId(cluster.getNameNode(), dataset1);
+  
+      assertTrue(checkLog(dataset0Id, INodeMetadataLogEntry.Operation.Add));
+      assertTrue(checkLog(dataset1Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file0},
-          new int[]{1});
-      dfs.rename(file0, file1, Options.Rename.NONE);
+      
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset0,
+              dataset1, file0}, new int[]{1, 1, 1});
+      
+      if(oldRename){
+        assertTrue(dfs.rename(file0, file1));
+      }else {
+        dfs.rename(file0, file1, Options.Rename.NONE);
+      }
       assertTrue(checkLog(dataset1Id, inodeId,
           INodeMetadataLogEntry.Operation.Rename));
       assertEquals(2, getMetadataLogEntries(inodeId).size());
   
       checkLogicalTimeAddRename(inodeId);
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file1},
-          new int[]{2});
+      checkLogicalTimeForINodes(cluster.getNameNode(),
+          new Path[]{dataset0, dataset1, file1}, new int[]{1, 1, 2});
 
     } finally {
       if (cluster != null) {
@@ -355,63 +348,15 @@ public class TestMetadataLog extends TestCase {
 
   @Test
   public void testDeepOldRename() throws Exception {
-    Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
-        .build();
-    try {
-      DistributedFileSystem dfs = cluster.getFileSystem();
-      Path projects = new Path("/projects");
-      Path project = new Path(projects, "project");
-      Path dataset0 = new Path(project, "dataset0");
-      Path folder0 = new Path(dataset0, "folder0");
-      Path dataset1 = new Path(project, "dataset1");
-      Path folder1 = new Path(dataset1, "folder1");
-      Path file0 = new Path(folder0, "file");
-
-      dfs.mkdirs(folder0, FsPermission.getDefault());
-      dfs.mkdirs(dataset1, FsPermission.getDefault());
-
-      dfs.setMetaEnabled(dataset0, true);
-      dfs.setMetaEnabled(dataset1, true);
-
-      HdfsDataOutputStream out = TestFileCreation.create(dfs, file0, 1);
-      out.close();
-
-      long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file0);
-      long folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
-      long dataset0Id = TestUtil.getINodeId(cluster.getNameNode(), dataset0);
-      long dataset1Id = TestUtil.getINodeId(cluster.getNameNode(), dataset1);
-
-      assertTrue(checkLog(dataset0Id, folder0Id, INodeMetadataLogEntry.Operation.Add));
-      assertTrue(checkLog(dataset0Id, inodeId, INodeMetadataLogEntry.Operation.Add));
-      
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder0, file0},
-          new int[]{1, 1});
-      
-      dfs.rename(folder0, folder1);
-
-      long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
-      assertTrue(checkLog(dataset1Id, folder1Id,
-          INodeMetadataLogEntry.Operation.Rename));
-      assertTrue(checkLog(dataset1Id, inodeId,
-          INodeMetadataLogEntry.Operation.ChangeDataset));
-      
-      checkLogicalTimeAddRename(folder0Id);
-      checkLogicalTimeAddRChangeDataset(inodeId);
-  
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder1,
-              new Path(folder1, file0.getName())}, new int[]{2, 2});
-
-    } finally {
-      if (cluster != null) {
-        cluster.shutdown();
-      }
-    }
+    testDeepRename(true);
   }
 
   @Test
-  public void testDeepRename() throws Exception {
+  public void testDeepRename() throws Exception{
+    testDeepRename(false);
+  }
+  
+  private void testDeepRename(boolean oldRename) throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
         .numDataNodes(2)
@@ -439,14 +384,20 @@ public class TestMetadataLog extends TestCase {
       long folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
       long dataset0Id = TestUtil.getINodeId(cluster.getNameNode(), dataset0);
       long dataset1Id = TestUtil.getINodeId(cluster.getNameNode(), dataset1);
-
+  
+      assertTrue(checkLog(dataset0Id, dataset0Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(dataset0Id, folder0Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(dataset0Id, inodeId, INodeMetadataLogEntry.Operation.Add));
+      assertTrue(checkLog(dataset1Id, dataset1Id, INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder0, file0},
-          new int[]{1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset0,
+          dataset1, folder0, file0}, new int[]{1, 1, 1, 1});
       
-      dfs.rename(folder0, folder1, Options.Rename.NONE);
+      if(oldRename){
+        dfs.rename(folder0, folder1);
+      }else {
+        dfs.rename(folder0, folder1, Options.Rename.NONE);
+      }
 
       long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
       assertEquals(folder0Id, folder1Id);
@@ -458,8 +409,9 @@ public class TestMetadataLog extends TestCase {
       checkLogicalTimeAddRename(folder0Id);
       checkLogicalTimeAddRChangeDataset(inodeId);
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder1,
-              new Path(folder1, file0.getName())}, new int[]{2, 2});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset0,
+          dataset1, folder1, new Path(folder1, file0.getName())},
+          new int[]{1, 1, 2, 2});
 
     } finally {
       if (cluster != null) {
@@ -490,10 +442,14 @@ public class TestMetadataLog extends TestCase {
       dfs.setMetaEnabled(dataset, true);
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
+      long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+  
+      assertTrue(checkLog(datasetId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(folderId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
+      
       checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{projects,
-          project, dataset, folder, file}, new int[]{0, 0, 0, 1, 1});
+          project, dataset, folder, file}, new int[]{0, 0, 1, 1, 1});
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -533,11 +489,14 @@ public class TestMetadataLog extends TestCase {
 
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
+      long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+  
+      assertTrue(checkLog(datasetId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(folderId, INodeMetadataLogEntry.Operation.Add));
       assertFalse(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder,
-          file}, new int[]{1, 0});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder, file}, new int[]{1, 1, 0});
       
       DistributedFileSystem dfs2 = (DistributedFileSystem) FileSystem
           .newInstance(fs.getUri(), fs.getConf());
@@ -618,13 +577,14 @@ public class TestMetadataLog extends TestCase {
       long folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
       long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
       long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
-
+  
+      assertTrue(checkLog(datasetId, datasetId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(datasetId, folder0Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(datasetId, folder1Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder0,
-          folder1, file}, new int[]{1, 1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder0, folder1, file}, new int[]{1, 1, 1, 1});
       
       if(oldRename){
         dfs.rename(folder0, newFolder);
@@ -648,8 +608,8 @@ public class TestMetadataLog extends TestCase {
   
       Path newFolder1 = new Path(newFolder, folder1.getName());
       Path newFile = new Path(newFolder1, file.getName());
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{newFolder,
-          newFolder1, newFile}, new int[]{2, 1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          newFolder, newFolder1, newFile}, new int[]{1, 2, 1, 1});
 
     } finally {
       if (cluster != null) {
@@ -686,13 +646,14 @@ public class TestMetadataLog extends TestCase {
       long folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
       long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
       long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
-
+  
+      assertTrue(checkLog(datasetId, datasetId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(datasetId, folder0Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(datasetId, folder1Id, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder0,
-          folder1, file}, new int[]{1, 1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder0, folder1, file}, new int[]{1, 1, 1, 1});
       
       if(oldRename){
         dfs.rename(folder0, newFolder);
@@ -721,8 +682,8 @@ public class TestMetadataLog extends TestCase {
   
       Path newFolder1 = new Path(newFolder, folder1.getName());
       Path newFile = new Path(newFolder1, file.getName());
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{newFolder,
-          newFolder1, newFile}, new int[]{2, 2, 2});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          newFolder, newFolder1, newFile}, new int[]{1, 2, 2, 2});
       
       //Move the directory back to the dataset
       if(oldRename){
@@ -739,8 +700,8 @@ public class TestMetadataLog extends TestCase {
       checkLogicalTimeAddDeleteAdd(folder1Id);
       checkLogicalTimeAddDeleteAdd(inodeId);
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder0,
-          folder1, file}, new int[]{3, 3, 3});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder0, folder1, file}, new int[]{1, 3, 3, 3});
       
     } finally {
       if (cluster != null) {
@@ -769,7 +730,9 @@ public class TestMetadataLog extends TestCase {
       long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
       long folder2Id = TestUtil.getINodeId(cluster.getNameNode(), folder2);
       long folder3Id = TestUtil.getINodeId(cluster.getNameNode(), folder3);
-
+  
+      assertTrue(checkLog(datasetId, datasetId,
+          INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(datasetId, folder1Id,
           INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(datasetId, folder2Id,
@@ -777,8 +740,9 @@ public class TestMetadataLog extends TestCase {
       assertTrue(checkLog(datasetId, folder3Id,
           INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder1,
-          folder2, folder3}, new int[]{1, 1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(),
+          new Path[]{dataset, folder1, folder2, folder3}, new int[]{1, 1, 1,
+              1});
       
       Path file1 = new Path(folder3, "file1");
       TestFileCreation.create(dfs, file1, 1).close();
@@ -794,8 +758,9 @@ public class TestMetadataLog extends TestCase {
       assertTrue(checkLog(datasetId, file2Id,
           INodeMetadataLogEntry.Operation.Add));
   
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder1,
-          folder2, folder3, file1, file1}, new int[]{1, 1, 1, 1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder1, folder2, folder3, file1, file2}, new int[]{1, 1, 1, 1, 1,
+          1});
       
       Path newDataset = new Path("/newDataset");
 
@@ -807,7 +772,10 @@ public class TestMetadataLog extends TestCase {
 
       long newDatasetId = TestUtil.getINodeId(cluster.getNameNode(), newDataset);
       assertTrue(newDatasetId == datasetId);
-
+  
+      assertTrue(checkLog(datasetId, datasetId, newDataset.getName(),
+          INodeMetadataLogEntry.Operation.Rename));
+      
       assertFalse(checkLog(datasetId, folder1Id,
           INodeMetadataLogEntry.Operation.Delete));
       assertFalse(checkLog(datasetId, folder2Id,
@@ -825,11 +793,14 @@ public class TestMetadataLog extends TestCase {
       Path newFile1 = new Path(newFolder3, file1.getName());
       Path newFile2 = new Path(newFolder3, file2.getName());
       
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{newFolder1,
-          newFolder2, newFolder3, newFile1, newFile2}, new int[]{1, 1, 1, 1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{newDataset,
+          newFolder1, newFolder2, newFolder3, newFile1, newFile2},
+          new int[]{2, 1, 1, 1, 1, 1});
       
       assertTrue(dfs.delete(newDataset, true));
-
+  
+      assertTrue(checkLog(datasetId, datasetId, newDataset.getName(),
+          INodeMetadataLogEntry.Operation.Delete));
       assertTrue(checkLog(datasetId, folder1Id,
           INodeMetadataLogEntry.Operation.Delete));
       assertTrue(checkLog(datasetId, folder2Id,
@@ -841,9 +812,11 @@ public class TestMetadataLog extends TestCase {
       assertTrue(checkLog(datasetId, file2Id,
           INodeMetadataLogEntry.Operation.Delete));
 
-      checkLogicalTimeDeleteAfterAdd(new long[]{folder1Id, folder2Id, folder3Id, file1Id,
-          file2Id});
-
+      checkLogicalTimeDeleteAfterAdd(new long[]{folder1Id, folder2Id,
+          folder3Id, file1Id, file2Id});
+  
+      checkLogicalTimeAddRenameDelete(datasetId);
+      
     } finally {
       if (cluster != null) {
         cluster.shutdown();
@@ -871,25 +844,30 @@ public class TestMetadataLog extends TestCase {
       dfs.setMetaEnabled(dataset, true);
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
+      long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+  
+      assertTrue(checkLog(datasetId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(folderId, INodeMetadataLogEntry.Operation.Add));
       assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
       
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder,
-          file}, new int[]{1, 1});
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder, file}, new int[]{1, 1, 1});
 
       dfs.setMetaEnabled(dataset, false);
       
       assertEquals(1, getMetadataLogEntries(inodeId).size());
       assertEquals(1, getMetadataLogEntries(folderId).size());
-  
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder,
-          file}, new int[]{1, 1});
+      assertEquals(1, getMetadataLogEntries(datasetId).size());
+      
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder, file}, new int[]{1, 1, 1});
       dfs.setMetaEnabled(dataset, true);
   
       assertEquals(2, getMetadataLogEntries(inodeId).size());
       assertEquals(2, getMetadataLogEntries(folderId).size());
-      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{folder,
-          file}, new int[]{2, 2});
+      assertEquals(2, getMetadataLogEntries(datasetId).size());
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
+          folder, file}, new int[]{2, 2, 2});
       
     } finally {
       if (cluster != null) {
@@ -924,6 +902,20 @@ public class TestMetadataLog extends TestCase {
         INodeMetadataLogEntry.Operation.Delete.getId());
     assertTrue(inodeLogEntries.get(2).getOperationId() ==
         INodeMetadataLogEntry.Operation.Add.getId());
+  }
+  
+  private void checkLogicalTimeAddRenameDelete(long inodeId) throws IOException {
+    List<MetadataLogEntry> inodeLogEntries = new
+        ArrayList<>(getMetadataLogEntries(inodeId));
+    
+    Collections.sort(inodeLogEntries, LOGICAL_TIME_COMPARATOR);
+    assertTrue(inodeLogEntries.size() == 3);
+    assertTrue(inodeLogEntries.get(0).getOperationId() ==
+        INodeMetadataLogEntry.Operation.Add.getId());
+    assertTrue(inodeLogEntries.get(1).getOperationId() ==
+        INodeMetadataLogEntry.Operation.Rename.getId());
+    assertTrue(inodeLogEntries.get(2).getOperationId() ==
+        INodeMetadataLogEntry.Operation.Delete.getId());
   }
   
   private void checkLogicalTimeAddRename(long inodeId) throws IOException {
@@ -1039,6 +1031,9 @@ public class TestMetadataLog extends TestCase {
       DFSTestUtil.createFile(dfs, file, 0, (short)1, 0);
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dir);
+  
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file, dir},
+          new int[]{1, 1});
       
       //set xatrr name1=value1
       dfs.setXAttr(file, name1, value1);
@@ -1070,16 +1065,55 @@ public class TestMetadataLog extends TestCase {
   
       checkXAttrLogicalTimeAddDelete(inodeId,
           XAttrHelper.buildXAttr(name1).getName());
+  
+      assertEquals(4, TestUtil.getINode(cluster
+          .getNameNode(), file).getLogicalTime());
       
       //replace xattr name2=value3
       dfs.setXAttr(file, name2, value3);
   
       assertTrue(Arrays.equals(value3, dfs.getXAttr(file, name2)));
       
+      assertEquals(5, TestUtil.getINode(cluster
+          .getNameNode(), file).getLogicalTime());
+      
+      //remove xattr name2
       dfs.removeXAttr(file, name2);
   
       checkXAttrLogicalTimeAddUpdateDelete(inodeId,
           XAttrHelper.buildXAttr(name2).getName());
+      assertEquals(6, TestUtil.getINode(cluster
+          .getNameNode(), file).getLogicalTime());
+      
+      //set xattr on dir
+      dfs.setXAttr(dir, name1, value1);
+      assertTrue(Arrays.equals(value1, dfs.getXAttr(dir, name1)));
+  
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file, dir},
+          new int[]{6, 2});
+  
+      //replace xattr on dir
+      dfs.setXAttr(dir, name1, value2);
+      assertTrue(Arrays.equals(value2, dfs.getXAttr(dir, name1)));
+  
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file, dir},
+          new int[]{6, 3});
+      
+      //set xattr on dir name2=value3
+      dfs.setXAttr(dir, name2, value3);
+      assertTrue(Arrays.equals(value3, dfs.getXAttr(dir, name2)));
+  
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file, dir},
+          new int[]{6, 4});
+      
+      //remove xattr on dir
+      dfs.removeXAttr(dir, name1);
+  
+      checkXAttrLogicalTimeAddUpdateDelete(datasetId,
+          XAttrHelper.buildXAttr(name1).getName());
+  
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{file, dir},
+          new int[]{6, 5});
       
     }finally {
       if(cluster != null){
@@ -1158,5 +1192,154 @@ public class TestMetadataLog extends TestCase {
         return da.getXAttrsByInodeId(inodeId) == null;
       }
     }.handle();
+  }
+  
+  @Test
+  public void testRenameDataset() throws Exception{
+    testRenameDataset(false);
+  }
+  
+  @Test
+  public void testOldRenameDataset() throws Exception{
+    testRenameDataset(true);
+  }
+  
+  private void testRenameDataset(boolean oldRename) throws
+      IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path projects = new Path("/projects");
+      Path project = new Path(projects, "project");
+      Path dataset = new Path(project, "dataset");
+      Path folder0 = new Path(dataset, "folder0");
+      Path folder1 = new Path(folder0, "folder1");
+      Path file = new Path(folder1, "file");
+      
+      Path newDataset = new Path(project, "newDataset");
+      
+      dfs.mkdirs(folder1, FsPermission.getDefault());
+      
+      dfs.setMetaEnabled(dataset, true);
+      
+      HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
+      out.close();
+      
+      long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
+      long folder0Id = TestUtil.getINodeId(cluster.getNameNode(), folder0);
+      long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
+      long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
+      
+      assertTrue(checkLog(datasetId, folder0Id, INodeMetadataLogEntry.Operation.Add));
+      assertTrue(checkLog(datasetId, folder1Id, INodeMetadataLogEntry.Operation.Add));
+      assertTrue(checkLog(inodeId, INodeMetadataLogEntry.Operation.Add));
+      
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{projects,
+          project, dataset, folder0, folder1, file}, new int[]{0, 0, 1, 1, 1,
+          1});
+      
+      if(oldRename){
+        dfs.rename(dataset, newDataset);
+      }else{
+        dfs.rename(dataset, newDataset, Options.Rename.NONE);
+      }
+      
+      long newDatasetId = TestUtil.getINodeId(cluster.getNameNode(),
+      newDataset);
+      
+      assertEquals(datasetId, newDatasetId);
+      
+      assertTrue(checkLog(datasetId, datasetId, newDataset.getName(),
+          INodeMetadataLogEntry.Operation.Rename));
+      
+      assertEquals("Subfolders and files shouldn't be logged during a rename " +
+          "in the same dataset", 1, getMetadataLogEntries(folder1Id).size());
+      assertEquals("Subfolders and files shouldn't be logged during a rename " +
+          "in the same dataset", 1, getMetadataLogEntries(folder0Id).size());
+      assertEquals("Subfolders and files shouldn't be logged during a rename " +
+          "in the same dataset", 1, getMetadataLogEntries(inodeId).size());
+  
+      Path newFolder0 = new Path(newDataset, folder0.getName());
+      Path newFolder1 = new Path(newFolder0, folder1.getName());
+      Path newFile = new Path(newFolder1, file.getName());
+      
+      checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{newDataset,
+          newFolder0, newFolder1, newFile}, new int[]{2, 1, 1, 1});
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testSetMetaEnabledOnNonExistingDirectory() throws
+      IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path root = new Path("/");
+      Path dir = new Path(root,"dir");
+      
+      try {
+        dfs.setMetaEnabled(dir, true);
+        fail("should fail to set metaEnabled on non existing directory");
+      }catch (FileNotFoundException ex){
+      }
+      
+      dfs.mkdirs(dir, FsPermission.getDefault());
+  
+      assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dir),
+          INodeMetadataLogEntry.Operation.Add));
+      
+      dfs.setMetaEnabled(dir, true);
+  
+      assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dir),
+          INodeMetadataLogEntry.Operation.Add));
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+  
+  @Test
+  public void testSetMetaEnabledOnRoot() throws
+      IOException {
+    Configuration conf = new HdfsConfiguration();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(2)
+        .build();
+    try {
+      DistributedFileSystem dfs = cluster.getFileSystem();
+      Path root = new Path("/");
+      Path dir = new Path(root,"dir");
+      dfs.mkdirs(dir, FsPermission.getDefault());
+      
+      try {
+        dfs.setMetaEnabled(root, true);
+        fail("should fail to set metaEnabled on the root since subtree locks " +
+            "are disabled for the root");
+      }catch (FileNotFoundException ex){
+      }
+  
+      assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dir),
+          INodeMetadataLogEntry.Operation.Add));
+      assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), root),
+          INodeMetadataLogEntry.Operation.Add));
+      
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
   }
 }
