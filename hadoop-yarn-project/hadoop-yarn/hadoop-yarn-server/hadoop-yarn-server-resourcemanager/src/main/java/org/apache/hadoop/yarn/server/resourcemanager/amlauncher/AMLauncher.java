@@ -183,20 +183,24 @@ public class AMLauncher implements Runnable {
         parseAndThrowException(t);
       }
     } finally {
-      RMApp application = rmContext.getRMApps().get(
-          this.application.getAppAttemptId().getApplicationId());
-      X509SecurityHandler.X509MaterialParameter x509Param =
-          new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
-              application.getCryptoMaterialVersion());
-      JWTSecurityHandler.JWTMaterialParameter jwtParam =
-          new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
-      
-      RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
-      securityMaterial.addMaterial(x509Param);
-      securityMaterial.addMaterial(jwtParam);
-      RMAppSecurityManagerEvent securityMaterialCleanup = new RMAppSecurityManagerEvent(application.getApplicationId(),
-          securityMaterial, RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL);
-      handler.handle(securityMaterialCleanup);
+      if (application.getFinalApplicationStatus() != null) {
+        // Application has really finished and it's not just another attempt
+        RMApp application = rmContext.getRMApps().get(
+            this.application.getAppAttemptId().getApplicationId());
+        X509SecurityHandler.X509MaterialParameter x509Param =
+            new X509SecurityHandler.X509MaterialParameter(application.getApplicationId(), application.getUser(),
+                application.getCryptoMaterialVersion());
+        JWTSecurityHandler.JWTMaterialParameter jwtParam =
+            new JWTSecurityHandler.JWTMaterialParameter(application.getApplicationId(), application.getUser());
+  
+        RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+        securityMaterial.addMaterial(x509Param);
+        securityMaterial.addMaterial(jwtParam);
+        RMAppSecurityManagerEvent securityMaterialCleanup =
+            new RMAppSecurityManagerEvent(application.getApplicationId(),
+                securityMaterial, RMAppSecurityManagerEventType.REVOKE_SECURITY_MATERIAL);
+        handler.handle(securityMaterialCleanup);
+      }
     }
   }
   
