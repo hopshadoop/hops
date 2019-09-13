@@ -56,15 +56,10 @@ public class BlockTokenSecretManager
   public static final Log LOG =
       LogFactory.getLog(BlockTokenSecretManager.class);
   
-  // We use these in an HA setup to ensure that the pair of NNs produce block
-  // token serial numbers that are in different ranges.
-  private static final int LOW_MASK = ~(1 << 31);
-  
   public static final Token<BlockTokenIdentifier> DUMMY_TOKEN =
       new Token<>();
 
   protected final boolean isMaster;
-  private int nnIndex;
   
   /**
    * keyUpdateInterval is the interval that NN updates its block keys. It
@@ -77,7 +72,7 @@ public class BlockTokenSecretManager
   protected int serialNo;
   protected BlockKey currentKey;
   protected BlockKey nextKey;
-  private Map<Integer, BlockKey> allKeys;
+  protected Map<Integer, BlockKey> allKeys;
   protected String blockPoolId;
   protected String encryptionAlgorithm;
   
@@ -93,49 +88,28 @@ public class BlockTokenSecretManager
    *     how long an individual token is valid
    */
   public BlockTokenSecretManager(long keyUpdateInterval, long tokenLifetime,
-      String blockPoolId, String encryptionAlgorithm) {
+      String blockPoolId, String encryptionAlgorithm) throws IOException {
     this(false, keyUpdateInterval, tokenLifetime, blockPoolId,
         encryptionAlgorithm);
   }
   
-  /**
-   * Constructor for masters.
-   *
-   * @param keyUpdateInterval
-   *     how often a new key will be generated
-   * @param tokenLifetime
-   *     how long an individual token is valid
-   * @param isHaEnabled
-   *     whether or not HA is enabled
-   * @param thisNnId
-   *     the NN ID of this NN in an HA setup
-   * @param otherNnId
-   *     the NN ID of the other NN in an HA setup
-   */
-  private BlockTokenSecretManager(long keyUpdateInterval, long tokenLifetime,
-      int nnIndex, String blockPoolId, String encryptionAlgorithm) {
-    this(true, keyUpdateInterval, tokenLifetime, blockPoolId,
-        encryptionAlgorithm);
-    Preconditions.checkArgument(nnIndex == 0 || nnIndex == 1);
-    this.nnIndex = nnIndex;
-    setSerialNo(new SecureRandom().nextInt());
-    generateKeys();
-  }
-  
   protected BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
-      long tokenLifetime, String blockPoolId, String encryptionAlgorithm) {
+      long tokenLifetime, String blockPoolId, String encryptionAlgorithm) throws IOException {
     this.isMaster = isMaster;
     this.keyUpdateInterval = keyUpdateInterval;
     this.tokenLifetime = tokenLifetime;
     this.allKeys = new HashMap<>();
     this.blockPoolId = blockPoolId;
     this.encryptionAlgorithm = encryptionAlgorithm;
+    if(isMaster){
+      setSerialNo(new SecureRandom().nextInt());
+    }
     generateKeys();
   }
   
   @VisibleForTesting
   public synchronized void setSerialNo(int serialNo) {
-    this.serialNo = (serialNo & LOW_MASK) | (nnIndex << 31);
+    this.serialNo = serialNo;
   }
   
   public void setBlockPoolId(String blockPoolId) {
@@ -163,10 +137,10 @@ public class BlockTokenSecretManager
      */
     setSerialNo(serialNo + 1);
     currentKey = new BlockKey(serialNo,
-        Time.now() + 2 * keyUpdateInterval + tokenLifetime, generateSecret());
+        Time.now() + 3 * keyUpdateInterval + tokenLifetime, generateSecret(), BlockKey.KeyType.CurrKey);
     setSerialNo(serialNo + 1);
     nextKey = new BlockKey(serialNo,
-        Time.now() + 3 * keyUpdateInterval + tokenLifetime, generateSecret());
+        Time.now() + 4 * keyUpdateInterval + tokenLifetime, generateSecret(), BlockKey.KeyType.NextKey);
     allKeys.put(currentKey.getKeyId(), currentKey);
     allKeys.put(nextKey.getKeyId(), nextKey);
   }
@@ -185,7 +159,7 @@ public class BlockTokenSecretManager
         currentKey, allKeys.values().toArray(new BlockKey[0]));
   }
 
-  private synchronized void removeExpiredKeys() {
+  protected synchronized void removeExpiredKeys() {
     long now = Time.now();
     for (Iterator<Map.Entry<Integer, BlockKey>> it =
              allKeys.entrySet().iterator(); it.hasNext(); ) {
@@ -241,15 +215,15 @@ public class BlockTokenSecretManager
     removeExpiredKeys();
     // set final expiry date of retiring currentKey
     allKeys.put(currentKey.getKeyId(), new BlockKey(currentKey.getKeyId(),
-        Time.now() + keyUpdateInterval + tokenLifetime, currentKey.getKey()));
+        Time.now() + 2 * keyUpdateInterval + tokenLifetime, currentKey.getKey(), BlockKey.KeyType.SimpleKey));
     // update the estimated expiry date of new currentKey
     currentKey = new BlockKey(nextKey.getKeyId(),
-        Time.now() + 2 * keyUpdateInterval + tokenLifetime, nextKey.getKey());
+        Time.now() + 3 * keyUpdateInterval + tokenLifetime, nextKey.getKey(), BlockKey.KeyType.CurrKey);
     allKeys.put(currentKey.getKeyId(), currentKey);
     // generate a new nextKey
     setSerialNo(serialNo + 1);
     nextKey = new BlockKey(serialNo,
-        Time.now() + 3 * keyUpdateInterval + tokenLifetime, generateSecret());
+        Time.now() + 4 * keyUpdateInterval + tokenLifetime, generateSecret(), BlockKey.KeyType.NextKey);
     allKeys.put(nextKey.getKeyId(), nextKey);
     return true;
   }

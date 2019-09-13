@@ -541,7 +541,11 @@ public class BlockManager {
     datanodeManager.activate(conf);
     this.replicationThread.start();
     if (isBlockTokenEnabled()) {
-      this.blockTokenSecretManager.generateKeysIfNeeded();
+      /*
+       * if the NN is leader at this point it means that the all cluster what restarted and we should overide the keys
+       * byt the keys created when initializing blockTokenSecretManager
+       */
+      this.blockTokenSecretManager.initKeys();
     }
   }
 
