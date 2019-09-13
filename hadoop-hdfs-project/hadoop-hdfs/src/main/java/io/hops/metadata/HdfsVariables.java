@@ -411,8 +411,7 @@ public class HdfsVariables {
     updateBlockTokenKeys(curr, next, null);
   }
   
-  public static void updateBlockTokenKeys(BlockKey curr, BlockKey next,
-      BlockKey simple) throws IOException {
+  public static void updateBlockTokenKeys(BlockKey curr, BlockKey next, BlockKey simple) throws IOException {
     ArrayVariable arr = new ArrayVariable(Variable.Finder.BlockTokenKeys);
     arr.addVariable(serializeBlockKey(curr, Variable.Finder.BTCurrKey));
     arr.addVariable(serializeBlockKey(next, Variable.Finder.BTNextKey));
