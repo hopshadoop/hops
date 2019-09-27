@@ -71,9 +71,9 @@ public class MDCleaner {
 
           Thread.sleep(3000);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          LOG.warn(e, e);
         } catch (IOException e){
-          e.printStackTrace();
+          LOG.warn(e, e);
         }
       }
     }

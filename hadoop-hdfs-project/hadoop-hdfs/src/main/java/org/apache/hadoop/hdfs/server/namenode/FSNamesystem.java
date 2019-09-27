@@ -4447,7 +4447,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         hasResourcesAvailable = nnResourceChecker.hasAvailableSpace();
         break;
       } catch (StorageException e) {
-        LOG.warn("StorageException in checkAvailableResources.", e);
+        LOG.warn("StorageException in checkAvailableResources (" + tries + "/" + maxDBTries + ").", e);
         if (e instanceof TransientStorageException) {
           continue; //do not count TransientStorageException as a failled try
         }
@@ -4469,7 +4469,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
       }
     }
-    if (tries > maxDBTries) {
+    if (tries >= maxDBTries) {
       terminate(1, lastThrowable);
     }
   }
@@ -4518,7 +4518,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     @Override
     public void run() {
-      try {
+      try {      
         while (fsRunning && shouldNNRmRun) {
           checkAvailableResources();
           if (!nameNodeHasResourcesAvailable()) {
