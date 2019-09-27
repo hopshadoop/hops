@@ -82,7 +82,8 @@ public class QuotaUpdateManager {
       try {
         updateThread.join(3000);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        LOG.error(e);
+        Thread.currentThread().interrupt();
       }
     }
   }
