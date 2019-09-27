@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import io.hops.DalEventStreaming;
+import io.hops.exception.StorageException;
 
 public class RMStorageFactory {
 
@@ -198,5 +199,9 @@ public class RMStorageFactory {
 
   public static void resetDALInitialized() {
     isInitialized = false;
+  }
+  
+  public static boolean hasResources(double threshold) throws StorageException {
+    return dStorageFactory.hasResources(threshold);
   }
 }

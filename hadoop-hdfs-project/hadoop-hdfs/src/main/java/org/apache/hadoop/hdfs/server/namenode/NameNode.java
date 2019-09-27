@@ -204,8 +204,7 @@ public class NameNode implements NameNodeStatusMXBean {
           //StartupOption.RECOVER.getName() + " [ " +
           //StartupOption.FORCE.getName() + " ] ] | [ "+
           StartupOption.NO_OF_CONCURRENT_BLOCK_REPORTS.getName() + " concurrentBlockReports ] | [" +
-          StartupOption.FORMAT_ALL.getName() + " ] | [" +
-          StartupOption.DROP_AND_CREATE_DB.getName() + "]" ;
+          StartupOption.FORMAT_ALL.getName() + " ]";
 
   public long getProtocolVersion(String protocol, long clientVersion)
       throws IOException {
@@ -1056,8 +1055,6 @@ public class NameNode implements NameNodeStatusMXBean {
             startOpt.setInteractiveFormat(false);
           }
         }
-      } else if (StartupOption.DROP_AND_CREATE_DB.getName().equalsIgnoreCase(cmd)) {
-        startOpt = StartupOption.DROP_AND_CREATE_DB;
       } else if (StartupOption.FORMAT_ALL.getName().equalsIgnoreCase(cmd)) {
         startOpt = StartupOption.FORMAT_ALL;
       } else if (StartupOption.GENCLUSTERID.getName().equalsIgnoreCase(cmd)) {
@@ -1155,10 +1152,6 @@ public class NameNode implements NameNodeStatusMXBean {
 
     switch (startOpt) {
       //HOP
-      case DROP_AND_CREATE_DB: { //delete everything other than inode and blocks table. this is tmp fix for safe mode
-        dropAndCreateDB(conf);
-        return null;
-      }
       case NO_OF_CONCURRENT_BLOCK_REPORTS:
         HdfsVariables.setMaxConcurrentBrs(startOpt.getMaxConcurrentBlkReports(), conf);
         LOG.info("Setting concurrent block reports processing to "+startOpt
@@ -1344,11 +1337,6 @@ public class NameNode implements NameNodeStatusMXBean {
       LOG.debug(msg);
       throw new BRLoadBalancingNonLeaderException(msg);
     }
-  }
-
-  private static void dropAndCreateDB(Configuration conf) throws IOException {
-    HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.getConnector().dropAndRecreateDB();
   }
 
   public static boolean isNameNodeAlive(Collection<ActiveNode> activeNamenodes,

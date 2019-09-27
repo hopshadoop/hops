@@ -2712,4 +2712,13 @@ public class YarnConfiguration extends Configuration {
   // 5 days
   public static long DEFAULT_RM_JWT_MASTER_VALIDITY_PERIOD = 432000;
   public static final String RM_JWT_MASTER_VALIDITY_PERIOD = RM_PREFIX + JWT_PREFIX + "master-token-validity";
+  
+  public static final String  DB_CHECK_MAX_TRIES = RM_PREFIX + "db.check.max.tries";
+  public static final int     DB_CHECK_MAX_TRIES_DEFAULT = 3;
+  
+  public static final String  RESOURCE_CHECK_INTERVAL_KEY = RM_PREFIX + "resource.check.interval";
+  public static final int     RESOURCE_CHECK_INTERVAL_DEFAULT = 5000;
+  
+  public static final String  RESOURCE_CHECK_THRESHOLD = RM_PREFIX + "resource.check.threshold";
+  public static final double  RESOURCE_CHECK_THRESHOLD_DEFAULT = 0.9;
 }

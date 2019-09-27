@@ -19,6 +19,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.exception.StorageException;
+import io.hops.exception.TransientStorageException;
 import io.hops.metadata.common.entity.ByteArrayVariable;
 import io.hops.metadata.common.entity.IntVariable;
 import io.hops.metadata.common.entity.LongVariable;
@@ -48,9 +49,12 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
+import org.apache.hadoop.util.Daemon;
+import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ReservationId;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.server.records.Version;
@@ -58,7 +62,7 @@ import org.apache.hadoop.yarn.server.records.impl.pb.VersionPBImpl;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.VersionProto;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
-import static org.apache.hadoop.yarn.server.resourcemanager.recovery.LeveldbRMStateStore.LOG;
+import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.AMRMTokenSecretManagerState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationAttemptStateData;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
@@ -70,19 +74,38 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 
 public class DBRMStateStore extends RMStateStore {
 
+  private int maxDBTries;
+  private boolean stateStoreRunning = false;
+  private long resourceRecheckInterval;
+  private double databaseResourcesThreshold;
+  private Daemon resourceMonitorthread = null;
+  
   protected static final Version CURRENT_VERSION_INFO = Version
           .newInstance(1, 2);
 
   @Override
   public synchronized void initInternal(Configuration conf) throws Exception {
+    resourceRecheckInterval = conf.getLong(YarnConfiguration.RESOURCE_CHECK_INTERVAL_KEY,
+        YarnConfiguration.RESOURCE_CHECK_INTERVAL_DEFAULT);;
+    maxDBTries = conf.getInt(YarnConfiguration.DB_CHECK_MAX_TRIES, YarnConfiguration.DB_CHECK_MAX_TRIES_DEFAULT);
+    databaseResourcesThreshold = conf.getDouble(YarnConfiguration.RESOURCE_CHECK_THRESHOLD,
+        YarnConfiguration.RESOURCE_CHECK_THRESHOLD_DEFAULT);
   }
 
   @Override
   public synchronized void startInternal() throws Exception {
+    stateStoreRunning = true;
+    resourceMonitorthread = new Daemon(new ResourceMonitor());
+    resourceMonitorthread.start();
   }
 
   @Override
   protected synchronized void closeInternal() throws Exception {
+    stateStoreRunning = false;
+    if(resourceMonitorthread!=null){
+      ((ResourceMonitor)resourceMonitorthread.getRunnable()).stopMonitor();
+      resourceMonitorthread.interrupt();
+    }
   }
 
   @Override
@@ -826,4 +849,69 @@ public class DBRMStateStore extends RMStateStore {
     storeReservationStateHandler.handle();
   }
   
+  /**
+   * Periodically calls hasAvailableResources if
+   * there are found to be insufficient resources available, causes the RM to terminate
+   */
+  class ResourceMonitor implements Runnable {
+
+    boolean shouldRmRun = true;
+
+    @Override
+    public void run() {
+      try {
+        while (stateStoreRunning && shouldRmRun) {
+          checkAvailableResources();
+          try {
+            Thread.sleep(resourceRecheckInterval);
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+          }
+        }
+      } catch (Exception e) {
+        LOG.error("Exception in NameNodeResourceMonitor: ", e);
+      }
+    }
+
+    public void stopMonitor() {
+      shouldRmRun = false;
+    }
+
+    void checkAvailableResources() {
+      int tries = 0;
+      Throwable lastThrowable = null;
+      while (tries < maxDBTries) {
+        try {
+          if (!RMStorageFactory.hasResources(databaseResourcesThreshold)) {
+            throw new IOException("not enough resources in the database");
+          }
+        } catch (StorageException e) {
+          LOG.warn("StorageException in checkAvailableResources (" + tries + "/" + maxDBTries + ").", e);
+          if (e instanceof TransientStorageException) {
+            LOG.debug("transiant exception");
+            continue; //do not count TransientStorageException as a failled try
+          }
+          lastThrowable = e;
+          tries++;
+          try {
+            Thread.sleep(500);
+          } catch (InterruptedException ex) {
+            // Deliberately ignore
+          }
+        } catch (Throwable t) {
+          LOG.error("Runtime exception in checkAvailableResources. ", t);
+          lastThrowable = t;
+          tries++;
+          try {
+            Thread.sleep(500);
+          } catch (InterruptedException ex) {
+            // Deliberately ignore
+          }
+        }
+      }
+      if (tries >= maxDBTries) {
+        terminate(1, lastThrowable);
+      }
+    }
+  }
 }

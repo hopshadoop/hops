@@ -92,7 +92,6 @@ public final class HdfsServerConstants {
    */
   static public enum StartupOption {
     FORMAT("-format"),
-    DROP_AND_CREATE_DB("-dropAndCreateDB"),
     NO_OF_CONCURRENT_BLOCK_REPORTS("-concurrentBlkReports"),
     FORMAT_ALL("-formatAll"),
     CLUSTERID("-clusterid"),
