@@ -297,8 +297,7 @@ class BPOfferService implements Runnable {
     try {
       reportBadBlocksWithRetry(block, storageUuid, storageType);
     } catch (Exception e) {
-      LOG.error("Failed to send bad block report to any namenode ");
-      e.printStackTrace();
+      LOG.error("Failed to send bad block report to any namenode ", e);
     }
   }
 

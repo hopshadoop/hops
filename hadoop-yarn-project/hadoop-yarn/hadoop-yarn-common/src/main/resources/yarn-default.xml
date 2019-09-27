@@ -2966,4 +2966,26 @@
     <name>yarn.resourcemanager.rmappsecurity.jwt.renew-token-%d</name>
   </property>
 
+  <property>
+    <description>The maximum number of try the database resource monitor
+    should cath non transiant exception before to shutdown the 
+    resource manager</description>
+    <name>yarn.resourcemanager.db.check.max.tries</name>
+    <value>3</value>
+  </property>
+
+  <property>
+    <description>The interval (in ms) at which the database resource monitor
+    should checkt the database status</description>
+    <name>yarn.resourcemanager.resource.check.interval</name>
+    <value>3</value>
+  </property>
+
+  <property>
+    <description>The maximum database usage, if the usage of the database
+    exceede this threshold the monitor will stop the resoure manager
+    </description>
+    <name>yarn.resourcemanager.resource.check.threshold</name>
+    <value>0.9</value>
+  </property>
 </configuration>

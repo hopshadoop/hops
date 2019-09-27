@@ -51,7 +51,8 @@ public class RootINodeCache {
         rootCacheUpdater = null;
       }
     } catch (InterruptedException e) {
-      e.printStackTrace();
+      LOG.error(e);
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -100,9 +101,10 @@ public class RootINodeCache {
             LOG.debug("RootCache: root does not exist.");
           }
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          LOG.warn(e);
+          Thread.currentThread().interrupt();
         } catch (IOException e) {
-          e.printStackTrace();
+          LOG.warn(e);
         }
       } // end while
     }
