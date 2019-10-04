@@ -121,6 +121,13 @@
         <configuration>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.openclover</groupId>
+        <artifactId>clover-maven-plugin</artifactId>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
