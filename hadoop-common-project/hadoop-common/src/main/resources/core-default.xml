@@ -3144,4 +3144,72 @@
       address. (i.e 0.0.0.0)
     </description>
   </property>
+
+  <property>
+    <name>hops.crl.validation.enabled</name>
+    <value>false</value>
+    <description>Enable CRL validation when HopsTLS is enabled</description>
+  </property>
+
+  <property>
+    <name>hops.crl.fetcher.class</name>
+    <value>org.apache.hadoop.security.ssl.RemoteCRLFetcher</value>
+    <description>Implementation class to use to fetch the Certificate Revocation List</description>
+  </property>
+
+  <property>
+    <name>hops.crl.input.uri</name>
+    <value>https://host:port/path/to/crl</value>
+    <description>URI to download CA CRL</description>
+  </property>
+
+  <property>
+    <name>hops.crl.output.file</name>
+    <value>/tmp/crl.pem</value>
+    <description>File path to save CRL</description>
+  </property>
+
+  <property>
+    <name>hops.crl.fetcher.interval</name>
+    <value>720</value>
+    <description>
+      Interval used by RevocationListFetcherService to fetch CA's CRL.
+      Valid suffixes NS, US, MS, S, M, H, D. If suffix is omitted, default is M (minutes)
+    </description>
+  </property>
+
+  <property>
+    <name>hops.hopsworks.host</name>
+    <value>https://localhost</value>
+    <description>
+      This property is used by Hopsworks security actions to perform REST calls
+      to Hopsworks such as issue, renew, revoke applications' X.509 or JWTs.
+    </description>
+  </property>
+
+  <property>
+    <name>hops.jwt-manager.master-token-validity</name>
+    <value>432000s</value>
+    <description>
+      Validity period of master JWT.
+    </description>
+  </property>
+
+  <property>
+    <name>hops.jwt-manager.service-renew-path</name>
+    <value>/hopsworks-api/api/jwt/service</value>
+    <description>
+      HTTP path that is combined with hops.hopsworks.host to make REST calls to
+      renew master token.
+    </description>
+  </property>
+
+  <property>
+    <name>hops.jwt-manager.service-invalidate-path</name>
+    <value>/hopsworks-api/api/jwt/service</value>
+    <description>
+      HTTP path that is combined with hops.hopsworks.host to make REST calls to
+      invalidate master token.
+    </description>
+  </property>
 </configuration>

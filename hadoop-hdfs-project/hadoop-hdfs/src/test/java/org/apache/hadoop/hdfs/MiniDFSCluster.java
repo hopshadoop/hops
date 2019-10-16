@@ -1224,6 +1224,8 @@ public class MiniDFSCluster {
       conf.set(DFS_DATANODE_HOST_NAME_KEY, "127.0.0.1");
     }
 
+    conf.set(FS_SECURITY_ACTIONS_ACTOR_KEY, "io.hops.security.TestingFsSecurityActions");
+    
     int curDatanodesNum = dataNodes.size();
     final int curDatanodesNumSaved = curDatanodesNum;
     // for mincluster's the default initialDelay for BRs is 0

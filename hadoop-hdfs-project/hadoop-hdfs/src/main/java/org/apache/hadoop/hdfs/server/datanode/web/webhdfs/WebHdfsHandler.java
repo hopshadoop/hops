@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.datanode.web.webhdfs;
 
 import com.google.common.base.Preconditions;
+import io.hops.security.CertificateLocalizationCtx;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -33,6 +34,7 @@ import org.apache.commons.io.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -51,6 +53,7 @@ import org.apache.hadoop.util.LimitInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -88,7 +91,7 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
 
   private String path;
   private ParameterParser params;
-  private UserGroupInformation ugi;
+  protected UserGroupInformation ugi;
 
   public WebHdfsHandler(Configuration conf, Configuration confForCreate)
     throws IOException {
@@ -100,13 +103,24 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
   public void channelRead0(final ChannelHandlerContext ctx,
                            final HttpRequest req) throws Exception {
     Preconditions.checkArgument(req.getUri().startsWith(WEBHDFS_PREFIX));
+    extractParams(req);
+    buildUGI();
+    injectToken();
+    doHandle(ctx, req);
+  }
+
+  protected void extractParams(final HttpRequest req) {
     QueryStringDecoder queryString = new QueryStringDecoder(req.getUri());
     params = new ParameterParser(queryString, conf);
+    path = params.path();
+  }
+
+  protected void buildUGI() throws IOException {
     DataNodeUGIProvider ugiProvider = new DataNodeUGIProvider(params);
     ugi = ugiProvider.ugi();
-    path = params.path();
-
-    injectToken();
+  }
+  
+  protected void doHandle(final ChannelHandlerContext ctx, final HttpRequest req) throws Exception {
     ugi.doAs(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws Exception {
@@ -115,7 +129,7 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
       }
     });
   }
-
+  
   public void handle(ChannelHandlerContext ctx, HttpRequest req)
     throws IOException, URISyntaxException {
     String op = params.op();
@@ -144,6 +158,14 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
     resp.headers().set(CONNECTION, CLOSE);
     ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
   }
+  
+  private HdfsWriter createHdfsWriter(DFSClient dfsClient, OutputStream out, DefaultHttpResponse response) {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      return new HopsHdfsWriter(dfsClient, out, response, conf, ugi);
+    }
+    return new HdfsWriter(dfsClient, out, response);
+  }
 
   private void onCreate(ChannelHandlerContext ctx)
     throws IOException, URISyntaxException {
@@ -168,8 +190,8 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
     final URI uri = new URI(HDFS_URI_SCHEME, nnId, path, null, null);
     resp.headers().set(LOCATION, uri.toString());
     resp.headers().set(CONTENT_LENGTH, 0);
-    ctx.pipeline().replace(this, HdfsWriter.class.getSimpleName(),
-      new HdfsWriter(dfsClient, out, resp));
+    HdfsWriter handler = createHdfsWriter(dfsClient, out, resp);
+    ctx.pipeline().replace(this, handler.getClass().getSimpleName(), handler);
   }
 
   private void onAppend(ChannelHandlerContext ctx) throws IOException {
@@ -182,8 +204,8 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
         EnumSet.of(CreateFlag.APPEND), null, null);
     DefaultHttpResponse resp = new DefaultHttpResponse(HTTP_1_1, OK);
     resp.headers().set(CONTENT_LENGTH, 0);
-    ctx.pipeline().replace(this, HdfsWriter.class.getSimpleName(),
-      new HdfsWriter(dfsClient, out, resp));
+    HdfsWriter handler = createHdfsWriter(dfsClient, out, resp);
+    ctx.pipeline().replace(this, handler.getClass().getSimpleName(), handler);
   }
 
   private void onOpen(ChannelHandlerContext ctx) throws IOException {
@@ -223,10 +245,11 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
       public void close() throws Exception {
         super.close();
         dfsclient.close();
+        removeX509Credentials();
       }
     }).addListener(ChannelFutureListener.CLOSE);
   }
-
+  
   private void onGetFileChecksum(ChannelHandlerContext ctx) throws IOException {
     MD5MD5CRC32FileChecksum checksum = null;
     final String nnId = params.namenodeId();
@@ -237,6 +260,7 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
       dfsclient = null;
     } finally {
       IOUtils.cleanup(LOG, dfsclient);
+      removeX509Credentials();
     }
     final byte[] js = JsonUtil.toJsonString(checksum).getBytes(Charsets.UTF_8);
     DefaultFullHttpResponse resp =
@@ -248,6 +272,19 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
     ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
   }
 
+  private void removeX509Credentials() throws IOException {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      try {
+        CertificateLocalizationCtx.getInstance().getCertificateLocalization()
+            .removeX509Material(ugi.getUserName());
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        throw new InterruptedIOException("CertificateLocalizationService interrupted while removing X.509 material");
+      }
+    }
+  }
+  
   private static void writeContinueHeader(ChannelHandlerContext ctx) {
     DefaultHttpResponse r = new DefaultFullHttpResponse(HTTP_1_1, CONTINUE,
       Unpooled.EMPTY_BUFFER);
@@ -260,7 +297,7 @@ public class WebHdfsHandler extends SimpleChannelInboundHandler<HttpRequest> {
     return new DFSClient(uri, conf);
   }
 
-  private void injectToken() throws IOException {
+  protected void injectToken() throws IOException {
     if (UserGroupInformation.isSecurityEnabled()) {
       Token<DelegationTokenIdentifier> token = params.delegationToken();
       token.setKind(HDFS_DELEGATION_KIND);

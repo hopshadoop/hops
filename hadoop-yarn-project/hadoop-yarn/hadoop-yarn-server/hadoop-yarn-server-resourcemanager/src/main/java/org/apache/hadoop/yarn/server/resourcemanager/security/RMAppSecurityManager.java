@@ -19,17 +19,19 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.security.AbstractSecurityActions;
+import io.hops.security.HopsSecurityActionsFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.BackOff;
 import org.apache.hadoop.util.ExponentialBackOff;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
@@ -83,7 +85,8 @@ public class RMAppSecurityManager extends AbstractService
     LOG.debug("Initializing RMAppSecurityManager");
     this.conf = conf;
     this.handler = rmContext.getDispatcher().getEventHandler();
-    rmAppCertificateActions = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    rmAppCertificateActions = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     isRPCTLSEnabled = conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT);
   
@@ -158,7 +161,9 @@ public class RMAppSecurityManager extends AbstractService
       } catch (InterruptedException ex) {
         renewalExecutorService.shutdownNow();
         if (rmAppCertificateActions != null) {
-          rmAppCertificateActions.destroy();
+          if (rmAppCertificateActions instanceof AbstractSecurityActions) {
+            ((AbstractSecurityActions)rmAppCertificateActions).stop();
+          }
         }
         Thread.currentThread().interrupt();
       }
@@ -168,7 +173,7 @@ public class RMAppSecurityManager extends AbstractService
   @InterfaceAudience.Private
   @VisibleForTesting
   protected void clearRMAppSecurityActionsFactory() {
-    RMAppSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear();
   }
   
   protected ScheduledExecutorService getRenewalExecutorService() {

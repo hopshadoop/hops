@@ -17,6 +17,7 @@ package org.apache.hadoop.security.ssl;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
@@ -32,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -44,7 +46,8 @@ public class HopsSSLTestUtils {
 
     protected enum CERT_ERR {
         ERR_CN,
-        NO_CA
+        NO_CA,
+        NO_ERROR
     }
 
     @Parameterized.Parameters
@@ -85,18 +88,6 @@ public class HopsSSLTestUtils {
             }
         }
     }
-
-    protected ByteBuffer[] getCryptoMaterial() throws Exception {
-        ByteBuffer[] material = new ByteBuffer[2];
-        ByteBuffer kstore = ByteBuffer.wrap(Files.readAllBytes
-            (c_clientKeyStore));
-        ByteBuffer tstore = ByteBuffer.wrap(Files.readAllBytes
-            (c_clientTrustStore));
-        material[0] = kstore;
-        material[1] = tstore;
-        
-        return material;
-    }
     
     protected void setCryptoConfig(Configuration conf, String classPathDir) throws Exception {
         conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY,
@@ -125,21 +116,32 @@ public class HopsSSLTestUtils {
             .getValue(), "TLSv1.2");
     }
 
-    protected List<Path> prepareCryptoMaterial(Configuration conf, String outDir) throws Exception {
+    protected static final String KEY_ALG = "RSA";
+    protected static final String SIGN_ALG = "SHA256withRSA";
+    
+    protected Pair<KeyPair, X509Certificate> generateCAMaterial(String subject) throws GeneralSecurityException {
+        KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
+        X509Certificate x509 = KeyStoreTestUtil.generateCertificate(subject, keyPair, 42, SIGN_ALG);
+        return new Pair<>(keyPair, x509);
+    }
+    
+    protected List<Path> prepareCryptoMaterial(String outDir) throws Exception {
+        return prepareCryptoMaterial(outDir, generateCAMaterial("CN=CARoot"));
+    }
+    
+    protected List<Path> prepareCryptoMaterial(String outDir, Pair<KeyPair, X509Certificate> caMaterial)
+        throws Exception {
         List<Path> filesToPurge = new ArrayList<>();
         this.outDir = outDir;
 
-        String keyAlg = "RSA";
-        String signAlg = "SHA256withRSA";
-
         // Generate CA
-        KeyPair caKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
-        X509Certificate caCert = KeyStoreTestUtil.generateCertificate("CN=CARoot", caKeyPair, 42, signAlg);
-
+        KeyPair caKeyPair = caMaterial.getFirst();
+        X509Certificate caCert = caMaterial.getSecond();
+        
         // Generate server certificate signed by CA
-        KeyPair serverKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+        KeyPair serverKeyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
         X509Certificate serverCrt = KeyStoreTestUtil.generateSignedCertificate("CN=serverCrt", serverKeyPair, 42,
-                signAlg, caKeyPair.getPrivate(), caCert);
+                SIGN_ALG, caKeyPair.getPrivate(), caCert);
 
         serverKeyStore = Paths.get(outDir, "server.keystore.jks");
         serverTrustStore = Paths.get(outDir, "server.truststore.jks");
@@ -150,10 +152,10 @@ public class HopsSSLTestUtils {
         KeyStoreTestUtil.createTrustStore(serverTrustStore.toString(), passwd, "CARoot", caCert);
 
         // Generate client certificate with the correct CN field and signed by the CA
-        KeyPair c_clientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+        KeyPair c_clientKeyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
         String c_cn = "CN=" + UserGroupInformation.getCurrentUser().getUserName();
         X509Certificate c_clientCrt = KeyStoreTestUtil.generateSignedCertificate(c_cn, c_clientKeyPair, 42,
-                signAlg, caKeyPair.getPrivate(), caCert);
+                SIGN_ALG, caKeyPair.getPrivate(), caCert);
 
         c_clientKeyStore = Paths.get(outDir, "c_client.keystore.jks");
         c_clientTrustStore = Paths.get(outDir, "c_client.truststore.jks");
@@ -166,9 +168,9 @@ public class HopsSSLTestUtils {
         if (error_mode.equals(CERT_ERR.NO_CA)) {
             LOG.info("no ca error mode");
             // Generate client certificate with the correct CN field but NOT signed by the CA
-            KeyPair noCA_clientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+            KeyPair noCA_clientKeyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
             X509Certificate noCA_clientCrt = KeyStoreTestUtil.generateCertificate(c_cn, noCA_clientKeyPair, 42,
-                    signAlg);
+                    SIGN_ALG);
 
             err_clientKeyStore = Paths.get(outDir, "noCA_client.keystore.jks");
             err_clientTrustStore = Paths.get(outDir, "noCA_client.truststore.jks");
@@ -181,9 +183,9 @@ public class HopsSSLTestUtils {
         } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
             LOG.info("wrong cn error mode");
             // Generate client with INCORRECT CN field but signed by the CA
-            KeyPair errCN_clientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlg);
+            KeyPair errCN_clientKeyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
             X509Certificate errCN_clientCrt = KeyStoreTestUtil.generateSignedCertificate("CN=Phil Lynott",
-                    errCN_clientKeyPair, 42, signAlg, caKeyPair.getPrivate(), caCert);
+                    errCN_clientKeyPair, 42, SIGN_ALG, caKeyPair.getPrivate(), caCert);
 
             err_clientKeyStore = Paths.get(outDir, "errCN_client.keystore.jks");
             err_clientTrustStore = Paths.get(outDir, "errCN_client.truststore.jks");

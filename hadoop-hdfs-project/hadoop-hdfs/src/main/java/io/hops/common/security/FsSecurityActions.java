@@ -15,12 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.security;
+package io.hops.common.security;
 
-import java.util.concurrent.ExecutionException;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
 
-public interface CertificateLocalizationMBean {
-  String getState();
-  boolean forceRemoveMaterial(String username) throws InterruptedException, ExecutionException;
-  boolean forceRemoveMaterial(String username, String applicationId) throws InterruptedException, ExecutionException;
+public interface FsSecurityActions {
+  HopsworksFsSecurityActions.X509CredentialsDTO getX509Credentials(String username)
+      throws URISyntaxException, GeneralSecurityException, IOException;
 }

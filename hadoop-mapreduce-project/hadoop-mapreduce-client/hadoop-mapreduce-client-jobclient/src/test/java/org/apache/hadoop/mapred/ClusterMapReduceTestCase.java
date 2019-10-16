@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapred;
 
+import io.hops.security.HopsSecurityActionsFactory;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -142,6 +143,7 @@ public abstract class ClusterMapReduceTestCase {
   @After
   public void tearDown() throws Exception {
     stopCluster();
+    HopsSecurityActionsFactory.getInstance().clear();
   }
 
   /**

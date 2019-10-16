@@ -29,8 +29,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
+import io.hops.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.LocalConfigurationProvider;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -70,9 +69,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.hops.util.GroupMembershipService;
 import io.hops.yarn.server.resourcemanager.quota.PriceMultiplicatorService;
 import io.hops.yarn.server.resourcemanager.quota.QuotaService;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 /**

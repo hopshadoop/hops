@@ -2050,4 +2050,17 @@
     </description>
   </property>
 
+  <property>
+    <name>dfs.security-actions.actor-class</name>
+    <value>io.hops.common.security.HopsworksFsSecurityActions</value>
+    <description>Class to use for interacting with Hopsworks</description>
+  </property>
+
+  <property>
+    <name>dfs.security-actions.x509.get-path</name>
+    <value>/hopsworks-api/api/admin/credentials/x509</value>
+    <description>REST endpoint in Hopsworks that is combined with hops.hopsworks.host to
+      get X.509 security material for a Hopsworks user.
+    </description>
+  </property>
 </configuration>

@@ -15,6 +15,7 @@
  */
 package org.apache.hadoop.yarn.server;
 
+import io.hops.security.HopsX509AuthenticationException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.ipc.RPC;
@@ -82,7 +83,7 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         conf = new YarnConfiguration();
         conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
             "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
-        filesToPurge = prepareCryptoMaterial(conf, classpathDir);
+        filesToPurge = prepareCryptoMaterial(classpathDir);
         setCryptoConfig(conf, classpathDir);
 
         conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
@@ -217,7 +218,7 @@ public class TestYarnSSLServer extends HopsSSLTestUtils {
         if (error_mode.equals(CERT_ERR.NO_CA)) {
             rule.expect(SSLException.class);
         } else if (error_mode.equals(CERT_ERR.ERR_CN)) {
-            rule.expect(RpcServerException.class);
+            rule.expect(HopsX509AuthenticationException.class);
         }
         GetNewApplicationResponse res1 = acClient1.getNewApplication(req1);
     }

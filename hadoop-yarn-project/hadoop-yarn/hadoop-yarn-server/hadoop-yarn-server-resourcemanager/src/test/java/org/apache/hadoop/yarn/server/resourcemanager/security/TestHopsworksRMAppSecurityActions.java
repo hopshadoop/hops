@@ -17,16 +17,15 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.nimbusds.jwt.JWT;
-import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
+import io.hops.security.AbstractSecurityActions;
+import io.hops.security.BaseTestHopsworksSecurityActions;
+import io.hops.security.HopsSecurityActionsFactory;
+import io.hops.security.ServiceJWTManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.util.Pair;
-import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
@@ -35,18 +34,6 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.http.Header;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.ssl.TrustStrategy;
-import org.apache.http.util.EntityUtils;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -65,37 +52,31 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Security;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
-import java.util.Date;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
 
+/**
+ * Unit test for testing the RMAppSecurityAction interface with Hopsworks
+ * By default the tests are ignored as they expect a running Hopsworks
+ * instance.
+ *
+ * You SHOULD ALWAYS run these test manually if you've changed the interface
+ *
+ */
 @Ignore
-public class TestHopsworksRMAppSecurityActions {
+public class TestHopsworksRMAppSecurityActions extends BaseTestHopsworksSecurityActions {
   private final static Log LOG = LogFactory.getLog(TestHopsworksRMAppSecurityActions.class);
-  private final static String HOPSWORKS_ENDPOINT = "https://HOST:PORT";
-  private final static String HOPSWORKS_USER = "USERNAME";
-  private final static String HOPSWORKS_PASSWORD = "PASSWORD";
   
-  private static final String HOPSWORKS_LOGIN_PATH = "/hopsworks-api/api/auth/service";
   private static final String O = "application_id";
   private static final String OU = "1";
   
@@ -105,7 +86,6 @@ public class TestHopsworksRMAppSecurityActions {
   private static final String JWT_SUBJECT = "ProjectA1__Flock";
   
   private static String classPath;
-  private static MockJWTIssuer jwtIssuer;
   
   private Path sslServerPath;
   private Configuration conf;
@@ -121,21 +101,21 @@ public class TestHopsworksRMAppSecurityActions {
     byte[] jwtIssuerSecret = new byte[32];
     Random rand = new Random();
     rand.nextBytes(jwtIssuerSecret);
-    jwtIssuer = new MockJWTIssuer(jwtIssuerSecret);
   }
   
   @Before
   public void beforeTest() throws Exception {
-    RMAppSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear();
     conf = new Configuration();
     String sslConfFilename = TestHopsworksRMAppSecurityActions.class.getSimpleName() + ".ssl-server.xml";
     sslServerPath = Paths.get(classPath, sslConfFilename);
+    
     Pair<String, String[]> jwtResponse = loginAndGetJWT();
     
     sslServer = new Configuration(false);
-    sslServer.set(YarnConfiguration.RM_JWT_MASTER_TOKEN, jwtResponse.getFirst());
+    sslServer.set(ServiceJWTManager.JWT_MANAGER_MASTER_TOKEN_KEY, jwtResponse.getFirst());
     for (int i = 0; i < jwtResponse.getSecond().length; i++) {
-      String renewalConfKey = String.format(YarnConfiguration.RM_JWT_RENEW_TOKEN_PATTERN, i);
+      String renewalConfKey = String.format(ServiceJWTManager.JWT_MANAGER_RENEW_TOKEN_PATTERN, i);
       sslServer.set(renewalConfKey, jwtResponse.getSecond()[i]);
     }
     
@@ -146,7 +126,7 @@ public class TestHopsworksRMAppSecurityActions {
     
     KeyStoreTestUtil.saveConfig(sslServerPath.toFile(), sslServer);
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFilename);
-    conf.set(YarnConfiguration.HOPS_HOPSWORKS_HOST_KEY, HOPSWORKS_ENDPOINT);
+    conf.set(CommonConfigurationKeys.HOPS_HOPSWORKS_HOST_KEY, HOPSWORKS_ENDPOINT);
     conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, "org.apache.hadoop.yarn.server.resourcemanager" +
         ".security.DevHopsworksRMAppSecurityActions");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
@@ -155,7 +135,9 @@ public class TestHopsworksRMAppSecurityActions {
   
   @After
   public void afterTest() throws Exception {
-    RMAppSecurityActionsFactory.getInstance().getActor(conf).destroy();
+    AbstractSecurityActions actorService = HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
+    actorService.stop();
     if (sslServerPath != null) {
       sslServerPath.toFile().delete();
     }
@@ -164,7 +146,8 @@ public class TestHopsworksRMAppSecurityActions {
   @Test
   public void testSign() throws Exception {
     PKCS10CertificationRequest csr = generateCSR(UUID.randomUUID().toString());
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     X509SecurityHandler.CertificateBundle singedBundle = actor.sign(csr);
     Assert.assertNotNull(singedBundle);
   }
@@ -173,7 +156,8 @@ public class TestHopsworksRMAppSecurityActions {
   public void testRevoke() throws Exception {
     String cn = UUID.randomUUID().toString();
     PKCS10CertificationRequest csr = generateCSR(cn);
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     actor.sign(csr);
     int response = actor.revoke(cn + "__" + O + "__" + OU);
     Assert.assertEquals(200, response);
@@ -201,7 +185,8 @@ public class TestHopsworksRMAppSecurityActions {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
     JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
     
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     String jwt = actor.generateJWT(jwtParam);
     Assert.assertNotNull(jwt);
     String[] tokenizedSubject = JWT_SUBJECT.split("__");
@@ -233,7 +218,8 @@ public class TestHopsworksRMAppSecurityActions {
   @Test
   public void testInvalidateJWT() throws Exception {
     String signingKeyName = "lala";
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     actor.invalidateJWT(signingKeyName);
   }
   
@@ -241,7 +227,8 @@ public class TestHopsworksRMAppSecurityActions {
   public void testGenerateJWTSameSigningKeyShouldFail() throws Exception {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
     JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     actor.generateJWT(jwtParam);
     
     rule.expect(IOException.class);
@@ -252,7 +239,8 @@ public class TestHopsworksRMAppSecurityActions {
   public void testGenerateJWTInvalidateGenerate() throws Exception {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
     JWTSecurityHandler.JWTMaterialParameter jwtParam = createJWTParameter(appId);
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     String jwt0 = actor.generateJWT(jwtParam);
     Assert.assertNotNull(jwt0);
     
@@ -261,22 +249,21 @@ public class TestHopsworksRMAppSecurityActions {
     Assert.assertNotEquals(jwt0, jwt1);
   }
   
-  @Test
+  @Test(timeout = 15000)
   public void testRenewJWT() throws Exception {
     ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
     JWTSecurityHandler.JWTMaterialParameter jwtParam0 = createJWTParameter(appId, 2, ChronoUnit.SECONDS);
-    RMAppSecurityActions actor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+    RMAppSecurityActions actor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     String jwt0 = actor.generateJWT(jwtParam0);
-  
-    TimeUnit.SECONDS.sleep(2);
+    
+    TimeUnit.SECONDS.sleep(10);
     
     JWTSecurityHandler.JWTMaterialParameter jwtParam1 = createJWTParameter(appId);
     jwtParam1.setToken(jwt0);
     String jwt1 = actor.renewJWT(jwtParam1);
     Assert.assertNotNull(jwt1);
     Assert.assertNotEquals(jwt0, jwt1);
-    LOG.info(jwt0);
-    LOG.info(jwt1);
   }
   
   private JWTSecurityHandler.JWTMaterialParameter createJWTParameter(ApplicationId appId) {
@@ -293,205 +280,5 @@ public class TestHopsworksRMAppSecurityActions {
     jwtParam.setValidNotBefore(now);
     jwtParam.setAudiences(new String[]{"job"});
     return jwtParam;
-  }
-  
-  @Test
-  public void testConfUpdate() throws Exception {
-    LocalDateTime now = LocalDateTime.now();
-    Date nbf = DateUtils.localDateTime2Date(now);
-    LocalDateTime expiration = now.plus(10, ChronoUnit.MINUTES);
-    Date expirationDate = DateUtils.localDateTime2Date(expiration);
-    JWTClaimsSet masterClaims = new JWTClaimsSet.Builder()
-        .subject("master_token")
-        .expirationTime(expirationDate)
-        .notBeforeTime(nbf).build();
-    String newMasterToken = jwtIssuer.generate(masterClaims);
-    Assert.assertNotNull(newMasterToken);
-
-    String[] newRenewalTokens = new String[5];
-    JWTClaimsSet renewClaims = new JWTClaimsSet.Builder()
-        .subject("renew_token")
-        .expirationTime(expirationDate)
-        .notBeforeTime(nbf).build();
-    for (int i = 0; i < newRenewalTokens.length; i++) {
-      String renewToken = jwtIssuer.generate(renewClaims);
-      Assert.assertNotNull(renewToken);
-      newRenewalTokens[i] = renewToken;
-    }
-    RMAppSecurityActions actor = new TestingHopsworksActions(newMasterToken, expirationDate, newRenewalTokens);
-    ((Configurable) actor).setConf(conf);
-    actor.init();
-    TimeUnit.MILLISECONDS.sleep(500);
-    
-    // Renewal must have happened, check new values in ssl-server
-    Configuration sslConf = new Configuration();
-    sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY));
-    String newMasterTokenConf = sslConf.get(YarnConfiguration.RM_JWT_MASTER_TOKEN, "");
-    Assert.assertEquals(newMasterToken, newMasterTokenConf);
-    for (int i = 0; i < newRenewalTokens.length; i++) {
-      String confKey = String.format(YarnConfiguration.RM_JWT_RENEW_TOKEN_PATTERN, i);
-      String newRenewalToken = sslConf.get(confKey, "");
-      Assert.assertEquals(newRenewalTokens[i], newRenewalToken);
-    }
-  
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-    Assert.assertEquals(expiration.format(formatter),
-        ((HopsworksRMAppSecurityActions)actor).getMasterTokenExpiration().format(formatter));
-    actor.destroy();
-  }
-  
-  @Test
-  public void testServiceJWTRenewalRetry() throws Exception {
-    LocalDateTime expiration = DateUtils.getNow().plus(10, ChronoUnit.MINUTES);
-    Date expirationDate = DateUtils.localDateTime2Date(expiration);
-    JWTClaimsSet claims = new JWTClaimsSet.Builder()
-    .subject("test")
-    .expirationTime(expirationDate).build();
-    String newMasterToken = jwtIssuer.generate(claims);
-    String[] renewTokens = new String[5];
-    for (int i = 0; i < renewTokens.length; i++) {
-      renewTokens[i] = jwtIssuer.generate(claims);
-    }
-    RMAppSecurityActions actor = new FailingTestHopsworksActions(newMasterToken, expirationDate, renewTokens);
-    ((Configurable)actor).setConf(conf);
-    actor.init();
-    
-    int secondsWaited = 0;
-    while (!((FailingTestHopsworksActions)actor).succeedRenewing
-        && secondsWaited++ < 10) {
-      TimeUnit.SECONDS.sleep(1);
-    }
-    // Renewal should intentionally fail but finally it should succeed
-    Assert.assertTrue(((FailingTestHopsworksActions)actor).succeedRenewing);
-    Assert.assertTrue(((FailingTestHopsworksActions)actor).usedOneTimeTokens.size() > 1);
-    actor.destroy();
-  }
-  
-  private Pair<String, String[]> loginAndGetJWT() throws Exception {
-    CloseableHttpClient client = null;
-    try {
-      SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
-      sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
-        @Override
-        public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-          return true;
-        }
-      });
-      SSLConnectionSocketFactory sslSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
-          NoopHostnameVerifier.INSTANCE);
-  
-      client = HttpClients.custom().setSSLSocketFactory(sslSocketFactory).build();
-      URL loginURL = new URL(new URL(HOPSWORKS_ENDPOINT), HOPSWORKS_LOGIN_PATH);
-      HttpUriRequest login = RequestBuilder.post()
-          .setUri(loginURL.toURI())
-          .addParameter("email", HOPSWORKS_USER)
-          .addParameter("password", HOPSWORKS_PASSWORD)
-          .build();
-      CloseableHttpResponse response = client.execute(login);
-      Assert.assertNotNull(response);
-      Assert.assertEquals(200, response.getStatusLine().getStatusCode());
-      Header[] authHeaders = response.getHeaders(HttpHeaders.AUTHORIZATION);
-  
-      String masterJWT = null;
-      for (Header h : authHeaders) {
-        Matcher matcher = HopsworksRMAppSecurityActions.JWT_PATTERN.matcher(h.getValue());
-        if (matcher.matches()) {
-          masterJWT = matcher.group(1);
-        }
-      }
-      JsonParser jsonParser = new JsonParser();
-      JsonObject json = jsonParser.parse(EntityUtils.toString(response.getEntity())).getAsJsonObject();
-      JsonArray array = json.getAsJsonArray("renewTokens");
-      String[] renewTokens = new String[array.size()];
-      boolean renewalTokensFound = false;
-      for (int i = 0; i < renewTokens.length; i++) {
-        renewTokens[i] = array.get(i).getAsString();
-        renewalTokensFound = true;
-      }
-      if (masterJWT != null && renewalTokensFound) {
-        return new Pair<>(masterJWT, renewTokens);
-      }
-      
-      throw new IOException("Could not get JWT from Hopsworks");
-    } finally {
-      if (client != null) {
-        client.close();
-      }
-    }
-  }
-  
-  private class TestingHopsworksActions extends HopsworksRMAppSecurityActions {
-  
-    final String newMasterToken;
-    final Date expiresAt;
-    final String[] newRenewalTokens;
-    private boolean renewed = false;
-    
-    public TestingHopsworksActions(String newMasterToken, Date expiresAt, String[] newRenewalTokens)
-        throws MalformedURLException, GeneralSecurityException {
-      super();
-      this.newMasterToken = newMasterToken;
-      this.expiresAt = expiresAt;
-      this.newRenewalTokens = newRenewalTokens;
-    }
-  
-    @Override
-    protected ServiceTokenDTO renewServiceJWT(String token, String oneTimeToken, LocalDateTime expiresAt,
-        LocalDateTime notBefore) throws URISyntaxException, IOException, GeneralSecurityException {
-      JWTDTO jwt = new JWTDTO();
-      jwt.setToken(newMasterToken);
-      jwt.setExpiresAt(this.expiresAt);
-      jwt.setNbf(DateUtils.localDateTime2Date(notBefore));
-      
-      ServiceTokenDTO serviceTokenResponse = new ServiceTokenDTO();
-      serviceTokenResponse.setJwt(jwt);
-      serviceTokenResponse.setRenewTokens(newRenewalTokens);
-      return serviceTokenResponse;
-    }
-  
-    @Override
-    protected void invalidateServiceJWT(String token2invalidate)
-        throws URISyntaxException, IOException, GeneralSecurityException {
-      // NO-OP
-    }
-  
-    @Override
-    protected boolean isTime2Renew(LocalDateTime now, LocalDateTime expiration) {
-      if (!renewed) {
-        renewed = true;
-        return true;
-      }
-      return false;
-    }
-  }
-  
-  private class FailingTestHopsworksActions extends TestingHopsworksActions {
-    
-    private int failures = 0;
-    private boolean succeedRenewing = false;
-    private Set<String> usedOneTimeTokens = new HashSet<>();
-    
-    public FailingTestHopsworksActions(String newMasterToken, Date expiresAt, String[] newRenewTokens)
-        throws MalformedURLException, GeneralSecurityException {
-      super(newMasterToken, expiresAt, newRenewTokens);
-    }
-  
-    @Override
-    protected ServiceTokenDTO renewServiceJWT(String token, String oneTimeToken, LocalDateTime expiresAt,
-        LocalDateTime notBefore) throws URISyntaxException, IOException, GeneralSecurityException {
-      usedOneTimeTokens.add(oneTimeToken);
-      if (failures++ < 3) {
-        throw new IOException("OOoops");
-      }
-      succeedRenewing = true;
-      JWTDTO jwt = new JWTDTO();
-      jwt.setToken(newMasterToken);
-      jwt.setExpiresAt(this.expiresAt);
-      jwt.setNbf(DateUtils.localDateTime2Date(notBefore));
-      ServiceTokenDTO serviceTokenResponse = new ServiceTokenDTO();
-      serviceTokenResponse.setJwt(jwt);
-      serviceTokenResponse.setRenewTokens(newRenewalTokens);
-      return serviceTokenResponse;
-    }
   }
 }

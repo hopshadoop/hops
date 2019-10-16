@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapreduce.security.ssl;
 
+import io.hops.security.HopsSecurityActionsFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -75,6 +76,7 @@ public class TestEncryptedShuffle {
     new File(classpathDir, "core-site.xml").delete();
     String keystoresDir = new File(BASEDIR).getAbsolutePath();
     KeyStoreTestUtil.cleanupSSLConfig(keystoresDir, classpathDir);
+    HopsSecurityActionsFactory.getInstance().clear();
   }
 
   private MiniDFSCluster dfsCluster = null;

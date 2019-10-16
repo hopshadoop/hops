@@ -135,6 +135,8 @@ public class TestYarnStartupWithCRL {
     conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
     String superUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + superUser, "*");
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
   
     Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(keyStore.toString(), password,
         password, trustStore.toString(), password, "");

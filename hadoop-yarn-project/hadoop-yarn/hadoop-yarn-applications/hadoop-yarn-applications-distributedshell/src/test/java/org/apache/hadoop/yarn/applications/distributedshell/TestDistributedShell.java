@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
-import io.hops.metadata.HdfsStorageFactory;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -44,6 +43,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.io.FileUtils;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.security.HopsSecurityActionsFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileContext;
@@ -284,6 +285,7 @@ public class TestDistributedShell {
         .delete(
             new Path(conf.get(YarnConfiguration.TIMELINE_SERVICE_LEVELDB_PATH)),
             true);
+    HopsSecurityActionsFactory.getInstance().clear();
   }
 
   @Test

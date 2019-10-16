@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.resourcemanager.security;
+package io.hops.security;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -29,21 +29,26 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
 import java.text.ParseException;
+import java.util.Random;
 
 public class MockJWTIssuer {
   
   private final byte[] sharedSecret;
   private final JWSSigner signer;
   private final JWSVerifier verifier;
+  private final Random rand;
   
   public MockJWTIssuer(byte[] sharedSecret) throws KeyLengthException, JOSEException {
     this.sharedSecret = sharedSecret;
     signer = new MACSigner(sharedSecret);
     verifier = new MACVerifier(sharedSecret);
+    rand = new Random();
   }
   
-  public String generate(JWTClaimsSet claims) throws JOSEException {
-    SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+  public String generate(JWTClaimsSet.Builder claimsBuilder) throws JOSEException {
+    claimsBuilder.issuer("MockJWTIssuer");
+    claimsBuilder.claim("rand", rand.nextLong());
+    SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsBuilder.build());
     signedJWT.sign(signer);
     
     return signedJWT.serialize();

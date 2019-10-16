@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import io.hops.security.AbstractSecurityActions;
+import io.hops.security.HopsSecurityActionsFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -49,7 +51,7 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     config = new Configuration();
     config.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
     
-    RMAppSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear();
     dispatcher = new DrainDispatcher();
     rmContext = new RMContextImpl(dispatcher, null, null, null, null, null, null, null, null);
     dispatcher.init(config);
@@ -97,7 +99,8 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     config.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
         "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
-    RMAppSecurityActionsFactory.getInstance().register(actor);
+    HopsSecurityActionsFactory.getInstance()
+        .register(config.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY), (AbstractSecurityActions) actor);
     
     RMAppSecurityManager securityManager = new RMAppSecurityManager(rmContext);
     JWTSecurityHandler jwtHandler = Mockito.spy(
@@ -147,7 +150,8 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
     config.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "2s");
     
     RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
-    RMAppSecurityActionsFactory.getInstance().register(actor);
+    HopsSecurityActionsFactory.getInstance()
+        .register(config.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY), (AbstractSecurityActions) actor);
     
     RMAppSecurityManager securityManager = new RMAppSecurityManager(rmContext);
     JWTSecurityHandler jwtHandler = Mockito.spy(new MockJWTSecurityHandler(rmContext, securityManager));
