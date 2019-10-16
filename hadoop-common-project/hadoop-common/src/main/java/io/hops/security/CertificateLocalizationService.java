@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.security;
+package io.hops.security;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -24,7 +24,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
-import org.apache.hadoop.security.ssl.CertificateLocalization;
 import org.apache.hadoop.security.ssl.SecurityMaterial;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
@@ -96,7 +95,8 @@ public class CertificateLocalizationService extends AbstractService
     NM("NM"),
     HS2("HS2"),
     HM("HM"),
-    LLAP("LLAP");
+    LLAP("LLAP"),
+    DN("DN");
 
     private final String service;
 

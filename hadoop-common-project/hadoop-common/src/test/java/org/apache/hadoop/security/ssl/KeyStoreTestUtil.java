@@ -375,7 +375,27 @@ public class KeyStoreTestUtil {
     conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslServerConfFile.getName());
     conf.setBoolean(SSLFactory.SSL_REQUIRE_CLIENT_CERT_KEY, useClientCert);
   }
-
+  
+  /**
+   * Creates SSL configuration for a client.
+   *
+   * @param clientKS String client keystore file
+   * @param password String store password, or null to avoid setting store
+   *   password
+   * @param keyPassword String key password, or null to avoid setting key
+   *   password
+   * @param trustKS String truststore file
+   * @param trustPassword Truststore password
+   * @param excludeCiphers String comma separated ciphers to exclude
+   * @return Configuration for client SSL
+   */
+  public static Configuration createClientSSLConfig(String clientKS,
+      String password, String keyPassword, String trustKS, String trustPassword,
+      String excludeCiphers) {
+    return createSSLConfig(SSLFactory.Mode.CLIENT, clientKS, password, keyPassword,
+        trustKS, trustPassword, excludeCiphers);
+  }
+  
   /**
    * Creates SSL configuration for a client.
    * 

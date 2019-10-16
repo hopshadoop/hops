@@ -21,7 +21,7 @@ import io.hops.security.HopsUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CertificateLocalization;
+import io.hops.security.CertificateLocalization;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 
 import java.io.File;

@@ -55,6 +55,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import io.hops.security.CertificateLocalizationCtx;
+import io.hops.security.CertificateLocalizationService;
+import io.hops.security.HopsSecurityActionsFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -373,6 +376,8 @@ public class DataNode extends ReconfigurableBase
   private static final int NUM_CORES = Runtime.getRuntime()
       .availableProcessors();
   private static final double CONGESTION_RATIO = 1.5;
+  
+  private CertificateLocalizationService certificateLocalizationService;
 
   private static Tracer createTracer(Configuration conf) {
     return new Tracer.Builder("DataNode").
@@ -1204,6 +1209,7 @@ public class DataNode extends ReconfigurableBase
     
     try {
       createAndStartCRLFetcherService(conf);
+      createCertificateLocalizationService(conf);
     } catch (Exception ex) {
       LOG.error("Error starting CRL fetcher service", ex);
       throw new IOException(ex);
@@ -1310,6 +1316,17 @@ public class DataNode extends ReconfigurableBase
       } else {
         LOG.warn("RPC TLS is enabled but CRL validation is disabled");
       }
+    }
+  }
+  
+  private void createCertificateLocalizationService(Configuration conf) throws Exception {
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+      LOG.info("Starting CertificateLocalizationService");
+      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.DN);
+      certificateLocalizationService.init(conf);
+      certificateLocalizationService.start();
+      CertificateLocalizationCtx.getInstance().setCertificateLocalization(certificateLocalizationService);
     }
   }
   
@@ -1942,6 +1959,18 @@ public class DataNode extends ReconfigurableBase
         LOG.warn("Exception while stopping CRL fetcher service, but we are shutting down anyway");
       }
     }
+    
+    if (certificateLocalizationService != null) {
+      certificateLocalizationService.stop();
+    }
+  
+    try {
+      HopsSecurityActionsFactory.getInstance().getActor(conf, conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY,
+          DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR)).stop();
+    } catch (Exception ex) {
+      LOG.warn("Error while stopping FsSecurityActions", ex);
+    }
+    
     LOG.info("Shutdown complete.");
     synchronized(this) {
       // it is already false, but setting it again to avoid a findbug warning.

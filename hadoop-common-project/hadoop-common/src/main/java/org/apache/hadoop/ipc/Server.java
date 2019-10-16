@@ -60,10 +60,9 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
-import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import io.hops.security.HopsUtil;
+import io.hops.security.HopsX509AuthenticationException;
+import io.hops.security.HopsX509Authenticator;
+import io.hops.security.HopsX509AuthenticatorFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -442,9 +441,8 @@ public abstract class Server {
 
   private final boolean isHopsTLSEnabled;
   private final CRLValidator crlValidator;
+  private final HopsX509Authenticator hopsX509Authenticator;
   private SSLFactory sslFactory = null;
-  private String proxySuperuser = null;
-  private Cache<InetAddress, String> trustedHostnames;
 
   private boolean logSlowRPC = false;
 
@@ -2297,93 +2295,15 @@ public abstract class Server {
        */
       private void authenticateSSLConnection(UserGroupInformation protocolUser)
           throws FatalRpcServerException {
-        if (!isHopsTLSEnabled) {
-          return;
-        }
-        try {
-          String user = protocolUser.getUserName();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Authenticating user: " + user + " for protocol "
-                + protocolName + " from " + hostAddress + ":" + remotePort);
+        if (isHopsTLSEnabled) {
+          try {
+            X509Certificate clientCertificate = ((ServerRpcSSLEngineImpl) rpcSSLEngine)
+                .getClientCertificate();
+            hopsX509Authenticator.authenticateConnection(protocolUser, clientCertificate, socket.getInetAddress(),
+                protocolName);
+          } catch (SSLPeerUnverifiedException | HopsX509AuthenticationException ex) {
+            throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED, ex);
           }
-    
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Authentication via certificate CN");
-          }
-          X509Certificate clientCertificate = ((ServerRpcSSLEngineImpl) rpcSSLEngine)
-              .getClientCertificate();
-    
-          String subjectDN = clientCertificate.getSubjectX500Principal().getName("RFC2253");
-          String cn = HopsUtil.extractCNFromSubject(subjectDN);
-          if (cn == null) {
-            throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED,
-                "Problematic CN in client certificate: " + subjectDN);
-          }
-    
-          // Hops X.509 certificates use O field for ApplicationID
-          String org = HopsUtil.extractOFromSubject(subjectDN);
-          if (org != null) {
-            protocolUser.addApplicationId(org);
-          }
-    
-          // If the CN of the certificate is equals to Hops superuser,
-          // let it go through
-          if (cn.equals(proxySuperuser)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("SSL authentication: CN is superuser");
-            }
-            return;
-          }
-    
-    
-          // If the CN is not equal to Hops superuser but it is the
-          // same as the RPC username, let it go through as well
-          if (protocolUser.getUserName() != null
-              && protocolUser.getUserName().equals(cn)) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("SSL authentication: CN equals the RPC username");
-            }
-            return;
-          }
-    
-          // The CN could also be the machine FQDN.
-          // These certificates will be used by Hops services RM, NM, NN, DN
-          // Assume that reverse DNS will succeed only for machines that we
-          // trust
-          // Try reverse DNS of the address to check if the CN matches
-          InetAddress remoteAddress = socket.getInetAddress();
-          Preconditions.checkNotNull(remoteAddress, "Remote address should not be null");
-          String cachedFqdn = trustedHostnames.getIfPresent(remoteAddress);
-          if (cachedFqdn != null) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("SSL authentication: CN is hostname and hostname " +
-                  "already authenticated");
-            }
-            return;
-          }
-  
-          String fqdn = remoteAddress.getCanonicalHostName();
-          if (cn.equals(fqdn)) {
-            trustedHostnames.put(remoteAddress, fqdn);
-            LOG.debug("TLS authentication: CN is the FQDN and just resolved");
-            return;
-          } else {
-            // Check the hostname for backwards compatibility
-            String hostname = socket.getInetAddress().getHostName();
-            if (cn.equals(hostname)) {
-              trustedHostnames.put(remoteAddress, hostname);
-              LOG.debug("TLS authentication: CN is the hostname and just resolved. Warning: hostname is deprecated");
-              return;
-            }
-          }
-  
-          // Incoming RPC did not manage to authenticate
-          throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED,
-              "Client's certificate CN " + cn +
-                  " did not match the supplied RPC username " + protocolUser.getUserName()
-                  + " for protocol: " + protocolName);
-        } catch (SSLPeerUnverifiedException ex) {
-          throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_UNAUTHORIZED, ex);
         }
       }
 
@@ -2928,6 +2848,7 @@ public abstract class Server {
         CommonConfigurationKeysPublic.IPC_SERVER_LOG_SLOW_RPC,
         CommonConfigurationKeysPublic.IPC_SERVER_LOG_SLOW_RPC_DEFAULT));
 
+    hopsX509Authenticator = HopsX509AuthenticatorFactory.getInstance(conf).getAuthenticator();
     this.isHopsTLSEnabled = conf.getBoolean(
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
@@ -2940,27 +2861,6 @@ public abstract class Server {
       } catch (GeneralSecurityException ex) {
         throw new IOException(ex);
       }
-
-      // Get the superuser
-      for (Map.Entry<String, String> entry : conf) {
-        String propName = entry.getKey();
-        if (propName.startsWith(ProxyUsers.CONF_HADOOP_PROXYUSER)) {
-          String[] tokens = propName.split("\\.");
-          // Configuration property is in the form of hadoop.proxyuser.USERNAME.{hosts,groups}
-          proxySuperuser = tokens[2];
-          break;
-        }
-      }
-      // Fallback to Hops default
-      if (proxySuperuser == null) {
-        proxySuperuser = "glassfish";
-      }
-
-      // <InetAddress, FQDN>
-      trustedHostnames = CacheBuilder.newBuilder()
-          .maximumSize(500)
-          .expireAfterWrite(30, TimeUnit.MINUTES)
-          .build();
       
       if (conf.getBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY,
           CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_DEFAULT)) {

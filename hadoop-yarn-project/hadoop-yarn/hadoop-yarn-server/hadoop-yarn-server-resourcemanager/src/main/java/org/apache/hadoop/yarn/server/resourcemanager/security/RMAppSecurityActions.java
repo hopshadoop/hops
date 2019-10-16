@@ -25,14 +25,10 @@ import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 
 public interface RMAppSecurityActions {
-  void init() throws MalformedURLException, GeneralSecurityException, IOException;
-  void destroy();
-  X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr) throws URISyntaxException, IOException, GeneralSecurityException;
+  X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr) throws IOException, GeneralSecurityException;
   int revoke(String certificateIdentifier) throws URISyntaxException, IOException, GeneralSecurityException;
   
-  String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException,
-      GeneralSecurityException;
+  String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws IOException, GeneralSecurityException;
   void invalidateJWT(String signingKeyName) throws URISyntaxException, IOException, GeneralSecurityException;
-  String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException,
-      GeneralSecurityException;
+  String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws IOException, GeneralSecurityException;
 }
