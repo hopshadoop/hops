@@ -19,8 +19,9 @@ package org.apache.hadoop.yarn.server;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jwt.JWTClaimsSet;
+import io.hops.security.ServiceJWTManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.HopsworksRMAppSecurityActions;
-import org.apache.hadoop.yarn.server.resourcemanager.security.MockJWTIssuer;
+import io.hops.security.MockJWTIssuer;
 
 import java.net.MalformedURLException;
 import java.security.GeneralSecurityException;
@@ -43,21 +44,41 @@ public class MockHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityAct
   }
   
   @Override
-  protected void loadMasterJWT() throws GeneralSecurityException {
-    LocalDateTime masterExpiration = LocalDateTime.now().plus(10L, ChronoUnit.MINUTES);
-    JWTClaimsSet claims = new JWTClaimsSet.Builder().expirationTime(Date.from(masterExpiration.atZone(ZoneId.
-        systemDefault()).toInstant())).build();
-    try {
-      String masterToken = jwtIssuer.generate(claims);
-      setMasterToken(masterToken);
-      setMasterTokenExpiration(masterExpiration);
-    } catch (JOSEException ex) {
-      throw new GeneralSecurityException(ex.getMessage(), ex);
-    }
+  protected ServiceJWTManager createJWTManager() {
+    return new MockJWTManager("Mock JWT Manager", jwtIssuer);
   }
   
-  @Override
-  protected void loadRenewalJWTs() throws GeneralSecurityException {
-    setRenewalTokens(new String[0]);
+  private class MockJWTManager extends ServiceJWTManager {
+    private final MockJWTIssuer jwtIssuer;
+    
+    public MockJWTManager(String name, MockJWTIssuer jwtIssuer) {
+      super(name);
+      this.jwtIssuer = jwtIssuer;
+    }
+  
+    @Override
+    protected void loadMasterJWT() throws GeneralSecurityException {
+      LocalDateTime masterExpiration = LocalDateTime.now().plus(10L, ChronoUnit.MINUTES);
+      JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder();
+      claimsBuilder.expirationTime(Date.from(masterExpiration.atZone(ZoneId.systemDefault()).toInstant()));
+      try {
+        String masterToken = jwtIssuer.generate(claimsBuilder);
+        setMasterToken(masterToken);
+        setMasterTokenExpiration(masterExpiration);
+      } catch (JOSEException ex) {
+        throw new GeneralSecurityException(ex.getMessage(), ex);
+      }
+    }
+  
+    @Override
+    protected void loadRenewalJWTs() throws GeneralSecurityException {
+      setRenewalTokens(new String[0]);
+    }
+    
+    @Override
+    protected void reloadJWTs() throws GeneralSecurityException {
+      loadMasterJWT();
+      loadRenewalJWTs();
+    }
   }
 }

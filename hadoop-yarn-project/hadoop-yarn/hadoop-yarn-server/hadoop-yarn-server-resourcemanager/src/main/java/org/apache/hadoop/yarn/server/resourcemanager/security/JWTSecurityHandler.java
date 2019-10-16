@@ -144,7 +144,7 @@ public class JWTSecurityHandler
       return null;
     }
     ApplicationId appId = parameter.getApplicationId();
-    LOG.info("Generating JWT for application " + appId);
+    LOG.debug("Generating JWT for application " + appId);
     prepareJWTGenerationParameters(parameter);
     String jwt = generateInternal(parameter);
     return new JWTSecurityManagerMaterial(appId, jwt, parameter.getExpirationDate());

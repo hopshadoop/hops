@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
-import org.apache.hadoop.conf.Configurable;
+import io.hops.security.AbstractSecurityActions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.log4j.spi.NOPLogger;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -40,7 +39,6 @@ import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
@@ -48,11 +46,10 @@ import java.security.KeyPairGenerator;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Date;
-import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.http.HttpStatus;
 
-public class TestingRMAppSecurityActions implements RMAppSecurityActions, Configurable {
+public class TestingRMAppSecurityActions extends AbstractSecurityActions implements RMAppSecurityActions {
   private final static Logger LOG = LogManager.getLogger(TestingRMAppSecurityActions.class);
   
   private final static String KEY_ALGORITHM = "RSA";
@@ -62,9 +59,9 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   private KeyPair caKeyPair;
   private X509Certificate caCert;
   private ContentSigner sigGen;
-  private Configuration conf;
   
   public TestingRMAppSecurityActions() {
+    super("TestingRMAppSecurityActions");
   }
   
   public X509Certificate getCaCert() {
@@ -72,7 +69,7 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
-  public void init() throws MalformedURLException, GeneralSecurityException {
+  public void serviceInit(Configuration conf) throws Exception {
     Security.addProvider(new BouncyCastleProvider());
     KeyPairGenerator kpg = KeyPairGenerator.getInstance(KEY_ALGORITHM, "BC");
     kpg.initialize(KEY_SIZE);
@@ -98,24 +95,19 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
-  public void destroy() {
+  public void serviceStart() throws Exception {
+    LOG.debug("Nothing to do here");
+  }
+  
+  @Override
+  public void serviceStop() {
     // Nothing to do here
     LOG.debug("Nothing to do here");
   }
   
   @Override
-  public void setConf(Configuration conf) {
-    this.conf = conf;
-  }
-  
-  @Override
-  public Configuration getConf() {
-    return conf;
-  }
-  
-  @Override
   public X509SecurityHandler.CertificateBundle sign(PKCS10CertificationRequest csr)
-      throws URISyntaxException, IOException, GeneralSecurityException {
+      throws IOException, GeneralSecurityException {
     JcaPKCS10CertificationRequest jcaRequest = new JcaPKCS10CertificationRequest(csr);
     X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(caCert,
         BigInteger.valueOf(System.currentTimeMillis()),
@@ -136,14 +128,14 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
-  public int revoke(String certificateIdentifier) throws URISyntaxException, IOException {
+  public int revoke(String certificateIdentifier) throws IOException {
     LOG.info("Revoking certificate " + certificateIdentifier);
     return HttpStatus.SC_OK;
   }
   
   @Override
   public String generateJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter)
-    throws URISyntaxException, IOException {
+    throws IOException {
     return RandomStringUtils.randomAlphanumeric(16);
   }
   
@@ -154,7 +146,7 @@ public class TestingRMAppSecurityActions implements RMAppSecurityActions, Config
   }
   
   @Override
-  public String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws URISyntaxException, IOException {
+  public String renewJWT(JWTSecurityHandler.JWTMaterialParameter jwtParameter) throws IOException {
     // Nothing to do
     LOG.info("Renewing JWT " + jwtParameter.getAppUser() + "/" + jwtParameter.getApplicationId());
     return RandomStringUtils.randomAlphanumeric(16);

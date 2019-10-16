@@ -65,7 +65,7 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
         conf = new HdfsConfiguration();
         conf.setInt(DFSConfigKeys.DFS_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, /*default 15*/ 1);
         conf.set(HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY, "1,1");
-        filesToPurge = prepareCryptoMaterial(conf, classpathDir);
+        filesToPurge = prepareCryptoMaterial(classpathDir);
         setCryptoConfig(conf, classpathDir);
         
         String testDataPath = System

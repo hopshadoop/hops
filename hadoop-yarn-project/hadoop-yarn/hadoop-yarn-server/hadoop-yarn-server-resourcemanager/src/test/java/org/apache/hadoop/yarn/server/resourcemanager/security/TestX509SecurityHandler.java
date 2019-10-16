@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
+import io.hops.security.AbstractSecurityActions;
+import io.hops.security.HopsSecurityActionsFactory;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -123,7 +125,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   public void beforeTest() throws Exception {
     conf = new Configuration();
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "5s");
-    RMAppSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear();
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
@@ -156,7 +158,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
       FileUtils.deleteDirectory(BASE_DIR_FILE);
     }
     
-    RMAppSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear();
   }
   
   @Test
@@ -165,8 +167,9 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     try {
       conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
           "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
-  
-      RMAppSecurityActions testActor = RMAppSecurityActionsFactory.getInstance().getActor(conf);
+      
+      RMAppSecurityActions testActor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+          conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
       String trustStore = Paths.get(BASE_DIR, "trustStore.jks").toString();
       X509Certificate caCert = ((TestingRMAppSecurityActions) testActor).getCaCert();
       String principal = caCert.getIssuerX500Principal().getName();
@@ -333,9 +336,13 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   
   @Test(timeout = 20000)
   public void testCertificateRevocationMonitor() throws Exception {
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
     RMAppSecurityActions actor = Mockito.spy(new TestingRMAppSecurityActions());
-    actor.init();
-    RMAppSecurityActionsFactory.getInstance().register(actor);
+    ((AbstractSecurityActions)actor).init(conf);
+    ((AbstractSecurityActions)actor).start();
+    HopsSecurityActionsFactory.getInstance()
+        .register(conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY), (AbstractSecurityActions) actor);
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL, "3s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);

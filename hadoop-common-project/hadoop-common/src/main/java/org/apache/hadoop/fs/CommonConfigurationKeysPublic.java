@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs;
 
 import java.nio.file.Paths;
+
+import io.hops.security.ServiceJWTManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.JceAesCtrCryptoCodec;
@@ -460,22 +462,24 @@ public class CommonConfigurationKeysPublic {
   public static final String  HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_DEFAULT =
     "org.apache.hadoop.net.StandardSocketFactory";
   
-  public static final String HOPS_CRL_VALIDATION_ENABLED_KEY = "hops.crl.validation.enabled";
+  public static final String HOPS_PREFIX = "hops.";
+  private static final String HOPS_CRL_PREFIX = HOPS_PREFIX + "crl.";
+  public static final String HOPS_CRL_VALIDATION_ENABLED_KEY = HOPS_CRL_PREFIX + "validation.enabled";
   public static final boolean HOPS_CRL_VALIDATION_ENABLED_DEFAULT = false;
   
   /**
    * Certificate Revocation List fetcher class
    */
-  public static final String HOPS_CRL_FETCHER_CLASS_KEY = "hops.crl.fetcher.class";
+  public static final String HOPS_CRL_FETCHER_CLASS_KEY = HOPS_CRL_PREFIX + "fetcher.class";
   public static final String HOPS_CRL_FETCHER_CLASS_DEFAULT = "org.apache.hadoop.security.ssl.RemoteCRLFetcher";
   
-  public static final String HOPS_CRL_INPUT_URI_KEY = "hops.crl.input.uri";
+  public static final String HOPS_CRL_INPUT_URI_KEY = HOPS_CRL_PREFIX + "input.uri";
   
-  public static final String HOPS_CRL_OUTPUT_FILE_KEY = "hops.crl.output.file";
+  public static final String HOPS_CRL_OUTPUT_FILE_KEY = HOPS_CRL_PREFIX + "output.file";
   public static final String HOPS_CRL_OUTPUT_FILE_DEFAULT = Paths.get(System.getProperty("java.io.tmpdir"),
       "crl.pem").toString();
   
-  public static final String HOPS_CRL_FETCHER_INTERVAL_KEY = "hops.crl.fetcher.interval";
+  public static final String HOPS_CRL_FETCHER_INTERVAL_KEY = HOPS_CRL_PREFIX + "fetcher.interval";
   // 720 Minutes - 12 hours
   public static final long HOPS_CRL_FETCHER_INTERVAL_DEFAULT = 720;
   
@@ -993,5 +997,18 @@ public class CommonConfigurationKeysPublic {
    */
   public static final String HOPS_UG_CACHE_SIZE = "hops.ug.cache.size";
   public static final int HOPS_UG_CACHE_SIZE_DEFUALT = 10000;
+  
+  public static final String HOPS_HOPSWORKS_HOST_KEY = HOPS_PREFIX + "hopsworks.host";
+  
+  // 5 days
+  public static final long DEFAULT_JWT_MANAGER_MASTER_TOKEN_VALIDITY_PERIOD = 432000;
+  public static final String JWT_MANAGER_MASTER_TOKEN_VALIDITY_PERIOD = ServiceJWTManager.JWT_MANAGER_PREFIX
+      + "master-token-validity";
+  public static final String DEFAULT_JWT_MANAGER_SERVICE_RENEW_PATH = "/hopsworks-api/api/jwt/service";
+  public static final String JWT_MANAGER_SERVICE_RENEW_PATH = ServiceJWTManager.JWT_MANAGER_PREFIX + "service-renew-path";
+  
+  public static final String DEFAULT_JWT_MANAGER_SERVICE_INVALIDATE_PATH = "/hopsworks-api/api/jwt/service";
+  public static final String JWT_MANAGER_SERVICE_INVALIDATE_PATH = ServiceJWTManager.JWT_MANAGER_PREFIX
+      + "service-invalidate-path";
 }
 

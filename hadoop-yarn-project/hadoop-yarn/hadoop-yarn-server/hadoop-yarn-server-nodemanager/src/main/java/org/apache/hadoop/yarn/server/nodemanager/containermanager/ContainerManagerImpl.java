@@ -159,6 +159,7 @@ import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService.Re
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService.RecoveredContainerType;
 import org.apache.hadoop.yarn.server.nodemanager.security.authorize.NMPolicyProvider;
 import org.apache.hadoop.yarn.server.nodemanager.timelineservice.NMTimelinePublisher;
+import io.hops.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.utils.YarnServerSecurityUtils;
 import org.apache.hadoop.yarn.util.SystemClock;
@@ -194,7 +195,6 @@ import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateJWTEvent;
 import org.apache.hadoop.yarn.server.nodemanager.CMgrUpdateX509Event;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 
 public class ContainerManagerImpl extends CompositeService implements
     ContainerManager {

@@ -15,7 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.security.ssl;
+package io.hops.security;
+
+import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.yarn.ams.ApplicationMasterServiceContext;
+import io.hops.security.CertificateLocalizationService;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
@@ -59,7 +60,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManag
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.RMDelegationTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.timelineservice.RMTimelineCollectorManager;
-import org.apache.hadoop.yarn.server.security.CertificateLocalizationService;
 
 /**
  * Context of the ResourceManager.
