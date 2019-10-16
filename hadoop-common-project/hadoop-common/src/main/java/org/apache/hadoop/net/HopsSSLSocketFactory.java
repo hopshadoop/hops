@@ -28,7 +28,7 @@ import org.apache.hadoop.net.hopssslchecks.NormalUserCertLocServiceHopsSSLCheck;
 import org.apache.hadoop.net.hopssslchecks.NormalUserMaterilizeDirSSLCheck;
 import org.apache.hadoop.net.hopssslchecks.SuperUserHopsSSLCheck;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.ssl.CertificateLocalization;
+import io.hops.security.CertificateLocalization;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.security.ssl.ReloadingX509TrustManager;

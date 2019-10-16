@@ -56,8 +56,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.security.authorize.ProxyUsers;
-import org.apache.hadoop.security.ssl.CertificateLocalizationCtx;
+import io.hops.security.CertificateLocalizationCtx;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.base.Preconditions;

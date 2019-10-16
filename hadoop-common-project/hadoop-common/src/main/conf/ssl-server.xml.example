@@ -101,4 +101,26 @@
   from SSL communication.</description>
 </property>
 
+<property>
+  <name>hops.jwt-manager.master-token</name>
+  <value>JWT</value>
+  <description>
+    Master JWT used to authenticate to remote host specified in hops.hopsworks.host
+    The token is populated in ssl-server.xml when Hops is deployed. It gets renewed by
+    ServiceJWTManager.
+  </description>
+</property>
+
+<property>
+  <name>hops.jwt-manager.renew-token-%d</name>
+  <value>JWT</value>
+  <description>
+    One-time token pattern used to by ServiceJWTManager to renew the master token. Depending
+    on the number of one-time tokens the property will be hops.jwt-manager.renew-token-1
+    hops.jwt-manager.renew-token-2 etc.
+    The tokens are populated in ssl-server.xml when Hops is deployed. They get renewed by
+    ServiceJWTManager.
+  </description>
+</property>
+
 </configuration>

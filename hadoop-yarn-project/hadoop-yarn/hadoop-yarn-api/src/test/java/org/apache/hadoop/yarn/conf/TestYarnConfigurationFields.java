@@ -102,6 +102,8 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
         AM_SCHEDULING_NODE_BLACKLISTING_ENABLED);
     configurationPropsToSkipCompare.add(YarnConfiguration.
         AM_SCHEDULING_NODE_BLACKLISTING_DISABLE_THRESHOLD);
+    
+    configurationPropsToSkipCompare.add(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT);
 
     // Ignore all YARN Application Timeline Service (version 1) properties
     configurationPrefixToSkipCompare.add("yarn.timeline-service.");
@@ -148,8 +150,5 @@ public class TestYarnConfigurationFields extends TestConfigurationFieldsBase {
 
     // Currently defined in RegistryConstants/core-site.xml
     xmlPrefixToSkipCompare.add("hadoop.registry");
-    
-    // Used as template for variable number of master JWT renew tokens. %d is a sequence number
-    xmlPropsToSkipCompare.add("yarn.resourcemanager.rmappsecurity.jwt.renew-token-%d");
   }
 }

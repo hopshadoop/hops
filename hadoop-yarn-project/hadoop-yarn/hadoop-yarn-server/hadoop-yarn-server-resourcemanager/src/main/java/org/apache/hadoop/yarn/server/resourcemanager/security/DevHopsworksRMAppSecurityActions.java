@@ -43,7 +43,7 @@ public class DevHopsworksRMAppSecurityActions extends HopsworksRMAppSecurityActi
   }
   
   @Override
-  protected PoolingHttpClientConnectionManager createConnectionManager() throws GeneralSecurityException {
+  protected PoolingHttpClientConnectionManager createHTTPConnectionManager() throws GeneralSecurityException {
     SSLContextBuilder sslContextBuilder = new SSLContextBuilder();
     sslContextBuilder.loadTrustMaterial(new TrustStrategy() {
       @Override

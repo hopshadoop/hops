@@ -994,4 +994,14 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   //Availability zones
   public static final String  DFS_LOCATION_DOMAIN_ID = "dfs.locationDomainId";
   public static final byte    DFS_LOCATION_DOMAIN_ID_DEFAULT = 0;
+  
+  private static final String FS_SECURITY_ACTIONS_PREFIX = "dfs.security-actions.";
+  
+  public static final String FS_SECURITY_ACTIONS_ACTOR_KEY = FS_SECURITY_ACTIONS_PREFIX + "actor-class";
+  public static final String DEFAULT_FS_SECURITY_ACTIONS_ACTOR = "io.hops.common.security.HopsworksFsSecurityActions";
+  
+  private static final String FS_SECURITY_ACTIONS_X509 = FS_SECURITY_ACTIONS_PREFIX + "x509.";
+  
+  public static final String FS_SECURITY_ACTIONS_X509_PATH_KEY = FS_SECURITY_ACTIONS_X509 + "get-path";
+  public static final String DEFAULT_FS_SECURITY_ACTIONS_X509_PATH = "/hopsworks-api/api/admin/credentials/x509";
 }

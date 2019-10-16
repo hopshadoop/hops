@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapred;
 
+import io.hops.security.HopsSecurityActionsFactory;
 import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -161,6 +162,7 @@ public abstract class ClusterMapReduceTestCase {
   @After
   public void tearDown() throws Exception {
     stopCluster();
+    HopsSecurityActionsFactory.getInstance().clear();
   }
 
   /**

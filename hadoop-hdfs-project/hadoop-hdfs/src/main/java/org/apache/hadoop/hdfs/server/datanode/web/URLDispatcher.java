@@ -22,9 +22,10 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.HttpRequest;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdfs.server.datanode.web.webhdfs.HopsWebHdfsHandler;
 import org.apache.hadoop.hdfs.server.datanode.web.webhdfs.WebHdfsHandler;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.hdfs.server.datanode.web.webhdfs.WebHdfsHandler.WEBHDFS_PREFIX;
@@ -47,8 +48,17 @@ class URLDispatcher extends SimpleChannelInboundHandler<HttpRequest> {
     String uri = req.getUri();
     ChannelPipeline p = ctx.pipeline();
     if (uri.startsWith(WEBHDFS_PREFIX)) {
-      WebHdfsHandler h = new WebHdfsHandler(conf, confForCreate);
-      p.replace(this, WebHdfsHandler.class.getSimpleName(), h);
+      WebHdfsHandler h = null;
+      String handlerName = null;
+      if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
+          CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        h = new HopsWebHdfsHandler(conf, confForCreate);
+        handlerName = HopsWebHdfsHandler.class.getSimpleName();
+      } else {
+        h = new WebHdfsHandler(conf, confForCreate);
+        handlerName = WebHdfsHandler.class.getSimpleName();
+      }
+      p.replace(this, handlerName, h);
       h.channelRead0(ctx, req);
     } else {
       SimpleHttpProxyHandler h = new SimpleHttpProxyHandler(proxyHost);

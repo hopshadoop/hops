@@ -15,14 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.security;
+package io.hops.security;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.SecurityMaterial;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.security.ssl.X509SecurityMaterial;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -87,7 +85,6 @@ public class TestCertificateLocalizationService {
   @Before
   public void setUp() throws Exception {
     conf = new Configuration();
-    conf.set(YarnConfiguration.NM_NONSECURE_MODE_LOCAL_USER_KEY, UserGroupInformation.getLoginUser().getUserName());
     certLocSrv = new CertificateLocalizationService(service);
     certLocSrv.serviceInit(conf);
     certLocSrv.serviceStart();
