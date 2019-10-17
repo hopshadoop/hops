@@ -174,6 +174,15 @@
                       <!-- the jdk ships part of the javax.annotation namespace, so if we want to relocate this we'll have to care it out by class :( -->
                       <exclude>com.google.code.findbugs:jsr305</exclude>
                       <exclude>io.dropwizard.metrics:metrics-core</exclude>
+                      <exclude>org.eclipse.jetty.websocket:*</exclude>
+                      <exclude>org.eclipse.jetty:jetty-servlet</exclude>
+                      <exclude>org.eclipse.jetty:jetty-security</exclude>
+                      <exclude>org.eclipse.jetty:jetty-client</exclude>
+                      <exclude>org.eclipse.jetty:jetty-http</exclude>
+                      <exclude>org.eclipse.jetty:jetty-xml</exclude>
+                      <exclude>org.ow2.asm:*</exclude>
+                      <!-- Leave bouncycastle unshaded because it's signed with a special Oracle certificate so it can be a custom JCE security provider -->
+                      <exclude>org.bouncycastle:*</exclude>
                     </excludes>
                   </artifactSet>
                   <filters>
