@@ -112,6 +112,7 @@ import org.xml.sax.helpers.DefaultHandler;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import org.apache.hadoop.hdfs.web.WebHdfsConstants;
+import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.slf4j.LoggerFactory;
 
 public class TestEncryptionZones {
@@ -1047,11 +1048,14 @@ public class TestEncryptionZones {
     Mockito.when(keyProvider.getConf()).thenReturn(conf);
     byte[] testIdentifier = "Test identifier for delegation token".getBytes();
 
-    Token<?> testToken = new Token(testIdentifier, new byte[0],
+    @SuppressWarnings("rawtypes")
+    Token testToken = new Token(testIdentifier, new byte[0],
         new Text(), new Text());
-    Mockito.when(((DelegationTokenExtension)keyProvider).
-        addDelegationTokens(anyString(), (Credentials)any())).
-        thenReturn(new Token<?>[] { testToken });
+    Mockito.when(((DelegationTokenIssuer)keyProvider).
+        getCanonicalServiceName()).thenReturn("service");
+    Mockito.when(((DelegationTokenIssuer)keyProvider).
+        getDelegationToken(anyString())).
+        thenReturn(testToken);
 
     dfs.getClient().setKeyProvider(keyProvider);
 
@@ -1061,7 +1065,7 @@ public class TestEncryptionZones {
         Arrays.asList(tokens));
     Assert.assertEquals(2, tokens.length);
     Assert.assertEquals(tokens[1], testToken);
-    Assert.assertEquals(1, creds.numberOfTokens());
+    Assert.assertEquals(2, creds.numberOfTokens());
   }
 
   /**
