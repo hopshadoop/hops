@@ -26,12 +26,14 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.hadoop.util.ExitUtil;
 
 public class DBUtility {
 
   private static final Log LOG = LogFactory.getLog(DBUtility.class);
     
   public static boolean InitializeDB() throws IOException {
+    ExitUtil.disableSystemExit();
     LightWeightRequestHandler setRMDTMasterKeyHandler
             = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
