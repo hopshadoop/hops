@@ -46,6 +46,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.ContainerStatus;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 import org.apache.hadoop.yarn.api.records.impl.pb.TokenPBImpl;
 
@@ -591,6 +592,7 @@ long start = System.currentTimeMillis();
   }
 
   public static boolean InitializeDB() throws IOException {
+    ExitUtil.disableSystemExit();
     LightWeightRequestHandler setRMDTMasterKeyHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
