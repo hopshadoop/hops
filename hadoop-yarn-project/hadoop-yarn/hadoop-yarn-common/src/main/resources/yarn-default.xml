@@ -2978,7 +2978,7 @@
     <description>The interval (in ms) at which the database resource monitor
     should checkt the database status</description>
     <name>yarn.resourcemanager.resource.check.interval</name>
-    <value>3</value>
+    <value>5000</value>
   </property>
 
   <property>
