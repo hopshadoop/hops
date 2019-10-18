@@ -1018,6 +1018,7 @@ public class DBRMStateStore extends RMStateStore {
           if (!RMStorageFactory.hasResources(databaseResourcesThreshold)) {
             throw new IOException("not enough resources in the database");
           }
+          return;
         } catch (StorageException e) {
           LOG.warn("StorageException in checkAvailableResources (" + tries + "/" + maxDBTries + ").", e);
           if (e instanceof TransientStorageException) {
