@@ -34,6 +34,7 @@ import org.junit.Test;
 import java.io.File;
 import java.util.Arrays;
 import java.util.UUID;
+import org.apache.hadoop.crypto.key.kms.LoadBalancingKMSClientProvider;
 
 import org.mockito.internal.util.reflection.Whitebox;
 
@@ -67,6 +68,14 @@ public class TestEncryptionZonesWithKMS extends TestEncryptionZones {
   @Override
   protected void setProvider() {
   }
+  
+  private KMSClientProvider getKMSClientProvider() {
+    LoadBalancingKMSClientProvider lbkmscp =
+        (LoadBalancingKMSClientProvider) Whitebox
+        .getInternalState(cluster.getNamesystem().getProvider(), "extension");
+    assert lbkmscp.getProviders().length == 1;
+    return lbkmscp.getProviders()[0];
+  }
 
   @Test(timeout = 120000)
   public void testCreateEZPopulatesEDEKCache() throws Exception {
@@ -74,8 +83,7 @@ public class TestEncryptionZonesWithKMS extends TestEncryptionZones {
     fsWrapper.mkdir(zonePath, FsPermission.getDirDefault(), false);
     dfsAdmin.createEncryptionZone(zonePath, TEST_KEY);
     @SuppressWarnings("unchecked")
-    KMSClientProvider kcp = (KMSClientProvider) Whitebox
-        .getInternalState(cluster.getNamesystem().getProvider(), "extension");
+    KMSClientProvider kcp = getKMSClientProvider();
     assertTrue(kcp.getEncKeyQueueSize(TEST_KEY) > 0);
   }
 
