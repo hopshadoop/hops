@@ -57,13 +57,11 @@ import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.NumberReplicas;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.NodeBase;
-import org.apache.hadoop.net.StandardSocketFactory;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -86,16 +84,12 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdfs.RemotePeerFactory;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.net.TcpPeerServer;
-import org.apache.hadoop.hdfs.server.blockmanagement.NumberReplicas;
-import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 
-import javax.net.SocketFactory;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataEncryptionKeyFactory;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.htrace.core.Tracer;
@@ -973,16 +967,13 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
             setTracer(tracer).
             setRemotePeerFactory(new RemotePeerFactory() {
               @Override
-              public SocketFactory getSocketFactory(Configuration conf) throws IOException {
-                return new StandardSocketFactory();
-              }
-  
-              @Override
               public Peer newConnectedPeer(InetSocketAddress addr,
                   Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
                   throws IOException {
                 Peer peer = null;
-                Socket s = getSocketFactory(namenode.conf).createSocket();
+                Socket s = NetUtils.getSocketFactoryFromProperty(conf,
+                    conf.get(DFSConfigKeys.DFS_CLIENT_XCEIVER_SOCKET_FACTORY_CLASS_KEY,
+                        DFSConfigKeys.DEFAULT_DFS_CLIENT_XCEIVER_FACTORY_CLASS)).createSocket();
                 try {
                   s.connect(addr, HdfsServerConstants.READ_TIMEOUT);
                   s.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);

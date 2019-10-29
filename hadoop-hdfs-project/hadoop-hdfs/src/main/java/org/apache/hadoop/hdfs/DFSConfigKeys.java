@@ -621,6 +621,11 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_KEY = "dfs.datanode.xceiver.stop.timeout.millis";
   public static final long   DFS_DATANODE_XCEIVER_STOP_TIMEOUT_MILLIS_DEFAULT = 60000;
   
+  // Socket factory for the DFSClient to use when connecting to DataXceiver
+  // See HOPS-1525
+  public static final String DFS_CLIENT_XCEIVER_SOCKET_FACTORY_CLASS_KEY = "dfs.client.xceiver.socket.factory.class";
+  public static final String DEFAULT_DFS_CLIENT_XCEIVER_FACTORY_CLASS = "org.apache.hadoop.net.StandardSocketFactory";
+  
   // WebHDFS retry policy
   @Deprecated
   public static final String  DFS_HTTP_CLIENT_RETRY_POLICY_ENABLED_KEY =
