@@ -20,11 +20,9 @@ package org.apache.hadoop.hdfs;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.net.Peer;
 
-import javax.net.SocketFactory;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -43,12 +41,4 @@ public interface RemotePeerFactory {
   Peer newConnectedPeer(InetSocketAddress addr,
       Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
       throws IOException;
-  
-  /**
-   * SocketFactory to be used to establish the connection
-   * @param conf
-   * @return appropriate socket factory
-   * @throws IOException
-   */
-  SocketFactory getSocketFactory(Configuration conf) throws IOException;
 }

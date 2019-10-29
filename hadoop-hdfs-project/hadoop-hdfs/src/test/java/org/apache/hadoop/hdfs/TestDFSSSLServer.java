@@ -17,6 +17,8 @@ package org.apache.hadoop.hdfs;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -108,12 +110,19 @@ public class TestDFSSSLServer extends HopsSSLTestUtils {
     @Test
     public void testChecksum() throws Exception {
         LOG.debug("testChecksum");
+        Random rand = new Random();
+        byte[] data = new byte[6 * 1024];
+        rand.nextBytes(data);
         dfs1 = DistributedFileSystem.newInstance(conf);
         Path file = new Path("some_file");
-        dfs1.create(file);
+        FSDataOutputStream out = dfs1.create(file);
+        out.write(data);
+        out.hflush();
+        out.close();
         boolean exists = dfs1.exists(file);
         assertTrue(exists);
         FileChecksum checksum = dfs1.getFileChecksum(file);
+        Assert.assertNotNull(checksum);
         LOG.debug("File checksum is: " + checksum.toString());
     }
 
