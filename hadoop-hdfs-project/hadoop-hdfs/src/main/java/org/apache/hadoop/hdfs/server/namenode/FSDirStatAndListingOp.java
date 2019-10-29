@@ -342,7 +342,6 @@ class FSDirStatAndListingOp {
      
      if (node.isFile()) {
        final INodeFile fileNode = node.asFile();
-       isStoredInDB = fileNode.isFileStoredInDB();
        size = fileNode.getSize();
        replication = fileNode.getBlockReplication();
        blocksize = fileNode.getPreferredBlockSize();
@@ -370,7 +369,6 @@ class FSDirStatAndListingOp {
         node.getId(),
         childrenNum,
         feInfo,
-        isStoredInDB,
         storagePolicy);
   }
 
@@ -427,7 +425,7 @@ class FSDirStatAndListingOp {
           getPermissionForFileStatus(node, isEncrypted),
           node.getUserName(), node.getGroupName(),
           node.isSymlink() ? node.asSymlink().getSymlink() : null, path,
-          node.getId(), loc, childrenNum, feInfo, isStoredInDB, storagePolicy);
+          node.getId(), loc, childrenNum, feInfo, storagePolicy);
     // Set caching information for the located blocks.
     if (loc != null) {
       CacheManager cacheManager = fsd.getFSNamesystem().getCacheManager();

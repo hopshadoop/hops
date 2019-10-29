@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream.SyncFlag;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdfs.protocol.QuotaByStorageTypeExceededException;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.server.namenode.RetryStartFileException;
@@ -124,6 +126,8 @@ public class DFSOutputStream extends FSOutputSummer
   private FileEncryptionInfo fileEncryptionInfo;
   
   private boolean singleBlock = false;
+
+  private static BlockStoragePolicySuite policySuite = BlockStoragePolicySuite.createDefaultSuite();
   
   /** Use {@link ByteArrayManager} to create buffer for non-heartbeat packets.*/
   protected DFSPacket createPacket(int packetSize, int chunksPerPkt, long offsetInBlock,
@@ -288,7 +292,7 @@ public class DFSOutputStream extends FSOutputSummer
     boolean toNewBlock = flags.contains(CreateFlag.NEW_BLOCK);
 
     // The last partial block of the file has to be filled.
-    if (!toNewBlock && lastBlock != null && !stat.isFileStoredInDB()) {
+    if (!toNewBlock && lastBlock != null && policySuite.getPolicy(stat.getStoragePolicy()).getStorageTypes()[0] != StorageType.DB) {
       // indicate that we are appending to an existing block
       streamer = new DataStreamer(lastBlock, stat, dfsClient, src, progress, checksum,
           cachingStrategy, byteArrayManager, dbFileMaxSize, forceClientToWriteSFToDisk);
@@ -298,7 +302,7 @@ public class DFSOutputStream extends FSOutputSummer
     } else {
       computePacketChunkSize(dfsClient.getConf().getWritePacketSize(),
           checksum.getBytesPerChecksum());
-      if (stat.isFileStoredInDB() && lastBlock != null) {
+      if (policySuite.getPolicy(stat.getStoragePolicy()).getStorageTypes()[0] == StorageType.DB && lastBlock != null) {
         streamer = new DataStreamer(stat, null, dfsClient, src, progress, checksum, cachingStrategy, byteArrayManager,
             dbFileMaxSize, forceClientToWriteSFToDisk, favoredNodes);
         streamer.setBytesCurBlock(0);
@@ -310,7 +314,7 @@ public class DFSOutputStream extends FSOutputSummer
             forceClientToWriteSFToDisk, favoredNodes);
       }
     }
-    streamer.setFileStoredInDB(stat.isFileStoredInDB());
+    streamer.setFileStoredInDB(policySuite.getPolicy(stat.getStoragePolicy()).getStorageTypes()[0] == StorageType.DB);
     this.fileEncryptionInfo = stat.getFileEncryptionInfo();
   }
 
@@ -357,7 +361,7 @@ public class DFSOutputStream extends FSOutputSummer
     TraceScope scope =
         dfsClient.newPathTraceScope("newStreamForAppend", src);
     try {
-      if (stat.isFileStoredInDB()) {
+      if (policySuite.getPolicy(stat.getStoragePolicy()).getStorageTypes()[0] == StorageType.DB) {
         String errorMessage = null;
         if (stat.getLen() > stat.getBlockSize()) {
           errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller "

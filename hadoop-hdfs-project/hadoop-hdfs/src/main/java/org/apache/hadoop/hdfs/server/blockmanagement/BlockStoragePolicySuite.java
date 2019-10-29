@@ -43,6 +43,7 @@ public class BlockStoragePolicySuite {
   public static BlockStoragePolicySuite createDefaultSuite() {
     final BlockStoragePolicy[] policies =
         new BlockStoragePolicy[1 << ID_BIT_LENGTH];
+
     final byte db = HdfsConstants.DB_STORAGE_POLICY_ID;
     policies[db] = new BlockStoragePolicy(db,
         HdfsConstants.DB_STORAGE_POLICY_NAME,
