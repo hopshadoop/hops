@@ -138,7 +138,6 @@ public class JsonUtil {
     m.put("fileId", status.getFileId());
     m.put("childrenNum", status.getChildrenNum());
     m.put("storagePolicy", status.getStoragePolicy());
-    m.put("isFileStoredInDB", status.isFileStoredInDB());
     ObjectMapper mapper = new ObjectMapper();
     try {
       return includeType ?
