@@ -2156,7 +2156,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final INodeFile myFile = INodeFile.valueOf(inode, src, true);
     final BlockStoragePolicy storagePolicy =
             getBlockManager().getStoragePolicySuite().getPolicy(myFile.getStoragePolicyID());
-    stat.setFileStoredInDB(storagePolicy.getStorageTypes()[0] == StorageType.DB);
 
     logAuditEvent(true, "create", src, null,
         (isAuditEnabled() && isExternalInvocation()) ? stat : null);
@@ -2896,6 +2895,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     // Get the storagePolicyID of this file
     byte storagePolicyID = pendingFile.getStoragePolicyID();
+
+    if(getBlockManager().getStoragePolicySuite().getPolicy(storagePolicyID).getName()
+            .equals(HdfsConstants.DB_STORAGE_POLICY_NAME)){
+      //Policy is DB but the file is moved to DNs so change the policy for this file
+      pendingFile.setStoragePolicyID(getBlockManager().getStoragePolicySuite()
+              .getDefaultPolicy().getId());
+    }
 
     if (clientNode == null) {
       clientNode = getClientNode(clientMachine);

@@ -52,7 +52,6 @@ public class HdfsFileStatus {
   // Used by dir, not including dot and dotdot. Always zero for a regular file.
   private int childrenNum;
   
-  private boolean isFileStoredInDB;
   private final byte storagePolicy;
 
   public static final byte[] EMPTY_NAME = new byte[0];
@@ -77,7 +76,7 @@ public class HdfsFileStatus {
       long blocksize, long modification_time, long access_time,
       FsPermission permission, String owner, String group, byte[] symlink,
       byte[] path, long fileId, int childrenNum, FileEncryptionInfo feInfo, 
-      boolean isFileStoredInDB, byte storagePolicy) {
+      byte storagePolicy) {
     this.length = length;
     this.isdir = isdir;
     this.block_replication = (short) block_replication;
@@ -94,7 +93,6 @@ public class HdfsFileStatus {
     this.symlink = symlink;
     this.path = path;
     this.fileId = fileId;
-    this.isFileStoredInDB = isFileStoredInDB;
     this.storagePolicy = storagePolicy;
     this.childrenNum = childrenNum;
     this.feInfo = feInfo;
@@ -277,13 +275,6 @@ public class HdfsFileStatus {
     return childrenNum;
   }
 
-  public final boolean isFileStoredInDB(){ 
-    return isFileStoredInDB; 
-  }
-
-  public void setFileStoredInDB(boolean isFileStoredInDB){
-    this.isFileStoredInDB = isFileStoredInDB;
-  }
   /**
    * Resolve the short name of the Path given the URI, parent provided. This
    * FileStatus reference will not contain a valid Path until it is resolved

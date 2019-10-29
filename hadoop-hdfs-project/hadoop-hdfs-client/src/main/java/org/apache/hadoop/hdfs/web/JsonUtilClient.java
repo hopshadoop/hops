@@ -122,7 +122,6 @@ class JsonUtilClient {
     final long mTime = ((Number) m.get("modificationTime")).longValue();
     final long blockSize = ((Number) m.get("blockSize")).longValue();
     final short replication = ((Number) m.get("replication")).shortValue();
-    final boolean isFileStoredInDB = m.containsKey("isFileStoredInDB")? ((Boolean) m.get("isFileStoredInDB") ): false;
     final long fileId = m.containsKey("fileId") ?
         ((Number) m.get("fileId")).longValue() : HdfsConstantsClient.GRANDFATHER_INODE_ID;
     final int childrenNum = getInt(m, "childrenNum", -1);
@@ -132,7 +131,7 @@ class JsonUtilClient {
     return new HdfsFileStatus(len, type == WebHdfsConstants.PathType.DIRECTORY, replication,
         blockSize, mTime, aTime, permission, owner, group,
         symlink, DFSUtilClient.string2Bytes(localName),
-        fileId, childrenNum, null, isFileStoredInDB,
+        fileId, childrenNum, null,
         storagePolicy);
   }
 
