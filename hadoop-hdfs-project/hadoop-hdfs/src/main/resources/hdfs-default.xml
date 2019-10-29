@@ -2031,13 +2031,23 @@
     </description>
   </property>
 
-<property>
-  <name>dfs.namenode.list.encryption.zones.num.responses</name>
-  <value>100</value>
-  <description>When listing encryption zones, the maximum number of zones
-    that will be returned in a batch. Fetching the list incrementally in
-    batches improves namenode performance.
-  </description>
-</property>
+  <property>
+    <name>dfs.namenode.list.encryption.zones.num.responses</name>
+    <value>100</value>
+    <description>When listing encryption zones, the maximum number of zones
+      that will be returned in a batch. Fetching the list incrementally in
+      batches improves namenode performance.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.client.xceiver.socket.factory.class</name>
+    <value>org.apache.hadoop.net.StandardSocketFactory</value>
+    <description>Socket Factory implementation to use when DFSClient connects
+      to datanode's DataXceiver. When Hops TLS is enabled, DataXceiver Server
+      still creates a plain server socket, so the client should not use a
+      HopsSSLSocketFactory.
+    </description>
+  </property>
 
 </configuration>

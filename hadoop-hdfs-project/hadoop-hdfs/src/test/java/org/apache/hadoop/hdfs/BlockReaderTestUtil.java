@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -52,7 +51,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 
-import javax.net.SocketFactory;
 import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
@@ -200,16 +198,13 @@ public class BlockReaderTestUtil {
       setTracer(FsTracer.get(fs.getConf())).
       setRemotePeerFactory(new RemotePeerFactory() {
         @Override
-        public SocketFactory getSocketFactory(Configuration conf) throws IOException {
-          return NetUtils.getDefaultSocketFactory(conf);
-        }
-  
-        @Override
         public Peer newConnectedPeer(InetSocketAddress addr,
             Token<BlockTokenIdentifier> blockToken, DatanodeID datanodeId)
             throws IOException {
           Peer peer = null;
-          Socket sock = getSocketFactory(fs.getConf()).createSocket();
+          Socket sock = NetUtils.getSocketFactoryFromProperty(fs.getConf(),
+              fs.getConf().get(DFSConfigKeys.DFS_CLIENT_XCEIVER_SOCKET_FACTORY_CLASS_KEY,
+                  DFSConfigKeys.DEFAULT_DFS_CLIENT_XCEIVER_FACTORY_CLASS)).createSocket();
           try {
             sock.connect(addr, HdfsServerConstants.READ_TIMEOUT);
             sock.setSoTimeout(HdfsServerConstants.READ_TIMEOUT);
