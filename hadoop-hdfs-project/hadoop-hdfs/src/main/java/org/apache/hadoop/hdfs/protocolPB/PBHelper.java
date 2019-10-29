@@ -1372,7 +1372,6 @@ public class PBHelper {
         fs.hasChildrenNum() ? fs.getChildrenNum() : -1,
         fs.hasFileEncryptionInfo() ? convert(fs.getFileEncryptionInfo()) :
             null,
-        fs.hasIsFileStoredInDB() ? fs.getIsFileStoredInDB() : false,
         fs.hasStoragePolicy() ? (byte) fs.getStoragePolicy()
             : HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
   }
@@ -1402,7 +1401,6 @@ public class PBHelper {
         setFileId(fs.getFileId()).
         setChildrenNum(fs.getChildrenNum()).
         setPath(ByteString.copyFrom(fs.getLocalNameInBytes())).
-        setIsFileStoredInDB(fs.isFileStoredInDB()).
         setStoragePolicy(fs.getStoragePolicy());
     if (fs.isSymlink()) {
       builder.setSymlink(ByteString.copyFrom(fs.getSymlinkInBytes()));
