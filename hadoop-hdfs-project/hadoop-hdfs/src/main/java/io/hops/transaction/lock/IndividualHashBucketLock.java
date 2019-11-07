@@ -38,7 +38,8 @@ public class IndividualHashBucketLock extends Lock {
     if (EntityManager.find(HashBucket.Finder.ByStorageIdAndBucketId,
         storageId, bucketId) == null){
       EntityManager.update(new HashBucket(storageId, bucketId, HashBuckets.initalizeHash()));
-      LOG.warn("The accessed bucket had not been initialized. There might be a misconfiguration.");
+      LOG.warn("The accessed bucket (StorageID: "+storageId+" bucketID: "+bucketId+") has not " +
+              "been initialized. There might be a misconfiguration.");
     }
   }
   

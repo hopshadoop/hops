@@ -37,6 +37,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
@@ -184,6 +185,12 @@ class FSDirConcatOp {
         throw new HadoopIllegalArgumentException("concat: the src file " + src
             + " is the same with the target file " + targetIIP.getPath());
       }
+
+      if(srcINodeFile.getStoragePolicyID() == HdfsConstants.DB_STORAGE_POLICY_ID) {
+        throw new HadoopIllegalArgumentException("concat: source file " + src
+                + " is stored in DB.");
+      }
+
       // source file cannot be under construction or empty
       if(srcINodeFile.isUnderConstruction() || srcINodeFile.numBlocks() == 0) {
         throw new HadoopIllegalArgumentException("concat: source file " + src

@@ -1764,7 +1764,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       System.arraycopy(oldData, 0, newData, 0, newLengthInt);
       file.deleteFileDataStoredInDB();
       file.storeFileDataInDB(newData);
-      return onBlockBoundary;
+      file.setSize(newData.length);
+      return true; //truncate is ready
     }
     if(!onBlockBoundary) {
       // Open file for write, but don't log into edits
@@ -3486,6 +3487,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
 
     pendingFile = checkLease(src, holder, inode, fileId, true);
+    pendingFile.setStoragePolicyID(HdfsConstants.DB_STORAGE_POLICY_ID);
 
     //in case of appending to small files. we might have to migrate the file from
     //in-memory to on disk
