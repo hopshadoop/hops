@@ -1666,33 +1666,32 @@ public class TestFsck {
       fs.mkdirs(new Path("/dir"));
       fs.setStoragePolicy(new Path("/dir"), "DB");
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
+      HopsFilesTestHelper.writeFile(fs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
       fs.setReplication(new Path(FILE_NAME1),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
+      HopsFilesTestHelper.verifyFile(fs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME2, ONDISK_SMALL_BUCKET_SIZE);
+      HopsFilesTestHelper.writeFile(fs, FILE_NAME2, ONDISK_SMALL_BUCKET_SIZE);
       fs.setReplication(new Path(FILE_NAME2),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME2, ONDISK_SMALL_BUCKET_SIZE);
+      HopsFilesTestHelper.verifyFile(fs, FILE_NAME2, ONDISK_SMALL_BUCKET_SIZE);
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME3, ONDISK_MEDIUM_BUCKET_SIZE);
+      HopsFilesTestHelper.writeFile(fs, FILE_NAME3, ONDISK_MEDIUM_BUCKET_SIZE);
       fs.setReplication(new Path(FILE_NAME3),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME3, ONDISK_MEDIUM_BUCKET_SIZE);
+      HopsFilesTestHelper.verifyFile(fs, FILE_NAME3, ONDISK_MEDIUM_BUCKET_SIZE);
 
-      TestSmallFilesCreation.writeFile(fs, FILE_NAME4, MAX_SMALL_FILE_SIZE);
+      HopsFilesTestHelper.writeFile(fs, FILE_NAME4, MAX_SMALL_FILE_SIZE);
       fs.setReplication(new Path(FILE_NAME4),(short)3);
-      TestSmallFilesCreation.verifyFile(fs, FILE_NAME4, MAX_SMALL_FILE_SIZE);
+      HopsFilesTestHelper.verifyFile(fs, FILE_NAME4, MAX_SMALL_FILE_SIZE);
 
-      assertTrue("Expecting 1 in-memory file. Got: " + TestSmallFilesCreation.countInMemoryDBFiles(),
-              TestSmallFilesCreation.countInMemoryDBFiles() == 1);
-      assertTrue("Expecting 3 on-disk file(s). Got:" + TestSmallFilesCreation.countAllOnDiskDBFiles(),
-              TestSmallFilesCreation.countAllOnDiskDBFiles() == 3);
-      assertTrue("Expecting 1 on-disk file(s). Got:" + TestSmallFilesCreation.countOnDiskSmallDBFiles(),
-              TestSmallFilesCreation.countOnDiskSmallDBFiles() == 1);
-      assertTrue("Expecting 1 on-disk file(s). Got:" + TestSmallFilesCreation.countOnDiskMediumDBFiles(),
-              TestSmallFilesCreation.countOnDiskMediumDBFiles() == 1);
-      assertTrue("Expecting 1 on-disk file(s). Got:" + TestSmallFilesCreation.countOnDiskLargeDBFiles(),
-              TestSmallFilesCreation.countOnDiskLargeDBFiles() == 1);
-
+      assertTrue("Expecting 1 in-memory file. Got: " + HopsFilesTestHelper.countInMemoryDBFiles(),
+              HopsFilesTestHelper.countInMemoryDBFiles() == 1);
+      assertTrue("Expecting 3 on-disk file(s). Got:" + HopsFilesTestHelper.countAllOnDiskDBFiles(),
+              HopsFilesTestHelper.countAllOnDiskDBFiles() == 3);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + HopsFilesTestHelper.countOnDiskSmallDBFiles(),
+              HopsFilesTestHelper.countOnDiskSmallDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + HopsFilesTestHelper.countOnDiskMediumDBFiles(),
+              HopsFilesTestHelper.countOnDiskMediumDBFiles() == 1);
+      assertTrue("Expecting 1 on-disk file(s). Got:" + HopsFilesTestHelper.countOnDiskLargeDBFiles(),
+              HopsFilesTestHelper.countOnDiskLargeDBFiles() == 1);
 
       final String fileName = "/srcdat";
       util.createFiles(fs, fileName);

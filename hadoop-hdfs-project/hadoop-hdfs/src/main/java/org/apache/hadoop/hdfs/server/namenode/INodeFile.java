@@ -307,7 +307,11 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   void addBlock(BlockInfoContiguous newblock)
       throws StorageException, TransactionContextException {
     BlockInfoContiguous maxBlk = findMaxBlk();
-    newblock.setBlockIndex(maxBlk.getBlockIndex() + 1);
+    int index = 0;
+    if (maxBlk != null) {
+      index = maxBlk.getBlockIndex() + 1;
+    }
+    newblock.setBlockIndex(index);
   }
 
   /**
@@ -379,7 +383,11 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   
   public long computeFileSize()
       throws StorageException, TransactionContextException {
-    return computeFileSize(true, false);
+    if(isFileStoredInDB){
+      return this.getSize();
+    } else {
+      return computeFileSize(true, false);
+    }
   }  
 
   /**
