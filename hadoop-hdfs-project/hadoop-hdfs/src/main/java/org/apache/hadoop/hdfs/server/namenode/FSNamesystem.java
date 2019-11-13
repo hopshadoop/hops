@@ -3512,7 +3512,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
 
 
-    finalizeINodeFileUnderConstructionStoredInDB(src, pendingFile);
+    finalizeINodeFileUnderConstruction(src, pendingFile);
 
     NameNode.stateChangeLog
         .info("DIR* completeFile: " + src + " is closed by " + holder);
@@ -4052,13 +4052,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private void finalizeINodeFileUnderConstruction(String src,
       INodeFile pendingFile)
       throws IOException {
-    finalizeINodeFileUnderConstructionInternal(src, pendingFile, false);
-  }
+    boolean skipReplicationCheck = false;
+    if (pendingFile.getStoragePolicyID() == HdfsConstants.DB_STORAGE_POLICY_ID){
+      skipReplicationCheck = true;
+    }
 
-  private void finalizeINodeFileUnderConstructionStoredInDB(String src,
-      INodeFile pendingFile)
-      throws IOException {
-    finalizeINodeFileUnderConstructionInternal(src, pendingFile, true);
+    finalizeINodeFileUnderConstructionInternal(src, pendingFile, skipReplicationCheck);
   }
 
   private void finalizeINodeFileUnderConstructionInternal(String src,
