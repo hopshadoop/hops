@@ -133,6 +133,7 @@ public class TestFilterFileSystem {
     public Token<?>[] addDelegationTokens(String renewer, Credentials creds)
         throws IOException;
     public String getScheme();
+    public String getAlternativeScheme();
     public Path fixRelativePart(Path p);
     public ContentSummary getContentSummary(Path f);
     public QuotaUsage getQuotaUsage(Path f);

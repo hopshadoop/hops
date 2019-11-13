@@ -113,7 +113,7 @@ public class TestHistoryFileManager {
   @Test
   public void testCreateDirsWithoutFileSystem() throws Exception {
     Configuration conf = new YarnConfiguration();
-    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hdfs://localhost:1");
+    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "hopsfs://localhost:1");
     testTryCreateHistoryDirs(conf, false);
   }
 

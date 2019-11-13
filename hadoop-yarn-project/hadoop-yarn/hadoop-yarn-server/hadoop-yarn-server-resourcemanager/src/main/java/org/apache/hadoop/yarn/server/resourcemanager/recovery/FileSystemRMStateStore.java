@@ -891,7 +891,8 @@ public class FileSystemRMStateStore extends RMStateStore {
   }
 
   private void setUnreadableBySuperuserXattrib(Path p) throws IOException {
-    if (fs.getScheme().toLowerCase().contains("hdfs")
+    if ((fs.getScheme().toLowerCase().contains("hdfs") 
+        || fs.getScheme().toLowerCase().contains("hopsfs"))
         && intermediateEncryptionEnabled
         && !fs.getXAttrs(p).containsKey(UNREADABLE_BY_SUPERUSER_XATTRIB)) {
       fs.setXAttr(p, UNREADABLE_BY_SUPERUSER_XATTRIB, null,

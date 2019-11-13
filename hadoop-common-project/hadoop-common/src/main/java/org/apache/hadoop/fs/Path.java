@@ -581,6 +581,15 @@ public class Path implements Comparable, Serializable, ObjectInputValidation {
     if (uri == null) {
       throw new InvalidObjectException("No URI in deserialized Path");
     }
-
+  }
+  
+  
+  public void setScheme(String scheme) {
+    try {
+      this.uri = new URI(scheme, this.uri.getAuthority(), normalizePath(scheme, this.uri.getPath()), null, this.uri.
+          getFragment()).normalize();
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(e);
+    }
   }
 }
