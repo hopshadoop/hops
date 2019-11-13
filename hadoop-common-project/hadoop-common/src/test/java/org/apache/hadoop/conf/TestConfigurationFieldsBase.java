@@ -205,6 +205,7 @@ public abstract class TestConfigurationFieldsBase {
       if (configDebug) {
         System.out.println("  Value: " + value);
       }
+      
       // Special Case: Detect and ignore partial properties (ending in x)
       //               or file properties (ending in .xml)
       if (value.endsWith(".xml") ||

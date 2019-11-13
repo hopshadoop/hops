@@ -391,7 +391,8 @@ public class NameNode implements NameNodeStatusMXBean {
           FileSystem.FS_DEFAULT_NAME_KEY, filesystemURI.toString()));
     }
     if (!HdfsConstants.HDFS_URI_SCHEME
-        .equalsIgnoreCase(filesystemURI.getScheme())) {
+        .equalsIgnoreCase(filesystemURI.getScheme()) && 
+        !HdfsConstants.ALTERNATIVE_HDFS_URI_SCHEME.equalsIgnoreCase(filesystemURI.getScheme())) {
       throw new IllegalArgumentException(String.format(
           "Invalid URI for NameNode address (check %s): %s is not of scheme '%s'.",
           FileSystem.FS_DEFAULT_NAME_KEY, filesystemURI.toString(),

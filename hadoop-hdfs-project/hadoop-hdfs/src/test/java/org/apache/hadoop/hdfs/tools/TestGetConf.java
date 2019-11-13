@@ -223,7 +223,7 @@ public class TestGetConf {
     HdfsConfiguration conf = new HdfsConfiguration(false);
 
     // Returned namenode address should match default address
-    conf.set(FS_DEFAULT_NAME_KEY, "hdfs://localhost:1000");
+    conf.set(FS_DEFAULT_NAME_KEY, "hopsfs://localhost:1000");
     verifyAddresses(conf, TestType.NAMENODE, false, "localhost:1000");
     verifyAddresses(conf, TestType.NNRPCADDRESSES, true, "localhost:1000");
 

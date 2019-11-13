@@ -73,7 +73,7 @@ public class TestErasureCodingFileSystem extends ClusterTest {
         DFSConfigKeys.DEFAULT_BLOCK_REPAIR_MANAGER_CLASSNAME);
     conf.setInt(DFSConfigKeys.RECHECK_INTERVAL_KEY, 10000);
     conf.setInt(DFSConfigKeys.REPAIR_DELAY_KEY, 100 * 60 * 60 * 1000);
-    conf.setClass("fs.hdfs.impl", ErasureCodingFileSystem.class,
+    conf.setClass("fs.hopsfs.impl", ErasureCodingFileSystem.class,
         FileSystem.class);
     numDatanode = 16;
   }

@@ -565,4 +565,13 @@ public class Path implements Comparable {
     }
     return new Path(newUri);
   }
+  
+  public void setScheme(String scheme) {
+    try {
+      this.uri = new URI(scheme, this.uri.getAuthority(), normalizePath(scheme, this.uri.getPath()), null, this.uri.
+          getFragment()).normalize();
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
 }
