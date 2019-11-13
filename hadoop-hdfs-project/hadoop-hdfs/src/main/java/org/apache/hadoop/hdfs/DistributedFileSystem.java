@@ -112,7 +112,7 @@ public class DistributedFileSystem extends FileSystem {
 
   DFSClient dfs;
   private boolean verifyChecksum = true;
-
+  
   static{
     HdfsConfiguration.init();
   }
@@ -130,13 +130,23 @@ public class DistributedFileSystem extends FileSystem {
   public String getScheme() {
     return HdfsConstants.HDFS_URI_SCHEME;
   }
+  
+  @Override
+  public String getAlternativeScheme() {
+    return HdfsConstants.ALTERNATIVE_HDFS_URI_SCHEME;
+  }
 
   @Override
   public URI getUri() { return uri; }
 
+  private class AlternativeDistributedFileSystem extends DistributedFileSystem{
+    
+  }
+  
   @Override
   public void initialize(URI uri, Configuration conf) throws IOException {
     super.initialize(uri, conf);
+    getAlternativeSchemeStatistics(getAlternativeScheme(), AlternativeDistributedFileSystem.class, statistics);
     setConf(conf);
 
     String host = uri.getHost();

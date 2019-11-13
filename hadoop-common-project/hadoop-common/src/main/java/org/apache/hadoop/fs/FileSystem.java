@@ -98,6 +98,9 @@ public abstract class FileSystem extends Configured implements Closeable {
                    CommonConfigurationKeys.FS_DEFAULT_NAME_KEY;
   public static final String DEFAULT_FS = 
                    CommonConfigurationKeys.FS_DEFAULT_NAME_DEFAULT;
+  public static final String FS_DEFAULT_ALTERNATIVESCHEME_KEY = CommonConfigurationKeys.FS_DEFAULT_ALTERNATIVESCHEME_KEY;
+  public static final String DEFAULT_ALTERNATIVE_SCHEME
+      = CommonConfigurationKeys.FS_DEFAULT_ALTERNATIVESCHEME_DEFAULT;
 
   public static final Log LOG = LogFactory.getLog(FileSystem.class);
 
@@ -184,6 +187,14 @@ public abstract class FileSystem extends Configured implements Closeable {
     return URI.create(fixName(conf.get(FS_DEFAULT_NAME_KEY, DEFAULT_FS)));
   }
 
+  /** Get the alternative default filesystem scheme from a configuration.
+   * @param conf the configuration to use
+   * @return the uri of the default filesystem
+   */
+  public static String getAlternativeDefaultScheme(Configuration conf) {
+    return conf.get(FS_DEFAULT_ALTERNATIVESCHEME_KEY, DEFAULT_ALTERNATIVE_SCHEME);
+  }
+  
   /** Set the default filesystem URI in a configuration.
    * @param conf the configuration to alter
    * @param uri the new default filesystem uri
@@ -221,6 +232,16 @@ public abstract class FileSystem extends Configured implements Closeable {
    */
   public String getScheme() {
     throw new UnsupportedOperationException("Not implemented by the " + getClass().getSimpleName() + " FileSystem implementation");
+  }
+  
+  /**
+   * Return an alternative protocol scheme for the FileSystem.
+   * <p/>
+   *
+   * @return the protocol scheme for the FileSystem.
+   */
+  public String getAlternativeScheme(){
+    return "";
   }
 
   /** Returns a URI whose scheme and authority identify this FileSystem.*/
@@ -333,7 +354,7 @@ public abstract class FileSystem extends Configured implements Closeable {
     } else if (name.indexOf('/')==-1) {   // unqualified is "hdfs://"
       LOG.warn("\""+name+"\" is a deprecated filesystem name."
                +" Use \"hdfs://"+name+"/\" instead.");
-      name = "hdfs://"+name;
+      name = "hopsfs://"+name;
     }
     return name;
   }
@@ -363,7 +384,8 @@ public abstract class FileSystem extends Configured implements Closeable {
 
     if (scheme != null && authority == null) {     // no authority
       URI defaultUri = getDefaultUri(conf);
-      if (scheme.equals(defaultUri.getScheme())    // if scheme matches default
+      if ((scheme.equals(defaultUri.getScheme())    // if scheme matches default
+          || scheme.equals(getAlternativeDefaultScheme(conf))) // if scheme matches default alternative
           && defaultUri.getAuthority() != null) {  // & default has authority
         return get(defaultUri, conf);              // return default
       }
@@ -416,7 +438,8 @@ public abstract class FileSystem extends Configured implements Closeable {
 
     if (authority == null) {                       // no authority
       URI defaultUri = getDefaultUri(conf);
-      if (scheme.equals(defaultUri.getScheme())    // if scheme matches default
+      if ((scheme.equals(defaultUri.getScheme())    // if scheme matches default
+              || scheme.equals(getAlternativeDefaultScheme(conf))) // if scheme matches default alternative
           && defaultUri.getAuthority() != null) {  // & default has authority
         return newInstance(defaultUri, conf);              // return default
       }
@@ -626,6 +649,11 @@ public abstract class FileSystem extends Configured implements Closeable {
       return;
     URI thisUri = getCanonicalUri();
     String thisScheme = thisUri.getScheme();
+    String thisAlternativeScheme = getAlternativeScheme();
+    if(thatScheme.equalsIgnoreCase(thisAlternativeScheme)){
+      thatScheme = thisScheme;
+      path.setScheme(thatScheme);
+    }
     //authority and scheme are not case sensitive
     if (thisScheme.equalsIgnoreCase(thatScheme)) {// schemes match
       String thisAuthority = thisUri.getAuthority();
@@ -2635,6 +2663,9 @@ public abstract class FileSystem extends Configured implements Closeable {
             fs = it.next();
             try {
               SERVICE_FILE_SYSTEMS.put(fs.getScheme(), fs.getClass());
+              if(!fs.getAlternativeScheme().equals("")){
+                  SERVICE_FILE_SYSTEMS.put(fs.getAlternativeScheme(), fs.getClass());
+              }
             } catch (Exception e) {
               LOG.warn("Cannot load: " + fs + " from " +
                   ClassUtil.findContainingJar(fs.getClass()), e);
@@ -2878,7 +2909,7 @@ public abstract class FileSystem extends Configured implements Closeable {
    * statistics, the reader thread totals up the contents of all of the 
    * thread-local data areas.
    */
-  public static final class Statistics {
+  public static class Statistics {
     /**
      * Statistics data.
      * 
@@ -2990,7 +3021,7 @@ public abstract class FileSystem extends Configured implements Closeable {
       STATS_DATA_CLEANER.setDaemon(true);
       STATS_DATA_CLEANER.start();
     }
-
+    
     public Statistics(String scheme) {
       this.scheme = scheme;
       this.rootData = new StatisticsData();
@@ -3314,8 +3345,66 @@ public abstract class FileSystem extends Configured implements Closeable {
     synchronized int getAllThreadLocalDataSize() {
       return allData.size();
     }
+    
+    public boolean isAlternative(){
+      return false;
+    }
   }
   
+  public static final class AlternativeSchemeStatistics extends Statistics{
+    
+    private final Statistics referenceStats;
+    
+    public AlternativeSchemeStatistics(String scheme, Statistics stats) {
+      super(scheme);
+      referenceStats = stats;
+    }
+    
+    public AlternativeSchemeStatistics(AlternativeSchemeStatistics other) {
+      super(other.getScheme());
+      this.referenceStats = new Statistics(other.referenceStats);
+    }
+    
+    @Override
+    public long getBytesRead() {
+      return referenceStats.getBytesRead();
+    }
+    
+    @Override
+    public long getBytesWritten() {
+      return referenceStats.getBytesWritten();
+    }
+    
+    /**
+     * Get the number of file system read operations such as list files
+     * @return number of read operations
+     */
+    public int getReadOps() {
+      return referenceStats.getReadOps();
+    }
+
+    /**
+     * Get the number of large file system read operations such as list files
+     * under a large directory
+     * @return number of large read operations
+     */
+    public int getLargeReadOps() {
+      return referenceStats.getLargeReadOps();
+    }
+
+    /**
+     * Get the number of file system write operations such as create, append 
+     * rename etc.
+     * @return number of write operations
+     */
+    public int getWriteOps() {
+      return referenceStats.getWriteOps();
+    }
+    
+    public boolean isAlternative(){
+      return true;
+    }
+  }
   /**
    * Get the Map of Statistics object indexed by URI Scheme.
    * @return a Map having a key as URI scheme and value as Statistics object
@@ -3347,6 +3436,16 @@ public abstract class FileSystem extends Configured implements Closeable {
     Statistics result = statisticsTable.get(cls);
     if (result == null) {
       result = new Statistics(scheme);
+      statisticsTable.put(cls, result);
+    }
+    return result;
+  }
+  
+  public static synchronized 
+  Statistics getAlternativeSchemeStatistics(String scheme, Class<? extends FileSystem> cls, Statistics ref){
+    Statistics result = statisticsTable.get(cls);
+    if (result == null) {
+      result = new AlternativeSchemeStatistics(scheme, ref);
       statisticsTable.put(cls, result);
     }
     return result;

@@ -1042,7 +1042,7 @@ public class TestBlockStoragePolicy {
     final DatanodeDescriptor[] dataNodes = DFSTestUtil
         .toDatanodeDescriptor(storages);
 
-    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
+    FileSystem.setDefaultUri(conf, "hopsfs://localhost:0");
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
     File baseDir = PathUtils.getTestDir(TestReplicationPolicy.class);
     DFSTestUtil.formatNameNode(conf);

@@ -79,7 +79,8 @@ public class Hdfs extends AbstractFileSystem {
    */
   Hdfs(final URI theUri, final Configuration conf)
       throws IOException, URISyntaxException {
-    super(theUri, HdfsConstants.HDFS_URI_SCHEME, true, NameNode.DEFAULT_PORT);
+    super(theUri, HdfsConstants.HDFS_URI_SCHEME, true, NameNode.DEFAULT_PORT,
+        HdfsConstants.ALTERNATIVE_HDFS_URI_SCHEME);
 
     if (!theUri.getScheme().equalsIgnoreCase(HdfsConstants.HDFS_URI_SCHEME)) {
       throw new IllegalArgumentException("Passed URI's scheme is not for Hdfs");

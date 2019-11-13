@@ -74,6 +74,14 @@ public class CommonConfigurationKeysPublic {
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
    * core-default.xml</a>
    */
+  public static final String FS_DEFAULT_ALTERNATIVESCHEME_KEY = "fs.defaultFS.alternativeScheme";
+  /** Default value for FS_DEFAULT_NAME_KEY */
+  public static final String  FS_DEFAULT_ALTERNATIVESCHEME_DEFAULT = "";
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
   public static final String  FS_DF_INTERVAL_KEY = "fs.df.interval"; 
   /** Default value for FS_DF_INTERVAL_KEY */
   public static final long    FS_DF_INTERVAL_DEFAULT = 60000;

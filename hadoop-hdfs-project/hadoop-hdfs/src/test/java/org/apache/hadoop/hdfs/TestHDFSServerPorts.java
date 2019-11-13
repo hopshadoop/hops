@@ -95,7 +95,7 @@ public class TestHDFSServerPorts {
       throw new IOException("Could not delete hdfs directory '" + hdfsDir + "'");
     }
     config = new HdfsConfiguration();
-    FileSystem.setDefaultUri(config, "hdfs://" + THIS_HOST);
+    FileSystem.setDefaultUri(config, "hopsfs://" + THIS_HOST);
     if (withService) {
       NameNode.setServiceAddress(config, THIS_HOST);
     }
@@ -198,12 +198,12 @@ public class TestHDFSServerPorts {
       assertFalse(started); // should fail
 
       // start on a different main port
-      FileSystem.setDefaultUri(conf2, "hdfs://" + THIS_HOST);
+      FileSystem.setDefaultUri(conf2, "hopsfs://" + THIS_HOST);
       started = canStartNameNode(conf2);
       assertFalse(started); // should fail again
 
       // reset conf2 since NameNode modifies it
-      FileSystem.setDefaultUri(conf2, "hdfs://" + THIS_HOST);
+      FileSystem.setDefaultUri(conf2, "hopsfs://" + THIS_HOST);
       // different http port
       conf2.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, THIS_HOST);
       started = canStartNameNode(conf2);
@@ -212,7 +212,7 @@ public class TestHDFSServerPorts {
         assertFalse("Should've failed on service port", started);
 
         // reset conf2 since NameNode modifies it
-        FileSystem.setDefaultUri(conf2, "hdfs://" + THIS_HOST);
+        FileSystem.setDefaultUri(conf2, "hopsfs://" + THIS_HOST);
         conf2.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, THIS_HOST);
         // Set Service address      
         conf2
