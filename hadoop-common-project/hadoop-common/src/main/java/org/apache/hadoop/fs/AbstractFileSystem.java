@@ -37,6 +37,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem.AlternativeSchemeStatistics;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.Options.CreateOpts;
@@ -87,6 +88,8 @@ public abstract class AbstractFileSystem {
   static final String NO_ABSTRACT_FS_ERROR = "No AbstractFileSystem configured for scheme";
   
   private final URI myUri;
+  
+  private final String alternativeScheme;
   
   public Statistics getStatistics() {
     return statistics;
@@ -230,7 +233,12 @@ public abstract class AbstractFileSystem {
     for (Map.Entry<URI, Statistics> pair : STATISTICS_TABLE.entrySet()) {
       URI key = pair.getKey();
       Statistics value = pair.getValue();
-      Statistics newStatsObj = new Statistics(value);
+      Statistics newStatsObj;
+      if(value.isAlternative()){
+        newStatsObj = new AlternativeSchemeStatistics((AlternativeSchemeStatistics) value);
+      }else{
+        newStatsObj = new Statistics(value);
+      }
       statsMap.put(URI.create(key.toString()), newStatsObj);
     }
     return statsMap;
@@ -271,8 +279,25 @@ public abstract class AbstractFileSystem {
   public AbstractFileSystem(final URI uri, final String supportedScheme,
       final boolean authorityNeeded, final int defaultPort)
       throws URISyntaxException {
+    this(uri, supportedScheme, authorityNeeded, defaultPort, null);
+  }
+  
+  /**
+   * Constructor to be called by subclasses.
+   * 
+   * @param uri for this file system.
+   * @param supportedScheme the scheme supported by the implementor
+   * @param authorityNeeded if true then theURI must have authority, if false
+   *          then the URI must have null authority.
+   *
+   * @throws URISyntaxException <code>uri</code> has syntax error
+   */
+  public AbstractFileSystem(final URI uri, final String supportedScheme,
+      final boolean authorityNeeded, final int defaultPort, String alternativeScheme)
+      throws URISyntaxException {
     myUri = getUri(uri, supportedScheme, authorityNeeded, defaultPort);
     statistics = getStatistics(uri); 
+    this.alternativeScheme = alternativeScheme;
   }
   
   /**
@@ -377,7 +402,10 @@ public abstract class AbstractFileSystem {
     String thisScheme = this.getUri().getScheme();
     String thisHost = this.getUri().getHost();
     String thatHost = uri.getHost();
-    
+    if(thatScheme.equalsIgnoreCase(alternativeScheme)){
+      thatScheme = thisScheme;
+      path.setScheme(thatScheme);
+    }
     // Schemes and hosts must match.
     // Allow for null Authority for file:///
     if (!thisScheme.equalsIgnoreCase(thatScheme) ||

@@ -91,7 +91,7 @@ public class TestRefreshUserMappings {
     config.setLong("hadoop.security.groups.cache.secs", groupRefreshTimeoutSec);
     Groups.getUserToGroupsMappingService(config);
     
-    FileSystem.setDefaultUri(config, "hdfs://localhost:" + "0");
+    FileSystem.setDefaultUri(config, "hopsfs://localhost:" + "0");
     cluster = new MiniDFSCluster.Builder(config).build();
     cluster.waitActive();
   }

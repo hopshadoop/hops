@@ -228,6 +228,8 @@ public class TestHarFileSystem {
 
     public Collection<FileStatus> getTrashRoots(boolean allUsers) throws IOException;
     StorageStatistics getStorageStatistics();
+    
+    public String getAlternativeScheme();
   }
 
   @Test

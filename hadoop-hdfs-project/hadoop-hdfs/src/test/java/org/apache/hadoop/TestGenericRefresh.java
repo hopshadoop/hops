@@ -57,7 +57,7 @@ public class TestGenericRefresh {
     config = new Configuration();
     config.set("hadoop.security.authorization", "true");
 
-    FileSystem.setDefaultUri(config, "hdfs://localhost:" + NNPort);
+    FileSystem.setDefaultUri(config, "hopsfs://localhost:" + NNPort);
     cluster = new MiniDFSCluster.Builder(config).nameNodePort(NNPort).build();
     cluster.waitActive();
   }
