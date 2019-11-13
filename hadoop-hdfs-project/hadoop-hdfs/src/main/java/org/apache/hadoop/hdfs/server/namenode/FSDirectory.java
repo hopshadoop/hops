@@ -389,6 +389,7 @@ public class FSDirectory implements Closeable {
             BlockUCState.UNDER_CONSTRUCTION, targets);
     getBlockManager().addBlockCollection(blockInfo, fileINode);
     fileINode.addBlock(blockInfo);
+    fileINode.getFileUnderConstructionFeature().setLastBlockId(blockInfo.getBlockId());
     fileINode.setHasBlocks(true);
 
     if (NameNode.stateChangeLog.isDebugEnabled()) {
