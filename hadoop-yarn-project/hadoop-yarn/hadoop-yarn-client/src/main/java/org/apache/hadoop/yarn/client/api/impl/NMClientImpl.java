@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
@@ -247,10 +248,13 @@ public class NMClientImpl extends NMClient {
   private void setupCryptoMaterial(StartContainersRequest request) throws IOException {
     if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      Path kStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-      Path tStorePath = Paths.get(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-      Path passwdPath = Paths.get(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
-      
+      Path kStorePath = Paths.get(getConfig().get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH));
+      Path tStorePath = Paths.get(getConfig().get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH));
+      Path passwdPath = Paths.get(getConfig().get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
+
       ByteBuffer kStore = ByteBuffer.wrap(Files.readAllBytes(kStorePath));
       ByteBuffer tStore = ByteBuffer.wrap(Files.readAllBytes(tStorePath));
       String password = readCryptoMaterialPassword(passwdPath.toFile());
