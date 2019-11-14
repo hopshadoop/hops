@@ -158,7 +158,8 @@ public class HopsUtil {
    * @throws IOException
    */
   public static void generateContainerSSLServerConfiguration(Configuration conf) throws IOException {
-    generateContainerSSLServerConfiguration(new File(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME), conf);
+    generateContainerSSLServerConfiguration(new File(conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH)), conf);
   }
   
   /**
@@ -175,8 +176,8 @@ public class HopsUtil {
   public static void generateContainerSSLServerConfiguration(File passwdFile, Configuration conf) throws IOException {
     if (!passwdFile.exists()) {
       String cwd = System.getProperty("user.dir");
-      throw new FileNotFoundException("File " + HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME + " does not exist " +
-          "in " + cwd);
+      throw new FileNotFoundException("File " + conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH) + " does not exist " + "in " + cwd);
     }
     String cryptoMaterialPassword = FileUtils.readFileToString(passwdFile);
     Configuration sslConf = generateSSLServerConf(conf, cryptoMaterialPassword);
@@ -187,7 +188,7 @@ public class HopsUtil {
     Configuration sslConf = new Configuration(false);
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY),
-        HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+        conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH));
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY), cryptoMaterialPassword);
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
@@ -195,13 +196,13 @@ public class HopsUtil {
     
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY),
-        HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+        conf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH));
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY), cryptoMaterialPassword);
 
     sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY),
-        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
 
     Configuration sslClientConf = new Configuration(false);
     String sslClientResource = conf.get(SSLFactory.SSL_CLIENT_CONF_KEY, "ssl-client.xml");

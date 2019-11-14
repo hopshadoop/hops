@@ -22,7 +22,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -75,14 +74,15 @@ public class TestHopsUtil {
     Configuration systemConf = new Configuration(false);
     Map<String, String> expected = new HashMap<>();
     Path passwdFilePath = Paths.get(BASE_DIR_FILE.getAbsolutePath(),
-        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
     File passwdFile = passwdFilePath.toFile();
     String password = "password";
     FileUtils.writeStringToFile(passwdFile, password);
 
     String keyStorePasswordFileKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY);
-    expected.put(keyStorePasswordFileKey, HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+    expected.put(keyStorePasswordFileKey, systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
 
     String keyStorePasswordKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY);
@@ -139,7 +139,7 @@ public class TestHopsUtil {
   public void testGenerateContainerSSLServerConfDefaults() throws IOException {
     Configuration systemConf = new Configuration(false);
     Path passwdFilePath = Paths.get(BASE_DIR_FILE.getAbsolutePath(),
-        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
     File passwdFile = passwdFilePath.toFile();
     String password = "password";
     FileUtils.writeStringToFile(passwdFile, password);
@@ -154,11 +154,11 @@ public class TestHopsUtil {
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
             .SSL_KEYSTORE_LOCATION_TPL_KEY),
-        HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
+        systemConf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH));
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
             .SSL_TRUSTSTORE_LOCATION_TPL_KEY),
-        HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
+        systemConf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH));
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
             .SSL_KEYSTORE_PASSWORD_TPL_KEY), password);
@@ -182,7 +182,7 @@ public class TestHopsUtil {
             .DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL));
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY),
-        HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
 
     assertSSLConfValues(expected, sslConf);
   }
@@ -190,8 +190,8 @@ public class TestHopsUtil {
   @Test
   public void testGenerateContainerSSLServerConfWithDifferentName() throws IOException {
     Configuration systemConf = new Configuration(false);
-    File passwdFile = Paths.get(BASE_DIR_FILE.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)
-        .toFile();
+    File passwdFile = Paths.get(BASE_DIR_FILE.getAbsolutePath(), systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+        SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH)).toFile();
     FileUtils.writeStringToFile(passwdFile, "password");
     systemConf.set(SSLFactory.SSL_SERVER_CONF_KEY, "client-ssl-server.xml");
     systemConf.set(SSLFactory.SSL_CLIENT_CONF_KEY, "client-ssl-client.xml");

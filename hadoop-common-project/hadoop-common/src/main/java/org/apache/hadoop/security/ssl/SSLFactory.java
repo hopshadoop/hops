@@ -17,8 +17,6 @@
 */
 package org.apache.hadoop.security.ssl;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -82,6 +80,13 @@ public class SSLFactory implements ConnectionConfigurator {
   public static final String DEFAULT_SSL_ENABLED_PROTOCOLS = "TLSv1.2,TLSv1.1";
   public static final String SSL_SERVER_EXCLUDE_CIPHER_LIST =
       "ssl.server.exclude.cipher.list";
+
+  public static final String LOCALIZED_PASSWD_FILE_PATH_KEY = "hops.ssl.keystores.passwd.name";
+  public static final String DEFAULT_LOCALIZED_PASSWD_FILE_PATH = "material_passwd";
+  public static final String LOCALIZED_KEYSTORE_FILE_PATH_KEY = "hops.ssl.keystore.name";
+  public static final String DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH = "k_certificate";
+  public static final String LOCALIZED_TRUSTSTORE_FILE_PATH_KEY = "hops.ssl.trustore.name";
+  public static final String DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH = "t_certificate";
 
   private Configuration conf;
   private Mode mode;
