@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.ByteString;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.UpdateContainerTokenEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerTokenUpdatedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.scheduler.ContainerSchedulerEvent;
@@ -186,9 +184,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
-import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.security.ssl.X509SecurityMaterial;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
+import org.apache.hadoop.security.ssl.SSLFactory;
 
 import static org.apache.hadoop.service.Service.STATE.STARTED;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
@@ -244,6 +244,10 @@ public class ContainerManagerImpl extends CompositeService implements
   
   // NM metrics publisher is set only if the timeline service v.2 is enabled
   private NMTimelinePublisher nmMetricsPublisher;
+
+  private String keyStoreFileName = SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH;
+  private String trustStoreFileName = SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH;
+  private String passwordFileName = SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH;
 
   public ContainerManagerImpl(Context context, ContainerExecutor exec,
       DeletionService deletionContext, NodeStatusUpdater nodeStatusUpdater,
@@ -337,6 +341,10 @@ public class ContainerManagerImpl extends CompositeService implements
         conf.getLong(YarnConfiguration.NM_PROCESS_KILL_WAIT_MS,
             YarnConfiguration.DEFAULT_NM_PROCESS_KILL_WAIT_MS) +
         SHUTDOWN_CLEANUP_SLOP_MS;
+
+    keyStoreFileName = conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, keyStoreFileName);
+    trustStoreFileName = conf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY, trustStoreFileName);
+    passwordFileName = conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, passwordFileName);
 
     super.serviceInit(conf);
     recover();
@@ -1467,12 +1475,9 @@ public class ContainerManagerImpl extends CompositeService implements
               "been localized correctly and is null");
         }
   
-        resources.put(keyStoreLocation.toFile(),
-            HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME);
-        resources.put(trustStoreLocation.toFile(),
-            HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME);
-        resources.put(passwdLocation.toFile(),
-            HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME);
+        resources.put(keyStoreLocation.toFile(), keyStoreFileName);
+        resources.put(trustStoreLocation.toFile(), trustStoreFileName);
+        resources.put(passwdLocation.toFile(), passwordFileName);
       }
       
       // Inject JWT material

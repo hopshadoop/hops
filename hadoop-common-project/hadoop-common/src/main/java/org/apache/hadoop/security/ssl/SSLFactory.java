@@ -104,6 +104,13 @@ public class SSLFactory implements ConnectionConfigurator {
   public static final String KEYSTORES_FACTORY_CLASS_KEY =
     "hadoop.ssl.keystores.factory.class";
 
+  public static final String LOCALIZED_PASSWD_FILE_PATH_KEY = "hops.ssl.keystores.passwd.name";
+  public static final String DEFAULT_LOCALIZED_PASSWD_FILE_PATH = "material_passwd";
+  public static final String LOCALIZED_KEYSTORE_FILE_PATH_KEY = "hops.ssl.keystore.name";
+  public static final String DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH = "k_certificate";
+  public static final String LOCALIZED_TRUSTSTORE_FILE_PATH_KEY = "hops.ssl.trustore.name";
+  public static final String DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH = "t_certificate";
+
   private Configuration conf;
   private Mode mode;
   private boolean requireClientCert;
