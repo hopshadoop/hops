@@ -293,12 +293,12 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         
         LOG.info("Mocked PWD is : " + EnvironmentVariablesFactory.getInstance().getEnv("PWD"));
         
-        String keystore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)
-            .toString();
-        String truststore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME)
-            .toString();
-        String passwd = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)
-            .toString();
+        String keystore = Paths.get(materialDir.getAbsolutePath(), conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH)).toString();
+      String truststore = Paths.get(materialDir.getAbsolutePath(), conf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH)).toString();
+      String passwd = Paths.get(materialDir.getAbsolutePath(), conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH)).toString();
         String password = "password";
         touchFile(keystore);
         touchFile(truststore);
@@ -479,12 +479,12 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
 
         LOG.info("Mocked PWD is : " + EnvironmentVariablesFactory.getInstance().getEnv("PWD"));
 
-        String keystore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)
-            .toString();
-        String truststore = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME)
-            .toString();
-        String passwd = Paths.get(materialDir.getAbsolutePath(), HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)
-            .toString();
+        String keystore = Paths.get(materialDir.getAbsolutePath(), conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH)).toString();
+        String truststore = Paths.get(materialDir.getAbsolutePath(), conf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH)).toString();
+        String passwd = Paths.get(materialDir.getAbsolutePath(), conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
+          SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH)).toString();
         String password = "password";
         touchFile(keystore);
         touchFile(truststore);

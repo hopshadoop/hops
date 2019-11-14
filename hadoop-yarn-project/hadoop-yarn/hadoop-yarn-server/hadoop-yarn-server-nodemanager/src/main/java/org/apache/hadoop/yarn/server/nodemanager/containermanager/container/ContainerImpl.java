@@ -46,6 +46,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
@@ -1106,16 +1107,16 @@ public class ContainerImpl implements Container {
     if (keyStoreLocalizedPath == null || trustStoreLocalizedPath == null || passwordFileLocalizedPath == null
         || jwtLocalizedPath == null) {
       for (Map.Entry<Path, List<String>> localizedResource : getLocalizedResources().entrySet()) {
-        if (keyStoreLocalizedPath == null &&
-            localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_KEYSTORE_FILE_NAME)) {
+        if (keyStoreLocalizedPath == null && localizedResource.getValue().contains(daemonConf.get(
+            SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH))) {
           keyStoreLocalizedPath = new File(localizedResource.getKey().toString());
         }
-        if (trustStoreLocalizedPath == null &&
-            localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_TRUSTSTORE_FILE_NAME)) {
+        if (trustStoreLocalizedPath == null && localizedResource.getValue().contains(daemonConf.get(
+            SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH))) {
           trustStoreLocalizedPath = new File(localizedResource.getKey().toString());
         }
-        if (passwordFileLocalizedPath == null  &&
-            localizedResource.getValue().contains(HopsSSLSocketFactory.LOCALIZED_PASSWD_FILE_NAME)) {
+        if (passwordFileLocalizedPath == null && localizedResource.getValue().contains(daemonConf.get(
+            SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH))) {
           passwordFileLocalizedPath = new File(localizedResource.getKey().toString());
         }
         if (jwtLocalizedPath == null &&
