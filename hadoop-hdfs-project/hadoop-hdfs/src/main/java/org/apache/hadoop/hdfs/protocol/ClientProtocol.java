@@ -21,6 +21,7 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -429,7 +430,7 @@ public interface ClientProtocol {
       QuotaExceededException, IOException;
 
   @Idempotent
-  public void setMetaEnabled(String src, boolean metaEnabled)
+  public void setMetaStatus(String src, MetaStatus metaStatus)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException;
 

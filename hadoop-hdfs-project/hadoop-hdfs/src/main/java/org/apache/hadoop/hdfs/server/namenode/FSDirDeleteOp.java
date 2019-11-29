@@ -22,6 +22,7 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.metadata.hdfs.entity.ProjectedINode;
+import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
@@ -449,9 +450,9 @@ class FSDirDeleteOp {
     if (iip.length() == 1) {
       return -1;
     }
-
+  
     // Add metadata log entry for all deleted childred.
-    addMetaDataLogForDirDeletion(targetNode);
+    addMetaDataLogForDirDeletion(targetNode, fsd.getFSNamesystem().getNamenodeId());
     
     // Remove the node from the namespace
     long removed = fsd.removeLastINode(iip);
@@ -477,17 +478,19 @@ class FSDirDeleteOp {
     return removed;
   }
   
-  private static void addMetaDataLogForDirDeletion(INode targetNode) throws TransactionContextException, StorageException {
+  private static void addMetaDataLogForDirDeletion(INode targetNode, long namenodeId) throws IOException {
     if (targetNode.isDirectory()) {
       List<INode> children = ((INodeDirectory) targetNode).getChildrenList();
       for(INode child : children){
        if(child.isDirectory()){
-         addMetaDataLogForDirDeletion(child);
+         addMetaDataLogForDirDeletion(child, namenodeId);
        }else{
          child.logMetadataEvent(INodeMetadataLogEntry.Operation.Delete);
+         child.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.delete());
        }
       }
     }
     targetNode.logMetadataEvent(INodeMetadataLogEntry.Operation.Delete);
+    targetNode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.delete());
   }
 }

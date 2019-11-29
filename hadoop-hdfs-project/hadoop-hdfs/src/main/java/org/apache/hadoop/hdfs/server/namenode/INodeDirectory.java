@@ -20,7 +20,9 @@ package org.apache.hadoop.hdfs.server.namenode;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
 import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import io.hops.transaction.EntityManager;
 
 import java.io.FileNotFoundException;
@@ -66,7 +68,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   public static final long ROOT_DIR_PARTITION_KEY = HdfsConstantsClient.GRANDFATHER_INODE_ID;
   public static final short ROOT_DIR_DEPTH =0;
 
-  private boolean metaEnabled;
+  private MetaStatus metaStatus = MetaStatus.DISABLED;
 
   private int childrenNum;
   
@@ -111,7 +113,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     if (copyFeatures) {
       this.features = other.features;
     }
-    this.metaEnabled = other.isMetaEnabled();
+    this.metaStatus = other.getMetaStatus();
   }
   
   /**
@@ -219,11 +221,15 @@ public class INodeDirectory extends INodeWithAdditionalFields {
   }
 
   public boolean isMetaEnabled() {
-    return metaEnabled;
+    return metaStatus.isMetaEnabled();
   }
-
-  public void setMetaEnabled(boolean metaEnabled) {
-    this.metaEnabled = metaEnabled;
+  
+  public MetaStatus getMetaStatus() {
+    return metaStatus;
+  }
+  
+  public void setMetaStatus(MetaStatus metaStatus) {
+    this.metaStatus = metaStatus;
   }
 
   public boolean removeChild(INode node)
@@ -424,12 +430,12 @@ public class INodeDirectory extends INodeWithAdditionalFields {
    *  @return false if the child with this name already exists; 
    *         otherwise, return true;
    */
-  boolean addChild(final INode node, final boolean setModTime) throws IOException{
-    return addChild(node, setModTime, true);
+  boolean addChild(final INode node, final boolean setModTime, long namenodeId) throws IOException{
+    return addChild(node, setModTime, true, namenodeId);
   }
   
-  boolean addChild(final INode node, final boolean setModTime, final boolean
-      logMetadataEvent) throws IOException{
+  boolean addChild(final INode node, final boolean setModTime, final boolean logMetadataEvent, long namenodeId)
+    throws IOException{
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
       return false;
@@ -469,6 +475,8 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     if (logMetadataEvent) {
       node.logMetadataEvent(INodeMetadataLogEntry.Operation.Add);
     }
+    //FIXME - once rename operation is tracked in provenance - update code
+    node.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.create());
 
     return true;
   }

@@ -25,12 +25,14 @@ import io.hops.metadata.common.entity.IntVariable;
 import io.hops.metadata.common.entity.LongVariable;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
+import io.hops.metadata.yarn.dal.AppProvenanceDataAccess;
 import io.hops.metadata.yarn.dal.ReservationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
+import io.hops.metadata.yarn.entity.AppProvenanceEntry;
 import io.hops.metadata.yarn.entity.ReservationState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
@@ -70,6 +72,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.RMDelegati
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.AMRMTokenSecretManagerStatePBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 
 public class DBRMStateStore extends RMStateStore {
@@ -434,6 +437,9 @@ public class DBRMStateStore extends RMStateStore {
       stateName = appStateDataPB.getState().toString();
     }
     final String stateN=stateName;
+    final long submitTime = appStateDataPB.getSubmitTime();
+    final long startTime = appStateDataPB.getStartTime();
+    final long finishTime = appStateDataPB.getFinishTime();
     LightWeightRequestHandler setApplicationStateHandler
             = new LightWeightRequestHandler(YARNOperationType.TEST) {
       @Override
@@ -446,11 +452,24 @@ public class DBRMStateStore extends RMStateStore {
         ApplicationState state = new ApplicationState(appIdString, appState,
                 user, name, stateN);
         DA.add(state);
+        logProvenance(state, submitTime, startTime, finishTime);
         connector.commit();
         return null;
       }
     };
     setApplicationStateHandler.handle();
+  }
+  
+  private void logProvenance(ApplicationState state, long submitTime, long startTime, long finishTime) 
+    throws StorageException {
+    long now = System.currentTimeMillis();
+    AppProvenanceDataAccess<AppProvenanceEntry> da
+      = (AppProvenanceDataAccess) RMStorageFactory.getDataAccess(AppProvenanceDataAccess.class);
+    AppProvenanceEntry provEntry = new AppProvenanceEntry(state, now, submitTime, startTime, finishTime);
+    if (state.getState() == null) {
+      provEntry.setState("null");
+    }
+    da.add(provEntry);
   }
 
   @Override

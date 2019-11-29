@@ -227,7 +227,7 @@ public class INodeDALAdaptor
       if (inode.isDirectory()) {
         hopINode.setUnderConstruction(false);
         hopINode.setDirWithQuota(((INodeDirectory) inode).isWithQuota());
-        hopINode.setMetaEnabled(((INodeDirectory) inode).isMetaEnabled());
+        hopINode.setMetaStatus(((INodeDirectory) inode).getMetaStatus());
         hopINode.setChildrenNum(((INodeDirectory) inode).getChildrenNum());
       }
       if (inode instanceof INodeFile) {
@@ -290,7 +290,7 @@ public class INodeDALAdaptor
 
           inode.setAccessTimeNoPersistance(hopINode.getAccessTime());
           inode.setModificationTimeNoPersistance(hopINode.getModificationTime());
-          ((INodeDirectory) inode).setMetaEnabled(hopINode.isMetaEnabled());
+          ((INodeDirectory) inode).setMetaStatus(hopINode.getMetaStatus());
           ((INodeDirectory) inode).setChildrenNum(hopINode.getChildrenNum());
         } else if (hopINode.getSymlink() != null) {
           inode = new INodeSymlink(hopINode.getId(), hopINode.getSymlink(),

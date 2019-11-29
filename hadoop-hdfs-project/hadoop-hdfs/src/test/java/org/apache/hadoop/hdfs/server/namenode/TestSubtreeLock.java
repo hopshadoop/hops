@@ -22,6 +22,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.INodeDataAccess;
 import io.hops.metadata.hdfs.dal.OngoingSubTreeOpsDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
@@ -857,7 +858,7 @@ public class TestSubtreeLock extends TestCase {
 
       DistributedFileSystem dfs = cluster.getFileSystem();
       dfs.mkdirs(new Path("/Projects/test"));
-      dfs.setMetaEnabled(new Path("/Projects"), true);
+      dfs.setMetaStatus(new Path("/Projects"), MetaStatus.META_ENABLED);
 
 
       try {

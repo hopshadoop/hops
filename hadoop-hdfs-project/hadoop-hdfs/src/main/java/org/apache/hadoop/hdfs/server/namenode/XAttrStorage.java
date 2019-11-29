@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+import java.io.IOException;
 import java.util.List;
 
 import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
 import io.hops.metadata.hdfs.entity.StoredXAttr;
 import io.hops.metadata.hdfs.entity.XAttrMetadataLogEntry;
 import io.hops.transaction.EntityManager;
@@ -73,16 +75,17 @@ public class XAttrStorage {
    * @param xAttr the xAttr to update.
    * @param xAttrExists
    */
-  public static void updateINodeXAttr(INode inode, XAttr xAttr,
-      boolean xAttrExists)
-      throws TransactionContextException, StorageException {
+  public static void updateINodeXAttr(INode inode, XAttr xAttr, boolean xAttrExists, long namenodeId)
+      throws IOException {
     XAttrFeature f = getXAttrFeature(inode);
     f.addXAttr(xAttr);
     
     if(!xAttrExists) {
       logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Add);
+      inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_ADD, xAttr);
     }else{
       logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Update);
+      inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_UPDATE, xAttr);
     }
   }
   
@@ -91,11 +94,12 @@ public class XAttrStorage {
    * @param inode Inode to update.
    * @param xAttr the xAttr to remove.
    */
-  public static void removeINodeXAttr(INode inode, XAttr xAttr)
-      throws TransactionContextException, StorageException {
+  public static void removeINodeXAttr(INode inode, XAttr xAttr, long namenodeId)
+      throws IOException {
     XAttrFeature f = getXAttrFeature(inode);
     f.removeXAttr(xAttr);
     logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Delete);
+    inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_DELETE, xAttr);
   }
   
   private static XAttrFeature getXAttrFeature(INode inode){
