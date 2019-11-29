@@ -25,6 +25,7 @@ import io.hops.leader_election.proto.ActiveNodeProtos;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import java.util.EnumSet;
 
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ContentSummary;
@@ -288,9 +289,9 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
       VOID_CHANGECONF_RESPONSE =
       ClientNamenodeProtocolProtos.ChangeConfResponseProto.newBuilder().build();
 
-  private static final ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto
+  private static final ClientNamenodeProtocolProtos.SetMetaStatusResponseProto
       VOID_SET_META_ENABLED_RESPONSE =
-      ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto.newBuilder()
+      ClientNamenodeProtocolProtos.SetMetaStatusResponseProto.newBuilder()
           .build();
 
   private static final CheckAccessResponseProto
@@ -531,12 +532,12 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   }
 
   @Override
-  public ClientNamenodeProtocolProtos.SetMetaEnabledResponseProto setMetaEnabled(
+  public ClientNamenodeProtocolProtos.SetMetaStatusResponseProto setMetaStatus(
       RpcController controller,
-      ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto req)
+      ClientNamenodeProtocolProtos.SetMetaStatusRequestProto req)
       throws ServiceException {
     try {
-      server.setMetaEnabled(req.getSrc(), req.getMetaEnabled());
+      server.setMetaStatus(req.getSrc(), MetaStatus.fromVal((byte)req.getMetaStatus()));
     } catch (IOException e) {
       throw new ServiceException(e);
     }

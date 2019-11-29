@@ -258,7 +258,6 @@ import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress.Counter;
@@ -1325,6 +1324,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
       }
     }
+    inodeFile.logProvenanceEvent(getNamenodeId(), FileProvenanceEntry.Operation.getBlockLocations());
     return ret;
   }
 
@@ -1511,7 +1511,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return success;
   }
 
-  void setMetaEnabled(final String srcArg, final boolean metaEnabled)
+  void setMetaStatus(final String srcArg, final MetaStatus metaStatus)
       throws IOException {
     final FSPermissionChecker pc = getPermissionChecker();
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
@@ -1524,7 +1524,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         throw new FileNotFoundException("Directory does not exist " + src);
       }
       final AbstractFileTree.FileTree fileTree = buildTreeForLogging(stoRootINode,
-          metaEnabled);
+          metaStatus.isMetaEnabled());
       new HopsTransactionalRequestHandler(HDFSOperationType.SET_META_ENABLED,
           src) {
         @Override
@@ -1544,7 +1544,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           try {
             final INodesInPath iip = dir.getINodesInPath4Write(src);
             dir.checkPathAccess(pc, iip, FsAction.WRITE);
-            setMetaEnabledInt(src, fileTree, metaEnabled);
+            setMetaStatusInt(src, fileTree, metaStatus);
           } catch (AccessControlException e) {
             logAuditEvent(false, "setMetaEnabled", src);
             throw e;
@@ -1570,8 +1570,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return fileTree;
   }
   
-  private void setMetaEnabledInt(final String src,
-      final AbstractFileTree.FileTree fileTree, final boolean metaEnabled)
+  private void setMetaStatusInt(final String src,
+      final AbstractFileTree.FileTree fileTree, final MetaStatus metaStatus)
       throws IOException {
     checkNameNodeSafeMode("Cannot set metaEnabled for " + src);
 
@@ -1580,8 +1580,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       throw new FileNotFoundException(src + ": Is not a directory");
     } else {
       INodeDirectory dirNode = (INodeDirectory) targetNode;
-      dirNode.setMetaEnabled(metaEnabled);
-      if (metaEnabled) {
+      dirNode.setMetaStatus(metaStatus);
+      if (metaStatus.isMetaEnabled()) {
         dirNode.incrementLogicalTime();
         INodeMetadataLogEntry dslogEntry =
             new INodeMetadataLogEntry(dirNode.getId(),
@@ -1594,7 +1594,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       EntityManager.update(dirNode);
     }
   
-    if(metaEnabled) {
+    if(metaStatus.isMetaEnabled()) {
       logMetadataEvents(fileTree);
     }
   }
@@ -4070,6 +4070,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     // close file and persist block allocations for this file
     pendingFile.toCompleteFile(now());
     closeFile(src, pendingFile);
+    pendingFile.logProvenanceEvent(getNamenodeId(), FileProvenanceEntry.Operation.append());
 
     if (!skipReplicationChecks) {
       blockManager.checkReplication(pendingFile);

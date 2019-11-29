@@ -28,6 +28,7 @@ import java.util.EnumSet;
 
 
 import com.google.common.collect.Lists;
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -427,14 +428,14 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
-  public void setMetaEnabled(String src, boolean metaEnabled)
+  public void setMetaStatus(String src, MetaStatus metaStatus)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
-    ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto req =
-        ClientNamenodeProtocolProtos.SetMetaEnabledRequestProto.newBuilder()
-            .setSrc(src).setMetaEnabled(metaEnabled).build();
+    ClientNamenodeProtocolProtos.SetMetaStatusRequestProto req =
+        ClientNamenodeProtocolProtos.SetMetaStatusRequestProto.newBuilder()
+            .setSrc(src).setMetaStatus(metaStatus.getVal()).build();
     try {
-      rpcProxy.setMetaEnabled(null, req);
+      rpcProxy.setMetaStatus(null, req);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }

@@ -26,8 +26,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 /**
  * XAttr is the POSIX Extended Attribute model similar to that found in
  * traditional Operating Systems.  Extended Attributes consist of one
- * or more name/value pairs associated with a file or directory. Five
- * namespaces are defined: user, trusted, security, system and raw.
+ * or more name/value pairs associated with a file or directory. Six
+ * namespaces are defined: user, trusted, security, system, raw and provenance.
  *   1) USER namespace attributes may be used by any user to store
  *   arbitrary information. Access permissions in this namespace are
  *   defined by a file directory's permission bits. For sticky directories,
@@ -49,6 +49,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
  *   not visible to the user except when getXAttr/getXAttrs is called on a file
  *   or directory in the /.reserved/raw HDFS directory hierarchy.  These
  *   attributes can only be accessed by the superuser.
+ * <br>
+ *   6) PROVENANCE namespace attributes are a special case of USER attributes.
+ *   The expectation here, is that unlike USER attributes,
+ *   these can only be set by applications that require provenance tracking.
+ *   Access permissions are the same as for USER
  * <p/>
  * @see <a href="http://en.wikipedia.org/wiki/Extended_file_attributes">
  * http://en.wikipedia.org/wiki/Extended_file_attributes</a>
@@ -62,7 +67,8 @@ public class XAttr {
     TRUSTED((byte)1),
     SECURITY((byte)2),
     SYSTEM((byte)3),
-    RAW((byte)4);
+    RAW((byte)4),
+    PROVENANCE((byte)5);
     
     private final byte ns;
     NameSpace(byte ns){
