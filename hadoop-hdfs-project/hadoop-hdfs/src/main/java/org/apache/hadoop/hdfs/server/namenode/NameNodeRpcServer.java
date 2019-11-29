@@ -25,6 +25,7 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import static org.apache.hadoop.util.Time.now;
 
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import io.hops.security.UsersGroups;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -585,10 +586,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // ClientProtocol
-  public void setMetaEnabled(String src, boolean metaEnabled)
+  public void setMetaStatus(String src, MetaStatus metaStatus)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
-    namesystem.setMetaEnabled(src, metaEnabled);
+    namesystem.setMetaStatus(src, metaStatus);
   }
 
   @Override // ClientProtocol

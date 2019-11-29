@@ -23,6 +23,7 @@ import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.MetadataLogDataAccess;
 import io.hops.metadata.hdfs.dal.XAttrDataAccess;
 import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import io.hops.metadata.hdfs.entity.MetadataLogEntry;
 import io.hops.metadata.hdfs.entity.XAttrMetadataLogEntry;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -141,7 +142,7 @@ public class TestMetadataLog extends TestCase {
       final Path subdir = new Path(dataset, "subdir");
       Path file = new Path(subdir, "file");
       dfs.mkdirs(dataset, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       dfs.mkdirs(subdir);
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
           INodeMetadataLogEntry.Operation.Add));
@@ -176,7 +177,7 @@ public class TestMetadataLog extends TestCase {
       final Path subdir = new Path(dataset, "subdir");
       Path file = new Path(subdir, "file");
       dfs.mkdirs(dataset, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       dfs.mkdirs(subdir);
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
           INodeMetadataLogEntry.Operation.Add));
@@ -227,7 +228,7 @@ public class TestMetadataLog extends TestCase {
       final Path dataset = new Path(project, "dataset");
       Path file = new Path(dataset, "file");
       dfs.mkdirs(dataset, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dataset),
           INodeMetadataLogEntry.Operation.Add));
@@ -261,7 +262,7 @@ public class TestMetadataLog extends TestCase {
       Path folder = new Path(dataset, "folder");
       Path file = new Path(folder, "file");
       dfs.mkdirs(folder, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
       out.close();
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
@@ -311,8 +312,8 @@ public class TestMetadataLog extends TestCase {
       Path file1 = new Path(dataset1, "file");
       dfs.mkdirs(dataset0, FsPermission.getDefault());
       dfs.mkdirs(dataset1, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset0, true);
-      dfs.setMetaEnabled(dataset1, true);
+      dfs.setMetaStatus(dataset0, MetaStatus.META_ENABLED);
+      dfs.setMetaStatus(dataset1, MetaStatus.META_ENABLED);
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file0, 1);
       out.close();
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file0);
@@ -374,8 +375,8 @@ public class TestMetadataLog extends TestCase {
       dfs.mkdirs(folder0, FsPermission.getDefault());
       dfs.mkdirs(dataset1, FsPermission.getDefault());
 
-      dfs.setMetaEnabled(dataset0, true);
-      dfs.setMetaEnabled(dataset1, true);
+      dfs.setMetaStatus(dataset0, MetaStatus.META_ENABLED);
+      dfs.setMetaStatus(dataset1, MetaStatus.META_ENABLED);
 
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file0, 1);
       out.close();
@@ -439,7 +440,7 @@ public class TestMetadataLog extends TestCase {
       checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{projects,
           project, dataset, folder, file}, new int[]{0, 0, 0, 0, 0});
       
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
       long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
@@ -482,7 +483,7 @@ public class TestMetadataLog extends TestCase {
       Path folder = new Path(dataset, "folder");
       Path file = new Path(folder, "file");
       dfs.mkdirs(folder, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
 
       FSDataOutputStream out = dfs.create(file);
       out.writeByte(0);
@@ -568,7 +569,7 @@ public class TestMetadataLog extends TestCase {
 
       dfs.mkdirs(folder1, FsPermission.getDefault());
 
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
 
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
       out.close();
@@ -637,7 +638,7 @@ public class TestMetadataLog extends TestCase {
 
       dfs.mkdirs(folder1, FsPermission.getDefault());
 
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
 
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
       out.close();
@@ -724,7 +725,7 @@ public class TestMetadataLog extends TestCase {
       Path folder3 = new Path(folder2, "folder3");
 
       dfs.mkdirs(folder3, FsPermission.getDefault());
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
 
       long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
       long folder1Id = TestUtil.getINodeId(cluster.getNameNode(), folder1);
@@ -841,7 +842,7 @@ public class TestMetadataLog extends TestCase {
       dfs.mkdirs(folder, FsPermission.getDefault());
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
       out.close();
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       long inodeId = TestUtil.getINodeId(cluster.getNameNode(), file);
       long folderId = TestUtil.getINodeId(cluster.getNameNode(), folder);
       long datasetId = TestUtil.getINodeId(cluster.getNameNode(), dataset);
@@ -853,7 +854,7 @@ public class TestMetadataLog extends TestCase {
       checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
           folder, file}, new int[]{1, 1, 1});
 
-      dfs.setMetaEnabled(dataset, false);
+      dfs.setMetaStatus(dataset, MetaStatus.DISABLED);
       
       assertEquals(1, getMetadataLogEntries(inodeId).size());
       assertEquals(1, getMetadataLogEntries(folderId).size());
@@ -861,7 +862,7 @@ public class TestMetadataLog extends TestCase {
       
       checkLogicalTimeForINodes(cluster.getNameNode(), new Path[]{dataset,
           folder, file}, new int[]{1, 1, 1});
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
   
       assertEquals(2, getMetadataLogEntries(inodeId).size());
       assertEquals(2, getMetadataLogEntries(folderId).size());
@@ -980,7 +981,7 @@ public class TestMetadataLog extends TestCase {
   
       assertTrue(getMetadataLogEntries(inodeId).isEmpty());
   
-      dfs.setMetaEnabled(dir, true);
+      dfs.setMetaStatus(dir, MetaStatus.META_ENABLED);
   
       assertEquals(2, getMetadataLogEntries(inodeId).size());
   
@@ -1025,7 +1026,7 @@ public class TestMetadataLog extends TestCase {
       DistributedFileSystem dfs = cluster.getFileSystem();
       Path dir = new Path("/dir");
       dfs.mkdirs(dir);
-      dfs.setMetaEnabled(dir, true);
+      dfs.setMetaStatus(dir, MetaStatus.META_ENABLED);
       
       Path file = new Path(dir, "file");
       DFSTestUtil.createFile(dfs, file, 0, (short)1, 0);
@@ -1223,7 +1224,7 @@ public class TestMetadataLog extends TestCase {
       
       dfs.mkdirs(folder1, FsPermission.getDefault());
       
-      dfs.setMetaEnabled(dataset, true);
+      dfs.setMetaStatus(dataset, MetaStatus.META_ENABLED);
       
       HdfsDataOutputStream out = TestFileCreation.create(dfs, file, 1);
       out.close();
@@ -1289,7 +1290,7 @@ public class TestMetadataLog extends TestCase {
       Path dir = new Path(root,"dir");
       
       try {
-        dfs.setMetaEnabled(dir, true);
+        dfs.setMetaStatus(dir, MetaStatus.META_ENABLED);
         fail("should fail to set metaEnabled on non existing directory");
       }catch (FileNotFoundException ex){
       }
@@ -1299,7 +1300,7 @@ public class TestMetadataLog extends TestCase {
       assertFalse(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dir),
           INodeMetadataLogEntry.Operation.Add));
       
-      dfs.setMetaEnabled(dir, true);
+      dfs.setMetaStatus(dir, MetaStatus.META_ENABLED);
   
       assertTrue(checkLog(TestUtil.getINodeId(cluster.getNameNode(), dir),
           INodeMetadataLogEntry.Operation.Add));
@@ -1325,7 +1326,7 @@ public class TestMetadataLog extends TestCase {
       dfs.mkdirs(dir, FsPermission.getDefault());
       
       try {
-        dfs.setMetaEnabled(root, true);
+        dfs.setMetaStatus(root, MetaStatus.META_ENABLED);
         fail("should fail to set metaEnabled on the root since subtree locks " +
             "are disabled for the root");
       }catch (FileNotFoundException ex){

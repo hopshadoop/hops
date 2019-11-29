@@ -160,12 +160,12 @@ message GetStoragePoliciesResponseProto {
   repeated BlockStoragePolicyProto policies = 1;
 }
 
-message SetMetaEnabledRequestProto {
+message SetMetaStatusRequestProto {
   required string src = 1;
-  required bool metaEnabled = 2;
+  required uint32 metaStatus = 2;
 }
 
-message SetMetaEnabledResponseProto {// void response
+message SetMetaStatusResponseProto {// void response
 }
 
 message SetPermissionRequestProto {
@@ -825,7 +825,7 @@ service ClientNamenodeProtocol {
   rpc setStoragePolicy(SetStoragePolicyRequestProto) returns(SetStoragePolicyResponseProto);
   rpc getStoragePolicy(GetStoragePolicyRequestProto) returns(GetStoragePolicyResponseProto);
   rpc getStoragePolicies(GetStoragePoliciesRequestProto) returns(GetStoragePoliciesResponseProto);
-  rpc setMetaEnabled (SetMetaEnabledRequestProto) returns (SetMetaEnabledResponseProto);
+  rpc setMetaStatus (SetMetaStatusRequestProto) returns (SetMetaStatusResponseProto);
   rpc setPermission (SetPermissionRequestProto) returns (SetPermissionResponseProto);
   rpc setOwner (SetOwnerRequestProto) returns (SetOwnerResponseProto);
   rpc abandonBlock (AbandonBlockRequestProto) returns (AbandonBlockResponseProto);
