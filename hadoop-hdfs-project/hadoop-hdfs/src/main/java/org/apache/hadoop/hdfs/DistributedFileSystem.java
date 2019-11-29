@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -628,11 +629,10 @@ public class DistributedFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     return dfs.getStoragePolicies();
   }
-
-  public void setMetaEnabled(Path src, boolean metaEnabled)
-          throws IOException {
+  
+  public void setMetaStatus(Path src, MetaStatus status) throws IOException {
     statistics.incrementWriteOps(1);
-    dfs.setMetaEnabled(getPathName(src), metaEnabled);
+    dfs.setMetaStatus(getPathName(src), status);
   }
 
   public int getNameNodesCount()

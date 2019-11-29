@@ -887,8 +887,7 @@ public class FSDirectory implements Closeable {
     }
 
     updateCount(existing, pos, counts, checkQuota);
-    final boolean added = parent.addChild(inode,
-        true, logMetadataEvent);
+    final boolean added = parent.addChild(inode, true, logMetadataEvent, getFSNamesystem().getNamenodeId());
     if (!added) {
       updateCountNoQuotaCheck(existing, pos, counts.negation());
       return null;

@@ -23,6 +23,7 @@ import io.hops.metadata.hdfs.dal.UserDataAccess;
 import io.hops.metadata.hdfs.dal.UserGroupDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
+import io.hops.metadata.hdfs.entity.MetaStatus;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.AclEntry;
@@ -173,7 +174,7 @@ public class TestUsersGroupsMultiNamenode {
     }
 
     @Override
-    public void setMetaEnabled(String src, boolean metaEnabled)
+    public void setMetaStatus(String src, MetaStatus metaStatus)
         throws AccessControlException, FileNotFoundException, SafeModeException,
         UnresolvedLinkException, IOException {
 
