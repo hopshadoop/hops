@@ -75,7 +75,7 @@ public class TestDelegationToken {
             true);
     config.set("hadoop.security.auth_to_local",
         "RULE:[2:$1@$0](JobTracker@.*FOO.COM)s/@.*//" + "DEFAULT");
-    FileSystem.setDefaultUri(config, "hopsfs://localhost:" + "0");
+    FileSystem.setDefaultUri(config, "hdfs://localhost:" + "0");
     cluster = new MiniDFSCluster.Builder(config).numDataNodes(0).build();
     cluster.waitActive();
     dtSecretManager =

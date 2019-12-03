@@ -62,7 +62,7 @@ public class TestValidateConfigurationSettings {
       final int port = 30000 + rand.nextInt(30000);
 
       // set both of these to the same port. It should fail.
-      FileSystem.setDefaultUri(conf, "hopsfs://localhost:" + port);
+      FileSystem.setDefaultUri(conf, "hdfs://localhost:" + port);
       conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:" + port);
       DFSTestUtil.formatNameNode(conf);
       nameNode = new NameNode(conf);
@@ -91,7 +91,7 @@ public class TestValidateConfigurationSettings {
       final int port1 = 30000 + rand.nextInt(10000);
       final int port2 = port1 + 1 + rand.nextInt(10000);
 
-      FileSystem.setDefaultUri(conf, "hopsfs://localhost:" + port1);
+      FileSystem.setDefaultUri(conf, "hdfs://localhost:" + port1);
       conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "127.0.0.1:" + port2);
       DFSTestUtil.formatNameNode(conf);
       NameNode nameNode = null;

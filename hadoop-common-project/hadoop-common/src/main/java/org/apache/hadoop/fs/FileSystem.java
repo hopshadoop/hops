@@ -354,7 +354,7 @@ public abstract class FileSystem extends Configured implements Closeable {
     } else if (name.indexOf('/')==-1) {   // unqualified is "hdfs://"
       LOG.warn("\""+name+"\" is a deprecated filesystem name."
                +" Use \"hdfs://"+name+"/\" instead.");
-      name = "hopsfs://"+name;
+      name = "hdfs://"+name;
     }
     return name;
   }

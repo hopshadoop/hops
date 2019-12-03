@@ -1631,7 +1631,7 @@ public class TestCombineFileInputFormat {
     String testName = "testMissingBlocks";
     try {
       Configuration conf = new Configuration();
-      conf.set("fs.hopsfs.impl", MissingBlockFileSystem.class.getName());
+      conf.set("fs.hdfs.impl", MissingBlockFileSystem.class.getName());
       conf.setBoolean("dfs.replication.considerLoad", false);
       dfs = new MiniDFSCluster.Builder(conf).racks(rack1).hosts(hosts1)
           .build();
