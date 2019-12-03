@@ -108,7 +108,7 @@ public class TestDelegationTokenForProxyUser {
         .setBoolean(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_ALWAYS_USE_KEY,
             true);
     configureSuperUserIPAddresses(config, REAL_USER);
-    FileSystem.setDefaultUri(config, "hopsfs://localhost:" + "0");
+    FileSystem.setDefaultUri(config, "hdfs://localhost:" + "0");
     cluster = new MiniDFSCluster.Builder(config).build();
     cluster.waitActive();
     ProxyUsers.refreshSuperUserGroupsConfiguration(config);

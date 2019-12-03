@@ -150,7 +150,7 @@ public class TestReplicationPolicyWithNodeGroup {
     NODE = 
       new DatanodeDescriptor(new StorageMap(false), DFSTestUtil.getDatanodeDescriptor("9.9.9.9", "/d2/r4/n7"));
     
-    FileSystem.setDefaultUri(CONF, "hopsfs://localhost:0");
+    FileSystem.setDefaultUri(CONF, "hdfs://localhost:0");
     CONF.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
     // Set properties to make HDFS aware of NodeGroup.
     CONF.set(DFSConfigKeys.DFS_BLOCK_REPLICATOR_CLASSNAME_KEY, 

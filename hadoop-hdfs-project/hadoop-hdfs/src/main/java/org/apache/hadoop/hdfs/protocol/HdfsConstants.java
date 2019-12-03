@@ -119,9 +119,9 @@ public class HdfsConstants {
   /**
    * URI Scheme for hdfs://namenode/ URIs.
    */
-  public static final String HDFS_URI_SCHEME = "hopsfs";
+  public static final String HDFS_URI_SCHEME = "hdfs";
 
-  public static final String ALTERNATIVE_HDFS_URI_SCHEME = "hdfs";
+  public static final String ALTERNATIVE_HDFS_URI_SCHEME = "hopsfs";
   
   /**
    * Current layout version for NameNode.

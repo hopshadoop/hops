@@ -43,7 +43,7 @@ public class TestNNThroughputBenchmark {
   @Test
   public void testNNThroughput() throws Exception {
     Configuration conf = new HdfsConfiguration();
-    FileSystem.setDefaultUri(conf, "hopsfs://localhost:" + 0);
+    FileSystem.setDefaultUri(conf, "hdfs://localhost:" + 0);
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
     DFSTestUtil.formatNameNode(conf);
     String[] args = new String[]{"-op", "all"};
