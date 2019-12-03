@@ -42,11 +42,11 @@ public class TestDelegateToFileSystem {
 
   @Test
   public void testDefaultURIwithOutPort() throws Exception {
-    testDefaultUriInternal("hopsfs://dummyhost");
+    testDefaultUriInternal("hdfs://dummyhost");
   }
 
   @Test
   public void testDefaultURIwithPort() throws Exception {
-    testDefaultUriInternal("hopsfs://dummyhost:8020");
+    testDefaultUriInternal("hdfs://dummyhost:8020");
   }
 }
