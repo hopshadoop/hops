@@ -56,7 +56,7 @@ public class TestRefreshCallQueue {
         MockCallQueue.class, BlockingQueue.class);
     config.set("hadoop.security.authorization", "true");
 
-    FileSystem.setDefaultUri(config, "hopsfs://localhost:" + NNPort);
+    FileSystem.setDefaultUri(config, "hdfs://localhost:" + NNPort);
     
     cluster = new MiniDFSCluster.Builder(config).nameNodePort(NNPort).build();
     cluster.waitActive();

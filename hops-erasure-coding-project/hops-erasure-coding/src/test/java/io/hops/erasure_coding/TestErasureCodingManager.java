@@ -81,7 +81,7 @@ public class TestErasureCodingManager extends ClusterTest {
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 10 * 1000);
     conf.setInt(DFSConfigKeys.REPAIR_DELAY_KEY, 10 * 1000);
     conf.setInt(DFSConfigKeys.PARITY_REPAIR_DELAY_KEY, 10 * 1000);
-    conf.setClass("fs.hopsfs.impl", ErasureCodingFileSystem.class,
+    conf.setClass("fs.hdfs.impl", ErasureCodingFileSystem.class,
         FileSystem.class); // Make sure it works with ecfs
     conf.setInt(DFSConfigKeys.DFS_DATANODE_HANDLER_COUNT_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_HANDLER_COUNT_KEY, 1);

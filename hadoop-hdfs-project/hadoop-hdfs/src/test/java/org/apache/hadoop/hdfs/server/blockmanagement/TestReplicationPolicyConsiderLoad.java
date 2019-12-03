@@ -63,7 +63,7 @@ public class TestReplicationPolicyConsiderLoad {
         "/rack2",
         "/rack2",
         "/rack2"};
-    FileSystem.setDefaultUri(conf, "hopsfs://localhost:0");
+    FileSystem.setDefaultUri(conf, "hdfs://localhost:0");
     conf.set(DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY, "0.0.0.0:0");
     conf.setBoolean(
         DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY, true);

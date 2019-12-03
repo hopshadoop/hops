@@ -68,7 +68,7 @@ public class TestAllowFormat {
     // Set multiple name directories.
     config.set(DFS_DATANODE_DATA_DIR_KEY, new File(DFS_BASE_DIR, "data").getPath());
 
-    FileSystem.setDefaultUri(config, "hopsfs://" + NAME_NODE_HOST + "0");
+    FileSystem.setDefaultUri(config, "hdfs://" + NAME_NODE_HOST + "0");
   }
 
   /**

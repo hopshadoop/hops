@@ -856,7 +856,7 @@ public class MiniDFSCluster {
         nameNodes[nnIndex].nameNode.getNameNodeAddressHostPortString();
     URI uri = null;
     try {
-      uri = new URI("hopsfs://" + hostPort);
+      uri = new URI("hdfs://" + hostPort);
     } catch (URISyntaxException e) {
       NameNode.LOG.warn("unexpected URISyntaxException: " + e);
     }
