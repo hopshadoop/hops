@@ -633,6 +633,10 @@ public class DistributedFileSystem extends FileSystem {
     return dfs.getStoragePolicies();
   }
   
+  public void setMetaEnabled(Path src, boolean metaEnabled) throws IOException {
+    setMetaStatus(src, metaEnabled? MetaStatus.META_ENABLED: MetaStatus.DISABLED);
+  }
+  
   public void setMetaStatus(Path src, MetaStatus status) throws IOException {
     statistics.incrementWriteOps(1);
     dfs.setMetaStatus(getPathName(src), status);
