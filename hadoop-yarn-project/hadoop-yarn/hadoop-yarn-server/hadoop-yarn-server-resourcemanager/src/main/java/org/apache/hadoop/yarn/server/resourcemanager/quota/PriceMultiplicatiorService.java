@@ -159,6 +159,11 @@ public class PriceMultiplicatiorService extends AbstractService {
           Thread.currentThread().interrupt();
         } catch (IOException ex) {
           LOG.error(ex, ex);
+          try {
+            Thread.sleep(500);
+          } catch (InterruptedException ex1) {
+            Thread.currentThread().interrupt();
+          }
         }
       }
       LOG.info("Quota scheduler thread is exiting gracefully");
