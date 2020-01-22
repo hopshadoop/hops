@@ -217,13 +217,21 @@ public class FileProvenance {
     if (PROV_PROJECTS.equals(aux.getLast().getLocalName())) { //part of a project - path - /Projects/
       aux.removeLast(); //drop Projects path element
       if(aux.isEmpty()) { //project
-        provDirs[ProvParents.PROJECT.ordinal()] = (INodeDirectory) inode;
-        return new Pair<>(TrackedProv.PROJECT, provDirs);
+        if(inode instanceof INodeDirectory) {
+          provDirs[ProvParents.PROJECT.ordinal()] = (INodeDirectory) inode;
+          return new Pair<>(TrackedProv.PROJECT, provDirs);
+        } else {
+          return new Pair<>(TrackedProv.OTHER, provDirs);
+        }
       }
       provDirs[ProvParents.PROJECT.ordinal()] = aux.removeLast();
       if (aux.isEmpty()) { //dataset
-        provDirs[ProvParents.DATASET.ordinal()] = (INodeDirectory) inode;
-        return new Pair<>(TrackedProv.DATASET, provDirs);
+        if(inode instanceof INodeDirectory) {
+          provDirs[ProvParents.DATASET.ordinal()] = (INodeDirectory) inode;
+          return new Pair<>(TrackedProv.DATASET, provDirs);
+        } else {
+          return new Pair<>(TrackedProv.OTHER, provDirs);
+        }
       } else { //part of a dataset
         provDirs[ProvParents.DATASET.ordinal()] = aux.removeLast();
         provDirs[ProvParents.PARENT_P1.ordinal()] = aux.isEmpty() ? null : aux.removeLast();
@@ -238,7 +246,11 @@ public class FileProvenance {
       provDirs[ProvParents.PROJECT.ordinal()] = null; //when in hive path we do not know the project
       
       if(aux.isEmpty()) { //hive database
-        provDirs[ProvParents.DATASET.ordinal()] = (INodeDirectory) inode;
+        if(inode instanceof INodeDirectory) {
+          provDirs[ProvParents.DATASET.ordinal()] = (INodeDirectory) inode;
+        } else {
+          return new Pair<>(TrackedProv.OTHER, provDirs);
+        }
       } else { //
         provDirs[ProvParents.DATASET.ordinal()] = aux.removeLast();
       }
