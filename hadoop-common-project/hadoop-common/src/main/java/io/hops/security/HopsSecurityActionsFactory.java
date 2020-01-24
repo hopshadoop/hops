@@ -18,6 +18,8 @@
 package io.hops.security;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -31,6 +33,8 @@ import java.util.function.Function;
  * or RMAppSecurityActions
  */
 public final class HopsSecurityActionsFactory<ACTOR extends AbstractSecurityActions> {
+  
+  private static final Log LOG = LogFactory.getLog(HopsSecurityActionsFactory.class.getName());
   
   private static volatile HopsSecurityActionsFactory _INSTANCE;
   private final Map<String, ACTOR> actors;
@@ -50,10 +54,11 @@ public final class HopsSecurityActionsFactory<ACTOR extends AbstractSecurityActi
     return _INSTANCE;
   }
   
-  public ACTOR getActor(final Configuration conf, String actorClass) throws Exception {
+  public ACTOR getActor(final Configuration conf, final String actorClass) throws Exception {
     ACTOR actor = actors.computeIfAbsent(actorClass, new Function<String, ACTOR>() {
       @Override
       public ACTOR apply(String s) {
+        LOG.debug("Creating new actor for: " + actorClass);
         return createActor(conf, s);
       }
     });
@@ -79,8 +84,12 @@ public final class HopsSecurityActionsFactory<ACTOR extends AbstractSecurityActi
   }
   
   @VisibleForTesting
-  public void clear() {
-    actors.clear();
+  public synchronized void clear(String actorClass) {
+    ACTOR actor = actors.remove(actorClass);
+    if (actor != null) {
+      LOG.debug("Removing and stopping actor: " + actorClass);
+      actor.stop();
+    }
   }
   
   @VisibleForTesting

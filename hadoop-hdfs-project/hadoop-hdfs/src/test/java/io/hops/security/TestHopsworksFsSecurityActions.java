@@ -55,7 +55,8 @@ public class TestHopsworksFsSecurityActions extends BaseTestHopsworksSecurityAct
   
   @Before
   public void beforeTest() throws Exception {
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
     conf = new Configuration();
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     conf.set(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY,
@@ -65,7 +66,8 @@ public class TestHopsworksFsSecurityActions extends BaseTestHopsworksSecurityAct
   
   @After
   public void afterTest() throws Exception {
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
   }
   
   @Test

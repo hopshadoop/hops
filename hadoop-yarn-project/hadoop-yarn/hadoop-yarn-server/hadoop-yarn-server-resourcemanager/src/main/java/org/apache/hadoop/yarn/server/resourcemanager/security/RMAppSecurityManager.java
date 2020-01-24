@@ -173,7 +173,8 @@ public class RMAppSecurityManager extends AbstractService
   @InterfaceAudience.Private
   @VisibleForTesting
   protected void clearRMAppSecurityActionsFactory() {
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
   }
   
   protected ScheduledExecutorService getRenewalExecutorService() {
