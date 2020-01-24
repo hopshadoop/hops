@@ -99,7 +99,7 @@ public class ServiceJWTManager extends AbstractService {
   private final Gson jsonParser;
   private CloseableHttpClient httpClient;
   private final ExecutorService tokenRenewer;
-  private final CountDownLatch waiter;
+  private CountDownLatch waiter;
   
   private Configuration sslConf;
   private URL serviceJWTRenewPath;
@@ -121,7 +121,6 @@ public class ServiceJWTManager extends AbstractService {
         .setNameFormat("JWT renewer thread")
         .setDaemon(true)
         .build());
-    waiter = new CountDownLatch(1);
   }
   
   public void setHTTPClient(CloseableHttpClient client) {
@@ -158,6 +157,7 @@ public class ServiceJWTManager extends AbstractService {
   private void createLockFileIfMissing() throws IOException {
     Path lockFile = getLockFilePath();
     if (!lockFile.toFile().exists()) {
+      LOG.debug("Lock file " + lockFile.toString() + " does not exist");
       FileChannel fc = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
       try (FileLock fl = fc.tryLock()) {
         if (fl == null) {
@@ -165,8 +165,6 @@ public class ServiceJWTManager extends AbstractService {
         }
         Files.setPosixFilePermissions(lockFile, LOCK_FILE_PERMISSIONS);
       }
-    } else {
-      Files.setPosixFilePermissions(lockFile, LOCK_FILE_PERMISSIONS);
     }
   }
   
@@ -178,37 +176,44 @@ public class ServiceJWTManager extends AbstractService {
   @Override
   protected void serviceStart() throws Exception {
     createLockFileIfMissing();
+    waiter = new CountDownLatch(1);
     tokenRenewer.execute(new TokenRenewer());
     super.serviceStart();
   }
   
   @Override
   protected void serviceStop() throws Exception {
+    LOG.info("Stopping ServiceJWTManager");
     try {
-      tokenRenewer.shutdown();
-      if (!tokenRenewer.awaitTermination(100L, TimeUnit.MILLISECONDS)) {
-        tokenRenewer.shutdownNow();
-      }
-    } catch (InterruptedException ex) {
-      tokenRenewer.shutdownNow();
-      Thread.currentThread().interrupt();
-    }
-    
-    waiter.await();
-    // Try to delete lock file if there is no lock
-    Path lockFile = getLockFilePath();
-    if (lockFile.toFile().exists()) {
-      FileChannel fc = FileChannel.open(lockFile, StandardOpenOption.WRITE);
-      try (FileLock fl = fc.tryLock()) {
-        if (fl != null) {
-          FileUtils.deleteQuietly(lockFile.toFile());
+      try {
+        tokenRenewer.shutdown();
+        if (!tokenRenewer.awaitTermination(100L, TimeUnit.MILLISECONDS)) {
+          tokenRenewer.shutdownNow();
         }
-      } catch (Exception ex) {
+      } catch (InterruptedException ex) {
+        tokenRenewer.shutdownNow();
         Thread.currentThread().interrupt();
       }
+  
+      if (waiter != null) {
+        waiter.await(100L, TimeUnit.MILLISECONDS);
+      }
+      
+      super.serviceStop();
+    } finally {
+      // Try to delete lock file if there is no lock
+      Path lockFile = getLockFilePath();
+      if (lockFile.toFile().exists()) {
+        FileChannel fc = FileChannel.open(lockFile, StandardOpenOption.WRITE);
+        try (FileLock fl = fc.tryLock()) {
+          if (fl != null) {
+            FileUtils.deleteQuietly(lockFile.toFile());
+          }
+        } catch (Exception ex) {
+          Thread.currentThread().interrupt();
+        }
+      }
     }
-    
-    super.serviceStop();
   }
   
   @VisibleForTesting

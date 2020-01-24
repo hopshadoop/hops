@@ -50,8 +50,9 @@ public class TestJWTSecurityHandler extends RMSecurityHandlersBaseTest {
   public void beforeTest() {
     config = new Configuration();
     config.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
-    
-    HopsSecurityActionsFactory.getInstance().clear();
+  
+    HopsSecurityActionsFactory.getInstance().clear(
+        config.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     dispatcher = new DrainDispatcher();
     rmContext = new RMContextImpl(dispatcher, null, null, null, null, null, null, null, null);
     dispatcher.init(config);

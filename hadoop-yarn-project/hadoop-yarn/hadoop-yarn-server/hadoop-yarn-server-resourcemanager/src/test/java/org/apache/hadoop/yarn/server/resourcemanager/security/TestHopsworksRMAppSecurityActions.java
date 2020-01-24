@@ -105,7 +105,8 @@ public class TestHopsworksRMAppSecurityActions extends BaseTestHopsworksSecurity
   
   @Before
   public void beforeTest() throws Exception {
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     conf = new Configuration();
     String sslConfFilename = TestHopsworksRMAppSecurityActions.class.getSimpleName() + ".ssl-server.xml";
     sslServerPath = Paths.get(classPath, sslConfFilename);

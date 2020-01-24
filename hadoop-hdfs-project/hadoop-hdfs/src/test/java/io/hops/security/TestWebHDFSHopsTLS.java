@@ -94,7 +94,9 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
     conf.setBoolean(SSLFactory.SSL_REQUIRE_CLIENT_CERT_KEY, true);
     
     conf.set(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, "io.hops.security.TestingFsSecurityActions");
-    
+  
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
     String testDataPath = System.getProperty(MiniDFSCluster.PROP_TEST_BUILD_DATA, "build/test/data");
     File testDataCluster = new File(testDataPath, "dfs_cluster");
     conf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, testDataCluster.getAbsolutePath());
@@ -107,7 +109,8 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
     if (cluster != null) {
       cluster.shutdown();
     }
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
   }
   
   @Test
