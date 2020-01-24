@@ -107,7 +107,8 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
     if (cluster != null) {
       cluster.shutdown();
     }
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
   }
   
   @Test

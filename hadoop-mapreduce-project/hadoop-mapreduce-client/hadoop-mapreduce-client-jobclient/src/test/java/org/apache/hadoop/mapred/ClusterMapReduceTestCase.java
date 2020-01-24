@@ -21,9 +21,11 @@ import io.hops.security.HopsSecurityActionsFactory;
 import junit.framework.TestCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.After;
 import org.junit.Before;
 
@@ -162,7 +164,10 @@ public abstract class ClusterMapReduceTestCase {
   @After
   public void tearDown() throws Exception {
     stopCluster();
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(dfsCluster.getConfiguration(0)
+        .get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
+    HopsSecurityActionsFactory.getInstance().clear(mrCluster.getJobTrackerConf()
+        .get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
   }
 
   /**
