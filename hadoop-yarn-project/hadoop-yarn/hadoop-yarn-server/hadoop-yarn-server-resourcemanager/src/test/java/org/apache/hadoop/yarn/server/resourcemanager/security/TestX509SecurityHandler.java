@@ -108,7 +108,7 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   private static final File BASE_DIR_FILE = new File(BASE_DIR);
   private static String classPath;
   
-  private Configuration conf;
+  private static Configuration conf;
   private DrainDispatcher dispatcher;
   private RMContext rmContext;
   private File sslServerFile;
@@ -124,7 +124,8 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   public void beforeTest() throws Exception {
     conf = new Configuration();
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "5s");
-    HopsSecurityActionsFactory.getInstance().clear();
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
     RMStorageFactory.setConfiguration(conf);
     YarnAPIStorageFactory.setConfiguration(conf);
     DBUtility.InitializeDB();
@@ -156,8 +157,9 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     if (BASE_DIR_FILE.exists()) {
       FileUtils.deleteDirectory(BASE_DIR_FILE);
     }
-    
-    HopsSecurityActionsFactory.getInstance().clear();
+  
+    HopsSecurityActionsFactory.getInstance().clear(
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
   }
   
   @Test
