@@ -18,9 +18,12 @@
 package org.apache.hadoop.mapred;
 
 import io.hops.security.HopsSecurityActionsFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.After;
 import org.junit.Before;
 
@@ -129,9 +132,17 @@ public abstract class ClusterMapReduceTestCase {
       mrCluster.shutdown();
       mrCluster = null;
     }
+  
     if (dfsCluster != null) {
+      Configuration clusterConf = dfsCluster.getConfiguration(0);
       dfsCluster.shutdown();
       dfsCluster = null;
+      if (clusterConf != null) {
+        HopsSecurityActionsFactory.getInstance().clear(clusterConf
+            .get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
+        HopsSecurityActionsFactory.getInstance().clear(clusterConf
+            .get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
+      }
     }
   }
 
@@ -143,7 +154,6 @@ public abstract class ClusterMapReduceTestCase {
   @After
   public void tearDown() throws Exception {
     stopCluster();
-    HopsSecurityActionsFactory.getInstance().clear();
   }
 
   /**
