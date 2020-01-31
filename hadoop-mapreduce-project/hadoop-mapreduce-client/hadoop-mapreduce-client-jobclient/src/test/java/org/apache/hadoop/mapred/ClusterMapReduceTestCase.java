@@ -157,9 +157,9 @@ public abstract class ClusterMapReduceTestCase {
       dfsCluster.shutdown();
       dfsCluster = null;
       if (clusterConf != null) {
-        HopsSecurityActionsFactory.getInstance().clear(dfsCluster.getConfiguration(0)
+        HopsSecurityActionsFactory.getInstance().clear(clusterConf
             .get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY, DFSConfigKeys.DEFAULT_FS_SECURITY_ACTIONS_ACTOR));
-        HopsSecurityActionsFactory.getInstance().clear(mrCluster.getJobTrackerConf()
+        HopsSecurityActionsFactory.getInstance().clear(clusterConf
             .get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
       }
     }
