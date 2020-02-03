@@ -264,14 +264,7 @@ public class LogAggregationService extends AbstractService implements
       }
 
       // Create the app dir
-      String keyStoreLocation = null;
-      if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-          CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-        keyStoreLocation = context.getCertificateLocalizationService()
-            .getX509MaterialLocation(user, appId.toString()).getKeyStoreLocation().
-            toString();
-      }
-      logAggregationFileController.createAppDir(user, appId, userUgi, getConfig(), keyStoreLocation);
+      logAggregationFileController.createAppDir(user, appId, userUgi, getConfig());
     } catch (Exception e) {
       if (appLogAggregatorLoc != null) {
         appLogAggregatorLoc.disableLogAggregation();
@@ -407,15 +400,8 @@ public class LogAggregationService extends AbstractService implements
                 getLogAggregationFileController(getConfig());
             UserGroupInformation userUgi =
                 aggregator.updateCredentials(credentials);
-            String keyStoreLocation = null;
-            if (getConfig().getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-                CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-              keyStoreLocation = context.getCertificateLocalizationService()
-                  .getX509MaterialLocation(userUgi.getShortUserName(), appId.toString()).getKeyStoreLocation().
-                  toString();
-            }
             logAggregationFileController
-                .createAppDir(userUgi.getShortUserName(), appId, userUgi, getConfig(), keyStoreLocation);
+                .createAppDir(userUgi.getShortUserName(), appId, userUgi, getConfig());
             aggregator.enableLogAggregation();
           }
           invalidTokenApps.remove(appId);

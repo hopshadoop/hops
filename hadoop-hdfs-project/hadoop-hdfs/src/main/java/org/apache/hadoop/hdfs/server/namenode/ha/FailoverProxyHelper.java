@@ -111,7 +111,7 @@ public class FailoverProxyHelper {
             break; // we got the list
           }
         } catch (Exception e) {
-          LOG.error(e);
+          LOG.error(e,e);
         } finally {
           if (handle != null) {
             RPC.stopProxy(handle);
