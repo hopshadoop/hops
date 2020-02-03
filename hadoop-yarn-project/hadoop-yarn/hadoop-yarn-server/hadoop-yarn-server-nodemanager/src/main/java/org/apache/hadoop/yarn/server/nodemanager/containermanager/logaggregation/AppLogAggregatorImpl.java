@@ -184,16 +184,8 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       this.logAggregationFileController = new LogAggregationTFileController();
       this.logAggregationFileController.initialize(conf, "TFile");
       this.logAggregationFileController.verifyAndCreateRemoteLogDir(conf, sslConf);
-      String  keyStoreLocation = null;
-      if (conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
-          CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-        keyStoreLocation = context.getCertificateLocalizationService()
-            .getX509MaterialLocation(this.userUgi.getShortUserName(), appId.toString()).getKeyStoreLocation().
-            toString();
-      }
       this.logAggregationFileController.createAppDir(
-          this.userUgi.getShortUserName(), appId, userUgi,
-          conf, keyStoreLocation);
+          this.userUgi.getShortUserName(), appId, userUgi,conf);
       this.remoteNodeLogFileForApp = this.logAggregationFileController
           .getRemoteNodeLogFileForApp(appId,
               this.userUgi.getShortUserName(), nodeId);

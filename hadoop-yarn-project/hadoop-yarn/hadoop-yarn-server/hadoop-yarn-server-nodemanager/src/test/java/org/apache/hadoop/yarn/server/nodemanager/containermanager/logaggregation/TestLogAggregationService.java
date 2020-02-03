@@ -829,7 +829,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
         new YarnRuntimeException(new SecretManager.InvalidToken("KABOOM!"));
     doThrow(e).when(spyLogAggregationFileFormat)
         .createAppDir(any(String.class), any(ApplicationId.class),
-            any(UserGroupInformation.class), any(Configuration.class), any(String.class));
+            any(UserGroupInformation.class), any(Configuration.class));
     LogAggregationService logAggregationService = spy(
         new LogAggregationService(dispatcher, this.context, spyDelSrvc,
             super.dirsHandler){
