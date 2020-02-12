@@ -45,9 +45,9 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
     readBlock(blockId, inodeId);
   }
 
-  private void announceBlockDoesNotExist() throws TransactionContextException {
+  private void announceBlockDoesNotExist(long blkId, long inodeId) throws TransactionContextException {
     EntityManager.snapshotMaintenance
-        (HdfsTransactionContextMaintenanceCmds.BlockDoesNotExist, blockId, inodeId);
+        (HdfsTransactionContextMaintenanceCmds.BlockDoesNotExist, blkId, inodeId);
   }
 
   protected void announceEmptyFile(long inodeFileId) throws TransactionContextException {
@@ -64,7 +64,7 @@ class IndividualBlockLock extends BaseIndividualBlockLock {
       if (result != null) {
         blocks.add(result);
       } else {
-        announceBlockDoesNotExist();
+        announceBlockDoesNotExist(blkId, inodeId);
       }
     }
   }
