@@ -109,6 +109,10 @@
           <groupId>io.hops</groupId>
           <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>io.hops</groupId>
+          <artifactId>hops-leader-election</artifactId>
+        </exclusion>
         <!-- exclude things that came in via transitive in shaded runtime and api -->
         <exclusion>
           <groupId>io.netty</groupId>
