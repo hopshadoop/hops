@@ -39,7 +39,7 @@ public class HopsX509Authenticator {
   private final Configuration conf;
   private final Cache<String, InetAddress> trustedHostnames;
   
-  HopsX509Authenticator(Configuration conf) {
+  public HopsX509Authenticator(Configuration conf) {
     this.conf = conf;
     trustedHostnames = CacheBuilder.newBuilder()
         .maximumSize(500)
@@ -88,25 +88,16 @@ public class HopsX509Authenticator {
     // Assume that if a domain name is resolvable and matches the incoming
     // IP address the connection is trusted
     Preconditions.checkNotNull(remoteAddress, "Remote address should not be null");
-    InetAddress address = isTrustedFQDN(cn);
-    if (address != null && address.equals(remoteAddress)) {
-      LOG.debug("CN " + cn + " is an FQDN and it has already been authenticated");
+    // In the case of system users certificates the L field of the Subject is the username
+    String locality = HopsUtil.extractLFromSubject(subjectDN);
+    if (locality == null) {
+      throw new HopsX509AuthenticationException("Incoming RPC claims to be a from a system user but the Locality (L) " +
+              "field of its X.509 is null or cannot be parsed");
+    }
+    if (isTrustedConnection(remoteAddress, cn, username, locality)) {
       return;
     }
 
-    try {
-      address = InetAddress.getByName(cn);
-      if (address.equals(remoteAddress)) {
-        trustedHostnames.put(cn, address);
-        LOG.debug("CN " + cn + " is an FQDN and we managed to resolve it and it matches the remote address");
-        return;
-      }
-    } catch (UnknownHostException ex) {
-      LOG.error("Could not resolve host " + cn, ex);
-      throw new HopsX509AuthenticationException("Hostname " + cn + " is not resolvable and could not authenticate " +
-              "user " + username);
-    }
-    
     // Could not authenticate incoming connection
     StringBuilder sb = new StringBuilder();
     sb.append("Could not authenticate client with CN ")
@@ -121,12 +112,67 @@ public class HopsX509Authenticator {
     
     throw new HopsX509AuthenticationException(sb.toString());
   }
-  
+
+  /**
+   * Used in Hive
+   *
+   * @param remoteAddress
+   * @param cnFQDN
+   * @return
+   * @throws HopsX509AuthenticationException
+   */
+  public boolean isTrustedConnection(InetAddress remoteAddress, String cnFQDN) throws HopsX509AuthenticationException {
+    return isTrustedConnection(remoteAddress, cnFQDN, null, null);
+  }
+
+  public boolean isTrustedConnection(InetAddress remoteAddress, String cnFQDN, String username, String locality)
+    throws HopsX509AuthenticationException {
+    InetAddress address = isTrustedFQDN(cnFQDN);
+    if (address != null && isTrustedConnectionInternal(remoteAddress, address, username, locality)) {
+      LOG.debug("CN " + cnFQDN + " is an FQDN and it has already been authenticated");
+      return true;
+    }
+
+    try {
+      address = InetAddress.getByName(cnFQDN);
+      if (isTrustedConnectionInternal(remoteAddress, address, username, locality)) {
+        trustedHostnames.put(cnFQDN, address);
+        LOG.debug("CN " + cnFQDN + " is an FQDN and we managed to resolve it and it matches the remote address");
+        return true;
+      }
+    } catch (UnknownHostException ex) {
+      LOG.error("Could not resolve host " + cnFQDN, ex);
+      throw new HopsX509AuthenticationException("Hostname " + cnFQDN + " is not resolvable and could not authenticate " +
+              "user " + username);
+    }
+    return false;
+  }
+
   private boolean isHopsTLS() {
     return conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT);
   }
-  
+
+  private boolean isTrustedConnectionInternal(InetAddress expectedAddress, InetAddress actualAddress,
+          String expectedUsername, String actualUsername) {
+    if (expectedUsername == null && actualUsername == null) {
+      return doesAddressMatch(expectedAddress, actualAddress);
+    }
+    return doesAddressMatch(expectedAddress, actualAddress) && doesUsernameMatch(expectedUsername, actualUsername);
+  }
+
+  private boolean doesAddressMatch(InetAddress expected, InetAddress actual) {
+    // If both are loopback addresses skip comparing them, one might be 127.0.0.1 and another 127.0.1.1 depending
+    // on hosts configuration
+    if (expected.isLoopbackAddress() && actual.isLoopbackAddress()) {
+      return true;
+    }
+    return expected.equals(actual);
+  }
+
+  private boolean doesUsernameMatch(String expected, String actual) {
+    return expected.equals(actual);
+  }
   @VisibleForTesting
   protected InetAddress isTrustedFQDN(String fqdn) {
     return trustedHostnames.getIfPresent(fqdn);

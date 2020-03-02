@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.security.ssl;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -74,6 +75,8 @@ class RpcTLSUtils {
     KeyStoreTestUtil.createTrustStore(tlsSetup.serverTstore.toString(), tlsSetup.serverStorePassword, "server",
         serverCert);
   
+    FileUtils.writeStringToFile(tlsSetup.serverStorePasswordLocation.toFile(), tlsSetup.serverStorePassword);
+    
     // Generate client certificate signed by server
     KeyPair clientKeyPair = KeyStoreTestUtil.generateKeyPair(tlsSetup.keyAlgorithm);
     X509Certificate clientCert = KeyStoreTestUtil.generateSignedCertificate("CN=" + tlsSetup.clientUserName,
@@ -94,12 +97,8 @@ class RpcTLSUtils {
     conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
     String superUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + superUser, "*");
-  
-    Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(tlsSetup.serverKstore.toString(),
-        tlsSetup.serverStorePassword, tlsSetup.serverStorePassword, tlsSetup.serverTstore.toString(),
-        tlsSetup.serverStorePassword, "");
-    KeyStoreTestUtil.saveConfig(tlsSetup.sslServerConf.toFile(), sslServerConf);
-    conf.set(SSLFactory.SSL_SERVER_CONF_KEY, callingClass.getSimpleName() + ".ssl-server.xml");
+    conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, tlsSetup.serverKstore.getParent().toString());
     
     return new TestCryptoMaterial(serverKeyPair, serverCert, clientKeyPair, clientCert);
   }
@@ -110,6 +109,7 @@ class RpcTLSUtils {
     
     private final Path serverKstore;
     private final Path serverTstore;
+    private final Path serverStorePasswordLocation;
     private final String serverStorePassword;
     
     private final Path clientKstore;
@@ -118,12 +118,12 @@ class RpcTLSUtils {
     private final String clientStorePassword;
     
     private final String clientUserName;
-    private final Path sslServerConf;
     
     private TLSSetup(Builder builder) {
       this.serverKstore = builder.serverKstore;
       this.serverTstore = builder.serverTstore;
       this.serverStorePassword = builder.serverStorePassword;
+      this.serverStorePasswordLocation = builder.serverStorePasswordLocation;
       
       this.clientKstore = builder.clientKstore;
       this.clientTstore = builder.clientTstore;
@@ -131,7 +131,6 @@ class RpcTLSUtils {
       this.clientStorePassword = builder.clientStorePassword;
       
       this.clientUserName = builder.clientUserName;
-      this.sslServerConf = builder.sslServerConf;
       this.keyAlgorithm = builder.keyAlgorithm;
       this.signatureAlgorithm = builder.signatureAlgorithm;
     }
@@ -165,6 +164,7 @@ class RpcTLSUtils {
       
       private Path serverKstore;
       private Path serverTstore;
+      private Path serverStorePasswordLocation;
       private String serverStorePassword;
       
       private Path clientKstore;
@@ -173,7 +173,6 @@ class RpcTLSUtils {
       private String clientStorePassword;
       
       private String clientUserName;
-      private Path sslServerConf;
       
       public Builder() {
       }
@@ -198,6 +197,11 @@ class RpcTLSUtils {
         return this;
       }
       
+      public Builder setServerStorePasswordLocation(Path serverStorePasswordLocation) {
+        this.serverStorePasswordLocation = serverStorePasswordLocation;
+        return this;
+      }
+      
       public Builder setClientKstore(Path clientKstore) {
         this.clientKstore = clientKstore;
         return this;
@@ -210,11 +214,6 @@ class RpcTLSUtils {
       
       public Builder setClientUserName(String clientUserName) {
         this.clientUserName = clientUserName;
-        return this;
-      }
-      
-      public Builder setSslServerConf(Path sslServerConf) {
-        this.sslServerConf = sslServerConf;
         return this;
       }
       

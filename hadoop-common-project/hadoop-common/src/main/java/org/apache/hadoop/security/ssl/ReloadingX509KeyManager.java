@@ -238,7 +238,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     String keyStorePass;
     String keyPass;
     if (passwordFileLocation != null) {
-      keyStorePass = FileUtils.readFileToString(passwordFileLocation);
+      keyStorePass = FileUtils.readFileToString(passwordFileLocation).trim();
       keyPass = keyStorePass;
     } else {
       keyStorePass = keystorePassword;

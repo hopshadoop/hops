@@ -15,21 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.util.envVars;
+package io.hops.security;
 
+import org.apache.hadoop.util.envVars.EnvironmentVariables;
+
+import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Read system environment variables
- */
-public class SystemEnvironmentVariables implements EnvironmentVariables {
-  private final Map<String, String> environmentVariables;
-  
-  public SystemEnvironmentVariables() {
-    environmentVariables = System.getenv();
+public class MockEnvironmentVariablesService implements EnvironmentVariables {
+  private final Map<String, String> mockEnvVars;
+
+  public MockEnvironmentVariablesService() {
+    mockEnvVars = new HashMap<>();
   }
-  
-  public String getEnv(String variableName) {
-    return environmentVariables.get(variableName);
+
+  public void setEnv(String name, String value) {
+    mockEnvVars.put(name, value);
+  }
+
+  @Override
+  public String getEnv(String Name) {
+    return mockEnvVars.get(Name);
   }
 }

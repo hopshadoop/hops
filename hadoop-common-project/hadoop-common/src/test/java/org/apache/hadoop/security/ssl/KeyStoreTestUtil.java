@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.security.ssl;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.alias.CredentialProvider;
@@ -48,19 +47,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import java.security.InvalidKeyException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.SignatureException;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateParsingException;
 import java.security.cert.X509CRL;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x500.X500NameBuilder;
-import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.Extension;
@@ -92,6 +86,11 @@ public class KeyStoreTestUtil {
     return baseDir;
   }
 
+  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm)
+    throws GeneralSecurityException {
+    return generateCertificate(dn, pair, days, algorithm, false);
+  }
+
   @SuppressWarnings("deprecation")
   /**
    * Create a self-signed X.509 Certificate.
@@ -100,63 +99,43 @@ public class KeyStoreTestUtil {
    * @param pair the KeyPair
    * @param days how many days from now the Certificate is valid for
    * @param algorithm the signing algorithm, eg "SHA1withRSA"
+   * @param ca flag whether this certificate is a Certificate Authority
    * @return the self-signed certificate
    */
-  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm)
-      throws CertificateEncodingException,
-             InvalidKeyException,
-             IllegalStateException,
-             NoSuchProviderException, NoSuchAlgorithmException, SignatureException{
-
+  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm, boolean ca)
+      throws GeneralSecurityException {
+  
     Date from = new Date();
     Date to = new Date(from.getTime() + days * 86400000l);
     BigInteger sn = new BigInteger(64, new SecureRandom());
     KeyPair keyPair = pair;
-    
+  
     X500Name x500Name = new X500Name(dn);
     try {
       ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(pair.getPrivate());
       X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(x500Name, sn, from, to, x500Name,
           pair.getPublic());
+      certGen.addExtension(Extension.basicConstraints, false, new BasicConstraints(ca));
       return new JcaX509CertificateConverter().setProvider("BC").getCertificate(certGen.build(sigGen));
     } catch (OperatorCreationException | CertificateException ex) {
       throw new InvalidKeyException(ex);
+    } catch (CertIOException ex) {
+      throw new GeneralSecurityException(ex);
     }
   }
-  
-  public static X509Certificate generateSignedCertificate(String dn, KeyPair pair, int days, String algorithm, 
-    PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
-    CertificateEncodingException,
-    NoSuchAlgorithmException,
-    SignatureException,
-    InvalidKeyException,
-    NoSuchProviderException {
-    return generateSignedCertificate(dn, null, pair, days, algorithm, caKey, caCert);
-  }
-  
-  public static X509Certificate generateSignedCertificate(String dn, String appId, KeyPair pair, int days,
-    String algorithm, PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
-      CertificateEncodingException,
-      NoSuchAlgorithmException,
-      SignatureException,
-      InvalidKeyException,
-      NoSuchProviderException {
+
+  public static X509Certificate generateSignedCertificate(String dn, KeyPair pair, int days,
+    String algorithm, PrivateKey caKey, X509Certificate caCert) throws NoSuchAlgorithmException, InvalidKeyException {
     Date from = new Date();
     Date to = new Date(from.getTime() + days * 86400000l);
     BigInteger sn = new BigInteger(64, new SecureRandom());
-  
-    X500NameBuilder x500NameBuilder = new X500NameBuilder();
-    x500NameBuilder.addRDN(BCStyle.CN, dn.split("=")[1]); //CN=XXX we need to get the value, not the entire string
-    if (!Strings.isNullOrEmpty(appId)){
-      x500NameBuilder.addRDN(BCStyle.OU, appId);
-    }
-  
+
+    X500Name x500Name = new X500Name(dn);
     X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
     try {
       JcaX509ExtensionUtils extUtil = new JcaX509ExtensionUtils();
       ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(caKey);
-      X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer, sn, from, to, x500NameBuilder.build(),
-          pair.getPublic())
+      X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer, sn, from, to, x500Name, pair.getPublic())
           .addExtension(Extension.authorityKeyIdentifier, false, extUtil.createAuthorityKeyIdentifier(caCert
               .getPublicKey()))
           .addExtension(Extension.subjectKeyIdentifier, false, extUtil.createSubjectKeyIdentifier(pair.getPublic()));
@@ -165,7 +144,7 @@ public class KeyStoreTestUtil {
       throw new InvalidKeyException(ex);
     }
   }
-  
+
   public static KeyPair generateKeyPair(String algorithm)
       throws NoSuchAlgorithmException {
     KeyPairGenerator keyGen = KeyPairGenerator.getInstance(algorithm);
@@ -542,7 +521,7 @@ public class KeyStoreTestUtil {
   private static Configuration createSSLConfig(SSLFactory.Mode mode,
     String keystore, String password, String keyPassword, String trustKS, String trustPass, String excludeCiphers) {
     String trustPassword = trustPass;
-    
+
     Configuration sslConf = new Configuration(false);
     if (keystore != null) {
       sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,

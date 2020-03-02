@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -105,15 +107,21 @@ public class TestYarnStartupWithCRL {
   @Test//(timeout = 20000)
   public void testYarnStartup() throws Exception {
     String hostname = NetUtils.getLocalCanonicalHostname();
-    Path keyStore = Paths.get(BASE_DIR, hostname + "__kstore.jks");
-    Path trustStore = Paths.get(BASE_DIR, hostname + "__tstore.jks");
-    Path sslServerConfPath = Paths.get(confDir, TestYarnStartupWithCRL.class.getSimpleName() + ".ssl-server.xml");
     Path inputCRLPath = Paths.get(BASE_DIR, "input.crl.pem");
     Path fetchedCRLPath = Paths.get(BASE_DIR, "fetched.crl.pem");
-    
+  
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path keyStore = Paths.get(BASE_DIR, loader.getSuperKeystoreFilename(ugi.getUserName()));
+    Path trustStore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(ugi.getUserName()));
+    Path passwdFile = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+    FileUtils.writeStringToFile(passwdFile.toFile(), password);
+
+    String superUser = UserGroupInformation.getCurrentUser().getUserName();
     // Generate server certificate
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + hostname, keyPair, 10, signatureAlgorithm);
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + hostname + ",L=" + superUser, keyPair, 10,
+            signatureAlgorithm);
     
     // Create server keystore and truststore
     KeyStoreTestUtil.createKeyStore(keyStore.toString(), password, "server", keyPair.getPrivate(), cert);
@@ -133,15 +141,11 @@ public class TestYarnStartupWithCRL {
     conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_SOCKET_FACTORY_CLASS_DEFAULT_KEY, "org.apache.hadoop.net.HopsSSLSocketFactory");
     conf.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
     conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
-    String superUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + superUser, "*");
     conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
         "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
-  
-    Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(keyStore.toString(), password,
-        password, trustStore.toString(), password, "");
-    KeyStoreTestUtil.saveConfig(sslServerConfPath.toFile(), sslServerConf);
-    conf.set(SSLFactory.SSL_SERVER_CONF_KEY, TestYarnStartupWithCRL.class.getSimpleName() + ".ssl-server.xml");
+    conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
   
     conf.setBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY, true);
     conf.set(CommonConfigurationKeys.HOPS_CRL_FETCHER_CLASS_KEY, "org.apache.hadoop.security.ssl.RemoteCRLFetcher");

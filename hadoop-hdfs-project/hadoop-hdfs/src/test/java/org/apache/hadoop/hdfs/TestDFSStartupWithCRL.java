@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -103,20 +105,26 @@ public class TestDFSStartupWithCRL {
   
   @Test(timeout = 20000)
   public void testDFSStartup() throws Exception {
-    String hostname = NetUtils.getLocalCanonicalHostname();
-    Path keyStore = Paths.get(BASE_DIR, hostname + "__kstore.jks");
-    Path trustStore = Paths.get(BASE_DIR, hostname + "__tstore.jks");
-    Path sslServerConfPath = Paths.get(confDir, TestDFSStartupWithCRL.class.getSimpleName() + ".ssl-server.xml");
+    String hostname = "localhost";
     Path inputCRLPath = Paths.get(BASE_DIR, "input.crl.pem");
     Path fetchedCRLPath = Paths.get(BASE_DIR, "fetched.crl.pem");
   
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path keyStore = Paths.get(BASE_DIR, loader.getSuperKeystoreFilename(ugi.getUserName()));
+    Path trustStore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(ugi.getUserName()));
+    Path passwdFile = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+    FileUtils.writeStringToFile(passwdFile.toFile(), password);
+  
     // Generate server certificate
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + hostname, keyPair, 10, signatureAlgorithm);
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + hostname + ",L=" + ugi.getUserName(), keyPair, 10,
+            signatureAlgorithm);
   
     // Create server keystore and truststore
     KeyStoreTestUtil.createKeyStore(keyStore.toString(), password, "server", keyPair.getPrivate(), cert);
     KeyStoreTestUtil.createTrustStore(trustStore.toString(), password, "server", cert);
+    
     
     // Generate CRL
     X509CRL crl = KeyStoreTestUtil.generateCRL(cert, keyPair.getPrivate(), signatureAlgorithm, null, null);
@@ -136,12 +144,9 @@ public class TestDFSStartupWithCRL {
     conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + superUser, "*");
     conf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.2,TLSv1.1");
     conf.set(HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getValue(), "TLSv1.2");
-  
-    Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(keyStore.toString(), password,
-        password, trustStore.toString(), password, "");
-    KeyStoreTestUtil.saveConfig(sslServerConfPath.toFile(), sslServerConf);
-    conf.set(SSLFactory.SSL_SERVER_CONF_KEY, TestDFSStartupWithCRL.class.getSimpleName() + ".ssl-server.xml");
-  
+    conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
+    
     conf.setBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY, true);
     conf.set(CommonConfigurationKeys.HOPS_CRL_FETCHER_CLASS_KEY, "org.apache.hadoop.security.ssl.RemoteCRLFetcher");
     conf.set(CommonConfigurationKeysPublic.HOPS_CRL_FETCHER_INTERVAL_KEY, "1s");

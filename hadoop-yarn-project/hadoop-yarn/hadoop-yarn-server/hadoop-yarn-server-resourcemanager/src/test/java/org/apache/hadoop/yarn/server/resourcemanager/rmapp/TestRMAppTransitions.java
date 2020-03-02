@@ -114,6 +114,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Matchers;
+import org.mockito.Mockito;
+
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.eq;
@@ -260,10 +262,14 @@ public class TestRMAppTransitions {
     realRMContext.setSystemMetricsPublisher(publisher);
     realRMContext.setRMApplicationHistoryWriter(writer);
 
-    certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
-    certificateLocalizationService.init(conf);
-    certificateLocalizationService.start();
-    ((RMContextImpl) realRMContext).setCertificateLocalizationService(certificateLocalizationService);
+    if (isSecurityEnabled) {
+      certificateLocalizationService =
+          spy(new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM));
+      Mockito.doReturn(cryptoPassword).when(certificateLocalizationService).readSupersuperPassword();
+      certificateLocalizationService.init(conf);
+      certificateLocalizationService.start();
+      ((RMContextImpl) realRMContext).setCertificateLocalizationService(certificateLocalizationService);
+    }
     
     this.rmContext = spy(realRMContext);
 
@@ -654,7 +660,7 @@ protected RMApp testCreateAppSubmittedNoRecovery(
     verifyRMAppFieldsForNonFinalTransitions(application);
     return application;
   }
-  
+
   protected RMApp testCreateAppSubmittedRecovery(
       ApplicationSubmissionContext submissionContext, boolean cryptoRecovered) throws Exception {
     RMApp application = createNewTestApp(submissionContext);

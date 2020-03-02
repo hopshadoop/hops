@@ -89,6 +89,9 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
     
     filesToPurge = prepareCryptoMaterial(classpathDir, caMaterial);
     setCryptoConfig(conf, classpathDir);
+    // ssl-server file is need by the WebHDFS client
+    configureAndWriteSSLServer(conf, classpathDir);
+    
     conf.set(DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
         conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
     conf.setBoolean(SSLFactory.SSL_REQUIRE_CLIENT_CERT_KEY, true);
@@ -116,13 +119,13 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
   @Test
   public void testOps() throws Exception {
     prepareFS();
-    testOpsPrivate("CN=" + ugi.getUserName(), null);
+    testOpsPrivate("CN=" + ugi.getUserName());
   }
   
   @Test
   public void testOpsWithAppId() throws Exception {
     prepareFS();
-    testOpsPrivate("CN=" + ugi.getUserName(), "application_1573690044319_1560");
+    testOpsPrivate("CN=" + ugi.getUserName() + ",O=application_1573690044319_1560");
   }
   
   @Test
@@ -205,9 +208,9 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
   }
   
   
-  private void testOpsPrivate(String  cn, String ou) throws Exception {
+  private void testOpsPrivate(String  cn) throws Exception {
     // Generate certificates for user project__name
-    Pair<KeyPair, X509Certificate> clientMaterial = createClientCertificate(cn, ou);
+    Pair<KeyPair, X509Certificate> clientMaterial = createClientCertificate(cn);
   
     java.nio.file.Path c_keystore = Paths.get(classpathDir, ugi.getUserName() + "_kstore.jks");
     java.nio.file.Path c_truststore = Paths.get(classpathDir, ugi.getUserName() + "_tstore.jks");
@@ -276,14 +279,10 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
       }
     });
   }
-  
+
   private Pair<KeyPair, X509Certificate> createClientCertificate(String cn) throws Exception {
-    return createClientCertificate(cn, null);
-  }
-  
-  private Pair<KeyPair, X509Certificate> createClientCertificate(String cn, String ou) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
-    X509Certificate x509 = KeyStoreTestUtil.generateSignedCertificate(cn, ou, keyPair, 42, SIGN_ALG,
+    X509Certificate x509 = KeyStoreTestUtil.generateSignedCertificate(cn, keyPair, 42, SIGN_ALG,
         caMaterial.getFirst().getPrivate(), caMaterial.getSecond());
     return new Pair<>(keyPair, x509);
   }

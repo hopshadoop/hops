@@ -69,4 +69,6 @@ public interface CertificateLocalization {
   String getSuperTruststoreLocation();
   
   String getSuperTruststorePass();
+  
+  String getSuperMaterialPasswordFile();
 }

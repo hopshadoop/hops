@@ -18,6 +18,8 @@
 package org.apache.hadoop.net.hopssslchecks;
 
 import io.hops.security.HopsUtil;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -34,6 +36,8 @@ import java.util.Set;
  * HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR
  */
 public class EnvVariableHopsSSLCheck extends AbstractHopsSSLCheck {
+  private static final Log LOG = LogFactory.getLog(EnvVariableHopsSSLCheck.class);
+  
   public EnvVariableHopsSSLCheck() {
     super(110);
   }
@@ -51,8 +55,10 @@ public class EnvVariableHopsSSLCheck extends AbstractHopsSSLCheck {
       File trustStoreFd = Paths.get(cryptoMaterialDir, username + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX).toFile();
       File passwordFd = Paths.get(cryptoMaterialDir, username + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX).toFile();
       
-      if (!keystoreFd.exists() || !trustStoreFd.exists()) {
-        throw new IOException("Crypto material for user <" + username + "> could not be found in " + cryptoMaterialDir);
+      if (!keystoreFd.exists() || !trustStoreFd.exists() || !passwordFd.exists()) {
+        LOG.warn("Environment variable " + HopsSSLSocketFactory.CRYPTO_MATERIAL_ENV_VAR + " has been set to "
+          + cryptoMaterialDir + " but could not find material for user <" + username + ">");
+        return null;
       }
       
       String password = HopsUtil.readCryptoMaterialPassword(passwordFd);

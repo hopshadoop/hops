@@ -21,10 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import io.hops.security.CertificateLocalization;
-import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
-import org.apache.hadoop.security.ssl.SSLFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 
@@ -77,45 +74,6 @@ public abstract class AbstractHopsSSLCheck implements HopsSSLCheck, Comparable<H
       throw new SSLMaterialAlreadyConfiguredException("Crypto material for user <" + username + "> has already been" +
           " configured");
     }
-  }
-  
-  /**
-   * Reads cryptographic material configuration from ssl-server.xml
-   * @param configuration Hadoop configuration
-   * @return HopsSSLCryptoMaterial object with the values read from ssl-server.xml
-   * @throws IOException
-   */
-  protected HopsSSLCryptoMaterial readSuperuserMaterialFromFile(Configuration configuration) throws IOException {
-    Configuration sslConf = new Configuration(false);
-    String sslConfResource = configuration.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml");
-  
-    sslConf.addResource(sslConfResource);
-  
-    String keystoreLocation = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
-    String keystorePassword = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
-    String keyPassword = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY));
-    String truststoreLocation = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
-    String truststorePassword = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
-  
-    File keystoreFd = new File(keystoreLocation);
-    File truststoreFd = new File(truststoreLocation);
-    if (!keystoreFd.exists() || !truststoreFd.exists()) {
-      throw new IOException("Keystore or Truststore specified in " + sslConfResource + " does not exist! " +
-          "Check your configuration.");
-    }
-  
-    return new HopsSSLCryptoMaterial(keystoreLocation, keystorePassword, keyPassword, truststoreLocation,
-        truststorePassword);
   }
   
   /**
