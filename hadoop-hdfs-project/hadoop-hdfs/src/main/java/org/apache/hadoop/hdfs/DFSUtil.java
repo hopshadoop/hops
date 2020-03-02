@@ -45,6 +45,8 @@ import java.util.Random;
 import java.util.Set;
 
 
+import io.hops.security.HopsUtil;
+import io.hops.security.SuperuserKeystoresLoader;
 import com.logicalclocks.servicediscoverclient.Builder;
 import com.logicalclocks.servicediscoverclient.ServiceDiscoveryClient;
 import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
@@ -77,6 +79,9 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.util.ToolRunner;
 
 import javax.net.SocketFactory;
@@ -688,19 +693,54 @@ public class DFSUtil {
     return policy;
   }
 
+  public static HttpServer3.Builder loadSslConfToHttpServerBuilder(HttpServer3.Builder builder, Configuration sslConf) {
+    return loadSslConfToHttpServerBuilder(builder, sslConf, null);
+  }
+
   public static HttpServer3.Builder loadSslConfToHttpServerBuilder(HttpServer3.Builder builder,
-      Configuration sslConf) {
+      Configuration sslConf, Configuration systemConf) {
+    String keystoreLocation = sslConf.get(
+            FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+                    FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), null);
+    builder.needsClientAuth(sslConf.getBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY, DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT));
+    if (keystoreLocation != null) {
+      // ssl-server.xml has been populated, load material from there
+      return loadFromSSLServerConf(builder, sslConf);
+    }
+    return loadFromSuperUserLoader(builder, sslConf, systemConf);
+  }
+
+  private static HttpServer3.Builder loadFromSSLServerConf(HttpServer3.Builder builder, Configuration sslConf) {
     return builder
-        .needsClientAuth(
-            sslConf.getBoolean(DFS_CLIENT_HTTPS_NEED_AUTH_KEY,
-                DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT))
-        .keyPassword(getPassword(sslConf, DFS_SERVER_HTTPS_KEYPASSWORD_KEY))
-        .keyStore(sslConf.get("ssl.server.keystore.location"),
-            getPassword(sslConf, DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
-            sslConf.get("ssl.server.keystore.type", "jks"))
-        .trustStore(sslConf.get("ssl.server.truststore.location"),
-            getPassword(sslConf, DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
-            sslConf.get("ssl.server.truststore.type", "jks"));
+            .keyPassword(getPassword(sslConf, DFS_SERVER_HTTPS_KEYPASSWORD_KEY))
+            .keyStore(sslConf.get("ssl.server.keystore.location"),
+                    getPassword(sslConf, DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
+                    sslConf.get("ssl.server.keystore.type", "jks"))
+            .trustStore(sslConf.get("ssl.server.truststore.location"),
+                    getPassword(sslConf, DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
+                    sslConf.get("ssl.server.truststore.type", "jks"));
+  }
+
+  private static HttpServer3.Builder loadFromSuperUserLoader(HttpServer3.Builder builder, Configuration sslConf,
+      Configuration systemConf) {
+    if (systemConf == null) {
+      throw new IllegalArgumentException("System configuration must not be null when loading x.509 material with" +
+              " SuperUserLoader");
+    }
+    try {
+      SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(systemConf);
+      X509SecurityMaterial material = loader.loadSuperUserMaterial();
+      String password = HopsUtil.readCryptoMaterialPassword(material.getPasswdLocation().toFile());
+      return builder
+              .keyPassword(password)
+              .keyStore(material.getKeyStoreLocation().toString(), password,
+                      sslConf.get("ssl.server.keystore.type", "jks"))
+              .trustStore(material.getTrustStoreLocation().toString(), password,
+                      sslConf.get("ssl.server.truststore.type", "jks"));
+    } catch (IOException ex) {
+      LOG.fatal("Could not system user x.509 material with SuperuserLoader", ex);
+      throw new RuntimeException(ex);
+    }
   }
 
   public static List<InetSocketAddress> getNameNodesServiceRpcAddresses(
@@ -767,7 +807,7 @@ public class DFSUtil {
   private static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf,
       String listKey, String defaultListKey, String singleKey, String defaultSingleKey) {
     List<URI> uris = new ArrayList<>();
-    
+
     if (conf.getBoolean(SERVICE_DISCOVERY_ENABLED_KEY, DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
       for (String nn : getNameNodesRPCAddressesFromServiceDiscovery(conf)) {
         uris.add(DFSUtil.createHDFSUri(nn));
@@ -798,7 +838,7 @@ public class DFSUtil {
   public static String joinNameNodesHostPortString(List<String> namenodes) {
     return Joiner.on(",").join(namenodes);
   }
-  
+
   private static Set<String> getNameNodesRPCAddressesFromServiceDiscovery(Configuration conf) {
     // Try with rpc-addresses
     String nnAddress = null;
@@ -837,7 +877,7 @@ public class DFSUtil {
     }
     return Collections.emptySet();
   }
-  
+
   private static Set<String> getNameNodesRPCAddressesInternal(
       Configuration conf, String listKey, String singleKey) {
     String namenodes = conf.get(listKey);
@@ -1048,7 +1088,7 @@ public class DFSUtil {
 
     if (policy.isHttpsEnabled() && httpsAddr != null) {
       Configuration sslConf = loadSslConfiguration(conf);
-      loadSslConfToHttpServerBuilder(builder, sslConf);
+      loadSslConfToHttpServerBuilder(builder, sslConf, conf);
 
       if (httpsAddr.getPort() == 0) {
         builder.setFindPort(true);

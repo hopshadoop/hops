@@ -45,6 +45,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -224,6 +225,7 @@ public class HttpServer implements FilterContainer {
       listenerStartedExternally = false;
       if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_KEY,
           CommonConfigurationKeysPublic.HADOOP_SSL_ENABLED_DEFAULT)) {
+        conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
         sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
         try {
           sslFactory.init();

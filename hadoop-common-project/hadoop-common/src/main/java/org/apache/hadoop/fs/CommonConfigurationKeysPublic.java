@@ -452,6 +452,9 @@ public class CommonConfigurationKeysPublic {
   public static final String HOPS_CRL_VALIDATION_ENABLED_KEY = HOPS_CRL_PREFIX + "validation.enabled";
   public static final boolean HOPS_CRL_VALIDATION_ENABLED_DEFAULT = false;
   
+  private static final String HOPS_TLS_PREFIX = HOPS_PREFIX + "tls.";
+  public static final String HOPS_TLS_SUPER_MATERIAL_DIRECTORY = HOPS_TLS_PREFIX + "superuser-material-directory";
+  
   /**
    * Certificate Revocation List fetcher class
    */

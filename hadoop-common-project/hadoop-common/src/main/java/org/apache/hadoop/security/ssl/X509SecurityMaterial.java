@@ -21,6 +21,8 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 
 public final class X509SecurityMaterial extends SecurityMaterial {
+  private final static ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
+  
   private final Path keyStoreLocation;
   private final int keyStoreSize;
   private final Path trustStoreLocation;
@@ -44,6 +46,11 @@ public final class X509SecurityMaterial extends SecurityMaterial {
     this.keyStorePass = kStorePass;
     this.trustStoreMem = tstore;
     this.trustStorePass = tstorePass;
+  }
+  
+  public X509SecurityMaterial(Path keyStoreLocation, Path trustStoreLocation, Path passwdLocation) {
+    this(null, keyStoreLocation, trustStoreLocation, passwdLocation, EMPTY_BUFFER, null,
+        EMPTY_BUFFER, null);
   }
   
   public Path getKeyStoreLocation() {

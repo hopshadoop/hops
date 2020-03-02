@@ -89,6 +89,9 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
     
     filesToPurge = prepareCryptoMaterial(classpathDir, caMaterial);
     setCryptoConfig(conf, classpathDir);
+    // ssl-server file is need by the WebHDFS client
+    configureAndWriteSSLServer(conf, classpathDir);
+    
     conf.set(DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
         conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml"));
     conf.setBoolean(SSLFactory.SSL_REQUIRE_CLIENT_CERT_KEY, true);

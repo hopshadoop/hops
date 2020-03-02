@@ -35,8 +35,10 @@ import java.util.Set;
 import javax.crypto.SecretKey;
 import javax.net.ssl.HttpsURLConnection;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.JobConf;
@@ -166,6 +168,10 @@ class Fetcher<K,V> extends Thread {
       sslShuffle = job.getBoolean(MRConfig.SHUFFLE_SSL_ENABLED_KEY,
                                   MRConfig.SHUFFLE_SSL_ENABLED_DEFAULT);
       if (sslShuffle && sslFactory == null) {
+        if (job.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+                CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+          job.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+        }
         sslFactory = new SSLFactory(SSLFactory.Mode.CLIENT, job);
         try {
           sslFactory.init();

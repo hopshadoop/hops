@@ -216,7 +216,7 @@ public final class ReloadingX509TrustManager
     KeyStore ks = KeyStore.getInstance(type);
     String tstorePassword;
     if (passwordFileLocation != null) {
-      tstorePassword = FileUtils.readFileToString(passwordFileLocation);
+      tstorePassword = FileUtils.readFileToString(passwordFileLocation).trim();
     } else {
       tstorePassword = password;
     }

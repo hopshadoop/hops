@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.util.envVars;
 
-import org.apache.hadoop.util.envVars.EnvironmentVariables;
-
 import java.util.Map;
 
 /**

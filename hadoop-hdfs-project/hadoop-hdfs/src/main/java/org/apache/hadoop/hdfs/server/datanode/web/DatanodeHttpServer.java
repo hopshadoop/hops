@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.datanode.web;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import io.netty.bootstrap.ChannelFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -33,6 +34,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -108,6 +110,10 @@ public class DatanodeHttpServer implements Closeable {
     }
 
     if (policy.isHttpsEnabled()) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+              CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+      }
       this.sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
       try {
         sslFactory.init();

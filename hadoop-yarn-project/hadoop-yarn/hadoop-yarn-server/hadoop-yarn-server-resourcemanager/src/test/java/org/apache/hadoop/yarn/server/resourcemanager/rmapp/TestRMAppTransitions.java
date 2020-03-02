@@ -103,6 +103,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Matchers;
+import org.mockito.Mockito;
 
 
 @RunWith(value = Parameterized.class)
@@ -240,11 +241,15 @@ public class TestRMAppTransitions {
     publisher = mock(SystemMetricsPublisher.class);
     realRMContext.setSystemMetricsPublisher(publisher);
     realRMContext.setRMApplicationHistoryWriter(writer);
-  
-    certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
-    certificateLocalizationService.init(conf);
-    certificateLocalizationService.start();
-    ((RMContextImpl) realRMContext).setCertificateLocalizationService(certificateLocalizationService);
+    
+    if (isSecurityEnabled) {
+      certificateLocalizationService =
+          spy(new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM));
+      Mockito.doReturn(cryptoPassword).when(certificateLocalizationService).readSupersuperPassword();
+      certificateLocalizationService.init(conf);
+      certificateLocalizationService.start();
+      ((RMContextImpl) realRMContext).setCertificateLocalizationService(certificateLocalizationService);
+    }
     
     this.rmContext = spy(realRMContext);
 

@@ -1520,7 +1520,6 @@ LOG.info("+");
     if (conf.getBoolean(CommonConfigurationKeysPublic
         .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
         .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      boolean isHAEnabled = rmContext.isHAEnabled();
       
       certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
       CertificateLocalizationCtx.getInstance().setCertificateLocalization

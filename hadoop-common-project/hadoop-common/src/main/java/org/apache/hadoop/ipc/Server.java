@@ -60,6 +60,7 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import io.hops.security.HopsX509AuthenticationException;
 import io.hops.security.HopsX509Authenticator;
 import io.hops.security.HopsX509AuthenticatorFactory;
@@ -2854,6 +2855,8 @@ public abstract class Server {
             CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT);
 
     if (this.isHopsTLSEnabled) {
+      // Set custom keystores factory
+      conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
       // Configure SSLContext
       this.sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
       try {

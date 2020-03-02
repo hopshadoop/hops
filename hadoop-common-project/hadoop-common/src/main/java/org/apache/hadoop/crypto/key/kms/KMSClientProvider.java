@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.crypto.key.kms;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -433,6 +434,10 @@ public class KMSClientProvider extends KeyProvider implements CryptoExtension,
     super(conf);
     kmsUrl = createServiceURL(extractKMSPath(uri));
     if ("https".equalsIgnoreCase(new URL(kmsUrl).getProtocol())) {
+      if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+              CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+      }
       sslFactory = new SSLFactory(SSLFactory.Mode.CLIENT, conf);
       try {
         sslFactory.init();

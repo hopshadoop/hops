@@ -18,6 +18,8 @@
 package org.apache.hadoop.security.ssl;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.security.HopsUtil;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.log4j.LogManager;
@@ -55,6 +57,7 @@ public class CRLValidator {
   private final Configuration sslConf;
   private final Path crl;
   private final File trustStoreLocation;
+  private final File truststorePasswordLocation;
   private final AtomicReference<X509CRL> crlReference;
   private final AtomicReference<KeyStore> trustStoreReference;
   
@@ -102,8 +105,11 @@ public class CRLValidator {
       }
     };
     
-    trustStoreLocation = new File(this.sslConf.get(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY)));
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    X509SecurityMaterial x509Material = loader.loadSuperUserMaterial();
+    trustStoreLocation = x509Material.getTrustStoreLocation().toFile();
+    truststorePasswordLocation = x509Material.getPasswdLocation().toFile();
+    
     trustStoreReference = new AtomicReference<>(loadTruststoreWithRetry.retry());
   }
   
@@ -188,9 +194,7 @@ public class CRLValidator {
     String type = sslConf.get(FileBasedKeyStoresFactory.resolvePropertyName(
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_TYPE_TPL_KEY),
         FileBasedKeyStoresFactory.DEFAULT_KEYSTORE_TYPE);
-    String trustStorePassword = sslConf.get(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
-    
+    String trustStorePassword = HopsUtil.readCryptoMaterialPassword(truststorePasswordLocation);
     KeyStore trustStore = KeyStore.getInstance(type);
     try (FileInputStream in = new FileInputStream(trustStoreLocation)) {
       trustStore.load(in, trustStorePassword.toCharArray());

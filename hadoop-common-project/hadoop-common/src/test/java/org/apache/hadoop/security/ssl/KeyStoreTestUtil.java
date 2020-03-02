@@ -41,9 +41,7 @@ import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.X509CRL;
+import java.security.cert.*;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -55,20 +53,15 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SignatureException;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateParsingException;
-import java.security.cert.X509Certificate;
 
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.cert.CertIOException;
-import org.bouncycastle.cert.X509CRLHolder;
-import org.bouncycastle.cert.X509v2CRLBuilder;
-import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.*;
 import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CRLHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -78,6 +71,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.x509.extension.X509ExtensionUtil;
 
 public class KeyStoreTestUtil {
   static {
@@ -93,6 +87,11 @@ public class KeyStoreTestUtil {
     return baseDir;
   }
 
+  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm)
+    throws GeneralSecurityException {
+    return generateCertificate(dn, pair, days, algorithm, false);
+  }
+
   @SuppressWarnings("deprecation")
   /**
    * Create a self-signed X.509 Certificate.
@@ -101,13 +100,11 @@ public class KeyStoreTestUtil {
    * @param pair the KeyPair
    * @param days how many days from now the Certificate is valid for
    * @param algorithm the signing algorithm, eg "SHA1withRSA"
+   * @param ca flag whether this certificate is a Certificate Authority
    * @return the self-signed certificate
    */
-  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm)
-      throws CertificateEncodingException,
-      InvalidKeyException,
-      IllegalStateException,
-      NoSuchProviderException, NoSuchAlgorithmException, SignatureException{
+  public static X509Certificate generateCertificate(String dn, KeyPair pair, int days, String algorithm, boolean ca)
+      throws GeneralSecurityException {
   
     Date from = new Date();
     Date to = new Date(from.getTime() + days * 86400000l);
@@ -119,9 +116,12 @@ public class KeyStoreTestUtil {
       ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(pair.getPrivate());
       X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(x500Name, sn, from, to, x500Name,
           pair.getPublic());
+      certGen.addExtension(Extension.basicConstraints, false, new BasicConstraints(ca));
       return new JcaX509CertificateConverter().setProvider("BC").getCertificate(certGen.build(sigGen));
     } catch (OperatorCreationException | CertificateException ex) {
       throw new InvalidKeyException(ex);
+    } catch (CertIOException ex) {
+      throw new GeneralSecurityException(ex);
     }
   }
   
@@ -134,7 +134,7 @@ public class KeyStoreTestUtil {
     NoSuchProviderException {
     return generateSignedCertificate(dn, null, pair, days, algorithm, caKey, caCert);
   }
-  
+
   public static X509Certificate generateSignedCertificate(String dn, String appId, KeyPair pair, int days,
     String algorithm, PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
       CertificateEncodingException,
@@ -151,7 +151,7 @@ public class KeyStoreTestUtil {
     if (!Strings.isNullOrEmpty(appId)){
       x500NameBuilder.addRDN(BCStyle.OU, appId);
     }
-  
+
     X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
     try {
       JcaX509ExtensionUtils extUtil = new JcaX509ExtensionUtils();
@@ -485,11 +485,11 @@ public class KeyStoreTestUtil {
     return createSSLConfig(SSLFactory.Mode.SERVER,
       serverKS, password, keyPassword, trustKS, "trustP", excludeCiphers);
   }
-
+  
   public static Configuration createServerSSLConfig(String serverKS,
       String password, String keyPassword, String trustKS, String trustPass, String excludeCiphers) throws IOException {
     return createSSLConfig(SSLFactory.Mode.SERVER,
-      serverKS, password, keyPassword, trustKS, trustPass, excludeCiphers);
+        serverKS, password, keyPassword, trustKS, trustPass, excludeCiphers);
   }
   
   /**

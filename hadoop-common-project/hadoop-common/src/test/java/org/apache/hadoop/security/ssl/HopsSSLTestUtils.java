@@ -15,6 +15,9 @@
  */
 package org.apache.hadoop.security.ssl;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
+import io.hops.security.SuperuserKeystoresLoader;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.util.Pair;
@@ -29,6 +32,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.runners.Parameterized;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -97,14 +101,8 @@ public class HopsSSLTestUtils {
         conf.set(SSLFactory.SSL_HOSTNAME_VERIFIER_KEY, "ALLOW_ALL");
         String user = UserGroupInformation.getCurrentUser().getUserName();
         conf.set(ProxyUsers.CONF_HADOOP_PROXYUSER + "." + user, "*");
-
-        Configuration sslServerConf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
-                passwd, passwd, serverTrustStore.toString(), passwd, "");
-        Path sslServerPath = Paths.get(classPathDir, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
-        filesToPurge.add(sslServerPath);
-        File sslServer = new File(sslServerPath.toUri());
-        KeyStoreTestUtil.saveConfig(sslServer, sslServerConf);
-        conf.set(SSLFactory.SSL_SERVER_CONF_KEY, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
+        conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+        conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, classPathDir);
 
         // Set the client certificate with correct CN and signed by the CA
         conf.set(HopsSSLSocketFactory.CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue(), c_clientKeyStore.toString());
@@ -116,12 +114,22 @@ public class HopsSSLTestUtils {
             .getValue(), "TLSv1.2");
     }
 
+    protected void configureAndWriteSSLServer(Configuration conf, String classpathDir) throws IOException {
+        Configuration sslconf = KeyStoreTestUtil.createServerSSLConfig(serverKeyStore.toString(),
+            passwd, passwd, serverTrustStore.toString(), passwd, "");
+        Path sslServerPath = Paths.get(classpathDir, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
+        filesToPurge.add(sslServerPath);
+        File sslServer = new File(sslServerPath.toUri());
+        KeyStoreTestUtil.saveConfig(sslServer, sslconf);
+        conf.set(SSLFactory.SSL_SERVER_CONF_KEY, HopsSSLTestUtils.class.getSimpleName() + ".ssl-server.xml");
+    }
+    
     protected static final String KEY_ALG = "RSA";
     protected static final String SIGN_ALG = "SHA256withRSA";
     
     protected Pair<KeyPair, X509Certificate> generateCAMaterial(String subject) throws GeneralSecurityException {
         KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
-        X509Certificate x509 = KeyStoreTestUtil.generateCertificate(subject, keyPair, 42, SIGN_ALG);
+        X509Certificate x509 = KeyStoreTestUtil.generateCertificate(subject, keyPair, 42, SIGN_ALG, true);
         return new Pair<>(keyPair, x509);
     }
     
@@ -134,6 +142,17 @@ public class HopsSSLTestUtils {
         List<Path> filesToPurge = new ArrayList<>();
         this.outDir = outDir;
 
+        UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+        // It is safe to pass null here as we use the loader just to construct the file names
+        SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(null);
+        serverKeyStore = Paths.get(outDir, loader.getSuperKeystoreFilename(currentUGI.getUserName()));
+        serverTrustStore = Paths.get(outDir, loader.getSuperTruststoreFilename(currentUGI.getUserName()));
+        Path serverPasswd = Paths.get(outDir, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+        FileUtils.writeStringToFile(serverPasswd.toFile(), passwd);
+        
+        filesToPurge.add(serverKeyStore);
+        filesToPurge.add(serverTrustStore);
+        filesToPurge.add(serverPasswd);
         // Generate CA
         KeyPair caKeyPair = caMaterial.getFirst();
         X509Certificate caCert = caMaterial.getSecond();
@@ -142,11 +161,7 @@ public class HopsSSLTestUtils {
         KeyPair serverKeyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
         X509Certificate serverCrt = KeyStoreTestUtil.generateSignedCertificate("CN=serverCrt", serverKeyPair, 42,
                 SIGN_ALG, caKeyPair.getPrivate(), caCert);
-
-        serverKeyStore = Paths.get(outDir, "server.keystore.jks");
-        serverTrustStore = Paths.get(outDir, "server.truststore.jks");
-        filesToPurge.add(serverKeyStore);
-        filesToPurge.add(serverTrustStore);
+        
         KeyStoreTestUtil.createKeyStore(serverKeyStore.toString(), passwd, passwd,
                 "server_alias", serverKeyPair.getPrivate(), serverCrt);
         KeyStoreTestUtil.createTrustStore(serverTrustStore.toString(), passwd, "CARoot", caCert);

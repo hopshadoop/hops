@@ -46,6 +46,7 @@ import javax.net.ssl.SSLSocketFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -58,6 +59,7 @@ import org.apache.commons.lang.time.DurationFormatUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.http.HttpConfig.Policy;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
@@ -816,6 +818,10 @@ public class TopCLI extends YarnCLI {
     URLConnection connection;
     // If https is chosen, configures SSL client.
     if (YarnConfiguration.useHttps(getConf())) {
+      if (getConf().getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+              CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        getConf().set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+      }
       clientSslFactory = new SSLFactory(SSLFactory.Mode.CLIENT, getConf());
       clientSslFactory.init();
       SSLSocketFactory sslSocktFact = clientSslFactory.createSSLSocketFactory();

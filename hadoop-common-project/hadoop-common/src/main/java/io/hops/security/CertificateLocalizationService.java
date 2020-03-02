@@ -25,9 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.HopsSSLSocketFactory;
 import org.apache.hadoop.security.ssl.SecurityMaterial;
-import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
-import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.LogManager;
@@ -64,16 +62,10 @@ public class CertificateLocalizationService extends AbstractService
   private final Logger LOG = LogManager.getLogger
       (CertificateLocalizationService.class);
   
-  private final String SYSTEM_TMP = System.getProperty("java.io.tmpdir",
-      "/tmp");
+  private final String SYSTEM_TMP = System.getProperty("java.io.tmpdir", "/tmp");
   private final String LOCALIZATION_DIR_NAME = "certLoc";
   private Path materializeDir;
-  private String superKeystoreLocation;
-  private String superKeystorePass;
-  private String superKeyPassword;
-  private String superTrustStoreLocation;
-  private String superTruststorePass;
-
+  
   private final Map<StorageKey, SecurityMaterial> materialLocation =
       new ConcurrentHashMap<>();
   private ObjectName mbeanObjectName;
@@ -84,6 +76,8 @@ public class CertificateLocalizationService extends AbstractService
   private final BlockingQueue<LocalizationEvent> localizationEventsQ;
   
   private Thread localizationEventsHandler;
+  private X509SecurityMaterial superuserMaterial;
+  private char[] keystoresPassword;
   
   @InterfaceAudience.Private
   @VisibleForTesting
@@ -118,7 +112,8 @@ public class CertificateLocalizationService extends AbstractService
   
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    parseSuperuserMaterial(conf);
+    superuserMaterial = loadSuperuserMaterialInternal(conf);
+    keystoresPassword = readSupersuperPassword();
     String localizationDir = service.toString() +  "_" + LOCALIZATION_DIR_NAME;
     materializeDir = Paths.get(SYSTEM_TMP, localizationDir);
     File fileMaterializeDir = materializeDir.toFile();
@@ -143,6 +138,15 @@ public class CertificateLocalizationService extends AbstractService
     super.serviceInit(conf);
   }
   
+  private X509SecurityMaterial loadSuperuserMaterialInternal(Configuration conf) throws IOException {
+    SuperuserKeystoresLoader superuserKeystoresLoader = new SuperuserKeystoresLoader(conf);
+    return superuserKeystoresLoader.loadSuperUserMaterial();
+  }
+  
+  public char[] readSupersuperPassword() throws IOException {
+    return FileUtils.readFileToString(superuserMaterial.getPasswdLocation().toFile()).toCharArray();
+  }
+  
   @Override
   protected void serviceStart() throws Exception {
     localizationEventsHandler = createLocalizationEventsHandler();
@@ -155,61 +159,45 @@ public class CertificateLocalizationService extends AbstractService
 
     super.serviceStart();
   }
-
-  private void parseSuperuserMaterial(Configuration conf) {
-    Configuration sslConf = new Configuration(false);
-    sslConf.addResource(conf.get(SSLFactory.SSL_SERVER_CONF_KEY,
-        "ssl-server.xml"));
-    superKeystoreLocation = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY));
-    superKeystorePass = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY));
-    superKeyPassword = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY));
-    superTrustStoreLocation = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
-    superTruststorePass = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
-  }
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
   @Override
   public String getSuperKeystoreLocation() {
-    return superKeystoreLocation;
+    return superuserMaterial.getKeyStoreLocation().toString();
   }
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
   @Override
   public String getSuperKeystorePass() {
-    return superKeystorePass;
+    return String.valueOf(keystoresPassword);
   }
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
   @Override
   public String getSuperKeyPassword() {
-    return superKeyPassword;
+    return String.valueOf(keystoresPassword);
   }
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
   @Override
   public String getSuperTruststoreLocation() {
-    return superTrustStoreLocation;
+    return superuserMaterial.getTrustStoreLocation().toString();
   }
   
   // This method is accessible only from RM or NM. In any other case
   // CertificateLocalizationService is null
   @Override
   public String getSuperTruststorePass() {
-    return superTruststorePass;
+    return String.valueOf(keystoresPassword);
+  }
+  
+  @Override
+  public String getSuperMaterialPasswordFile() {
+    return superuserMaterial.getPasswdLocation().toString();
   }
 
   @Override
@@ -224,6 +212,10 @@ public class CertificateLocalizationService extends AbstractService
     
     if (null != materializeDir) {
       FileUtils.deleteQuietly(materializeDir.toFile());
+    }
+    
+    for (int i = 0; i < keystoresPassword.length; i++) {
+      keystoresPassword[i] = 'x';
     }
     
     LOG.debug("Stopped CertificateLocalization service");

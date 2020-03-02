@@ -19,6 +19,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import io.hops.security.AbstractSecurityActions;
 import io.hops.security.HopsSecurityActionsFactory;
+import io.hops.security.SuperuserKeystoresLoader;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -27,6 +28,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -75,6 +78,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.net.URL;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
@@ -106,18 +110,17 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
       Paths.get("target", "test-dir").toString()),
       TestX509SecurityHandler.class.getSimpleName()).toString();
   private static final File BASE_DIR_FILE = new File(BASE_DIR);
-  private static String classPath;
   
   private static Configuration conf;
   private DrainDispatcher dispatcher;
   private RMContext rmContext;
-  private File sslServerFile;
+  private static UserGroupInformation currentUGI;
   
   @BeforeClass
   public static void beforeClass() throws Exception {
     Security.addProvider(new BouncyCastleProvider());
     BASE_DIR_FILE.mkdirs();
-    classPath = KeyStoreTestUtil.getClasspathDir(TestX509SecurityHandler.class);
+    currentUGI = UserGroupInformation.getCurrentUser();
   }
   
   @Before
@@ -134,21 +137,12 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     rmContext = new RMContextImpl(dispatcher, null, null, null, null, null, null, null, null);
     dispatcher.init(conf);
     dispatcher.start();
-  
-    String sslConfFileName = TestX509SecurityHandler.class.getSimpleName() + ".ssl-server.xml";
-    sslServerFile = Paths.get(classPath, sslConfFileName).toFile();
-    Configuration sslServer = new Configuration(false);
-    KeyStoreTestUtil.saveConfig(sslServerFile, sslServer);
-    conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFileName);
   }
   
   @After
   public void afterTest() throws Exception {
     if (dispatcher != null) {
       dispatcher.stop();
-    }
-    if (sslServerFile != null) {
-      sslServerFile.delete();
     }
   }
   
@@ -164,56 +158,46 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
   
   @Test
   public void testSuccessfulCertificateCreationTesting() throws Exception {
-    File testSpecificSSLServerFile = null;
-    try {
-      conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
-          "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
-      
-      RMAppSecurityActions testActor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
-          conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
-      String trustStore = Paths.get(BASE_DIR, "trustStore.jks").toString();
-      X509Certificate caCert = ((TestingRMAppSecurityActions) testActor).getCaCert();
-      String principal = caCert.getIssuerX500Principal().getName();
-      // Principal should be CN=RootCA
-      String alias = principal.split("=")[1];
-      String password = "password";
-  
-      String sslServer = TestX509SecurityHandler.class.getSimpleName() + "-testSuccessfulCertificateCreationTesting.ssl-server.xml";
-      testSpecificSSLServerFile = Paths.get(classPath, sslServer).toFile();
-  
-      conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslServer);
-  
-      createTrustStore(trustStore, password, alias, caCert);
-      Configuration sslServerConf = createSSLConfig("", "", "", trustStore, password, "");
-      saveConfig(testSpecificSSLServerFile.getAbsoluteFile(), sslServerConf);
-  
-      MockRMAppEventHandler eventHandler = new MockRMAppEventHandler(RMAppEventType.SECURITY_MATERIAL_GENERATED);
-      rmContext.getDispatcher().register(RMAppEventType.class, eventHandler);
-      
-      RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(rmContext);
-      X509SecurityHandler x509SecurityHandler = new MockX509SecurityHandler(rmContext, rmAppSecurityManager, true);
-      rmAppSecurityManager.registerRMAppSecurityHandler(x509SecurityHandler);
-      rmAppSecurityManager.init(conf);
-      rmAppSecurityManager.start();
-      ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
-      X509SecurityHandler.X509MaterialParameter x509Param =
-          new X509SecurityHandler.X509MaterialParameter(
-              appId,"Dorothy", 1);
-      RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
-      securityMaterial.addMaterial(x509Param);
-      RMAppSecurityManagerEvent genSecurityMaterialEvent = new RMAppSecurityManagerEvent(appId,
-          securityMaterial, RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL);
-      
-      rmAppSecurityManager.handle(genSecurityMaterialEvent);
-  
-      dispatcher.await();
-      eventHandler.verifyEvent();
-      rmAppSecurityManager.stop();
-    } finally {
-      if (testSpecificSSLServerFile != null) {
-        testSpecificSSLServerFile.delete();
-      }
-    }
+    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
+        "org.apache.hadoop.yarn.server.resourcemanager.security.TestingRMAppSecurityActions");
+    
+    RMAppSecurityActions testActor = (RMAppSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+        conf.get(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY, YarnConfiguration.HOPS_RM_SECURITY_ACTOR_DEFAULT));
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    String trustStore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(currentUGI.getUserName())).toString();
+    X509Certificate caCert = ((TestingRMAppSecurityActions) testActor).getCaCert();
+    String principal = caCert.getIssuerX500Principal().getName();
+    // Principal should be CN=RootCA
+    String alias = principal.split("=")[1];
+    String password = "password";
+    Path passwd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    FileUtils.writeStringToFile(passwd.toFile(), password);
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
+    
+    createTrustStore(trustStore, password, alias, caCert);
+    
+    MockRMAppEventHandler eventHandler = new MockRMAppEventHandler(RMAppEventType.SECURITY_MATERIAL_GENERATED);
+    rmContext.getDispatcher().register(RMAppEventType.class, eventHandler);
+    
+    RMAppSecurityManager rmAppSecurityManager = new RMAppSecurityManager(rmContext);
+    X509SecurityHandler x509SecurityHandler = new MockX509SecurityHandler(rmContext, rmAppSecurityManager, true);
+    rmAppSecurityManager.registerRMAppSecurityHandler(x509SecurityHandler);
+    rmAppSecurityManager.init(conf);
+    rmAppSecurityManager.start();
+    ApplicationId appId = ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    X509SecurityHandler.X509MaterialParameter x509Param =
+        new X509SecurityHandler.X509MaterialParameter(
+            appId,"Dorothy", 1);
+    RMAppSecurityMaterial securityMaterial = new RMAppSecurityMaterial();
+    securityMaterial.addMaterial(x509Param);
+    RMAppSecurityManagerEvent genSecurityMaterialEvent = new RMAppSecurityManagerEvent(appId,
+        securityMaterial, RMAppSecurityManagerEventType.GENERATE_SECURITY_MATERIAL);
+    
+    rmAppSecurityManager.handle(genSecurityMaterialEvent);
+    
+    dispatcher.await();
+    eventHandler.verifyEvent();
+    rmAppSecurityManager.stop();
   }
   
   @Test
@@ -347,7 +331,11 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL, "3s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
-    
+  
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path passwd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    FileUtils.writeStringToFile(passwd.toFile(), "password");
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
     MockRM rm = new MyMockRM(conf);
     rm.start();
   
@@ -394,6 +382,10 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "45s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path passwd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    FileUtils.writeStringToFile(passwd.toFile(), "password");
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
     MockRM rm  = new MyMockRM(conf);
     rm.start();
   
@@ -513,7 +505,11 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
     conf.set(YarnConfiguration.RM_STORE, DBRMStateStore.class.getName());
     conf.set(YarnConfiguration.RM_APP_CERTIFICATE_EXPIRATION_SAFETY_PERIOD, "40s");
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
-    
+  
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path passwd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    FileUtils.writeStringToFile(passwd.toFile(), "password");
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
     MockRM rm = new MyMockRM2(conf);
     rm.start();
     MockNM nm1 = new MockNM("127.0.0.1:1234", 2 * 1024, rm.getResourceTrackerService());
@@ -705,58 +701,6 @@ public class TestX509SecurityHandler extends RMSecurityHandlersBaseTest {
       ks.store(out, password.toCharArray());
     } finally {
       out.close();
-    }
-  }
-  
-  private Configuration createSSLConfig(String keystore, String password, String keyPassword, String trustKS,
-      String trustPass, String excludeCiphers) {
-    SSLFactory.Mode mode = SSLFactory.Mode.SERVER;
-    String trustPassword = trustPass;
-    Configuration sslConf = new Configuration(false);
-    if (keystore != null) {
-      sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-          FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), keystore);
-    }
-    if (password != null) {
-      sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-          FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY), password);
-    }
-    if (keyPassword != null) {
-      sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-          FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY),
-          keyPassword);
-    }
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY), "1000");
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY), "MILLISECONDS");
-    if (trustKS != null) {
-      sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-          FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY), trustKS);
-    }
-    if (trustPassword != null) {
-      sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-          FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY),
-          trustPassword);
-    }
-    if(null != excludeCiphers && !excludeCiphers.isEmpty()) {
-      sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-          FileBasedKeyStoresFactory.SSL_EXCLUDE_CIPHER_LIST),
-          excludeCiphers);
-    }
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(mode,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY), "1000");
-    
-    return sslConf;
-  }
-  
-  private void saveConfig(File file, Configuration conf)
-      throws IOException {
-    Writer writer = new FileWriter(file);
-    try {
-      conf.writeXml(writer);
-    } finally {
-      writer.close();
     }
   }
 }

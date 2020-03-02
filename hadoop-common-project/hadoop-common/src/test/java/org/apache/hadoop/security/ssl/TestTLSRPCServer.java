@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.security.ssl;
 
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -46,6 +47,7 @@ public class TestTLSRPCServer {
       Paths.get("target", "test-dir").toString()),
       TestTLSRPCServer.class.getSimpleName()).toString();
   private static final File BASE_DIR_FILE = new File(BASE_DIR);
+  private static final File SUPER_MATERIAL_DIR = Paths.get(BASE_DIR, "super").toFile();
   private static final int KB = 1024;
   
   private final String keyAlgorithm = "RSA";
@@ -58,7 +60,7 @@ public class TestTLSRPCServer {
   
   @BeforeClass
   public static void beforeClass() throws Exception {
-    BASE_DIR_FILE.mkdirs();
+    SUPER_MATERIAL_DIR.mkdirs();
     classPathDir = KeyStoreTestUtil.getClasspathDir(TestTLSRPCServer.class);
   }
   
@@ -109,9 +111,14 @@ public class TestTLSRPCServer {
   }
   
   private RpcTLSUtils.TLSSetup setupTLSMaterial(String clientName) throws GeneralSecurityException, IOException {
-    Path serverKeystore = Paths.get(BASE_DIR, "server.kstore.jks");
-    Path serverTruststore = Paths.get(BASE_DIR, "server.tstore.jks");
-    Path sslServerConfPath = Paths.get(classPathDir, TestTLSRPCServer.class.getSimpleName() + ".ssl-server.xml");
+    UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path serverKeystore = Paths.get(SUPER_MATERIAL_DIR.getAbsolutePath(),
+        loader.getSuperKeystoreFilename(currentUGI.getUserName()));
+    Path serverTruststore = Paths.get(SUPER_MATERIAL_DIR.getAbsolutePath(),
+        loader.getSuperTruststoreFilename(currentUGI.getUserName()));
+    Path serverPasswd = Paths.get(SUPER_MATERIAL_DIR.getAbsolutePath(),
+        loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
     
     Path clientKeystore = Paths.get(BASE_DIR, clientName + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientName + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
@@ -123,13 +130,13 @@ public class TestTLSRPCServer {
         .setSignatureAlgorithm(signatureAlgorithm)
         .setServerKstore(serverKeystore)
         .setServerTstore(serverTruststore)
+        .setServerStorePasswordLocation(serverPasswd)
         .setServerStorePassword(password)
         .setClientKstore(clientKeystore)
         .setClientTstore(clientTruststore)
         .setClientStorePassword(password)
         .setClientPasswordLocation(clientPasswordLocation)
         .setClientUserName(clientName)
-        .setSslServerConf(sslServerConfPath)
         .build();
     
     RpcTLSUtils.setupTLSMaterial(conf, tlsSetup, TestTLSRPCServer.class);

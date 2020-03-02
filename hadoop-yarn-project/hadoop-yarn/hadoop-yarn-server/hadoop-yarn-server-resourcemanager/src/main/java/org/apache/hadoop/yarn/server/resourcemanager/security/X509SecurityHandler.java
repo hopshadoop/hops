@@ -18,6 +18,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.security.HopsUtil;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.logging.Log;
@@ -28,6 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.util.BackOff;
 import org.apache.hadoop.util.DateUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -92,6 +95,7 @@ public class X509SecurityHandler
   private final RMAppSecurityManager rmAppSecurityManager;
   private final SecureRandom rng;
   private final EventHandler eventHandler;
+  private SuperuserKeystoresLoader superuserKeystoresLoader;
   
   private CertificateLocalizationService certificateLocalizationService;
   private RMAppSecurityActions rmAppSecurityActions;
@@ -154,6 +158,7 @@ public class X509SecurityHandler
     revocationUnitOfInterval = monitorIntervalUnit.getSecond();
   
     if (isHopsTLSEnabled()) {
+      superuserKeystoresLoader = new SuperuserKeystoresLoader(config);
       this.certificateLocalizationService = rmContext.getCertificateLocalizationService();
       rmAppSecurityActions = rmAppSecurityManager.getRmAppCertificateActions();
       keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGORITHM, SECURITY_PROVIDER);
@@ -312,23 +317,21 @@ public class X509SecurityHandler
     String sslConfName = conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml");
     Configuration sslConf = new Configuration();
     sslConf.addResource(sslConfName);
-    String trustStoreLocation = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY));
-    String trustStorePassword = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
     String trustStoreType = sslConf.get(
-        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-            FileBasedKeyStoresFactory.SSL_TRUSTSTORE_TYPE_TPL_KEY),
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_TYPE_TPL_KEY),
         FileBasedKeyStoresFactory.DEFAULT_KEYSTORE_TYPE);
     
-    KeyStore trustStore = KeyStore.getInstance(trustStoreType);
-    try (FileInputStream fis = new FileInputStream(trustStoreLocation)) {
-      trustStore.load(fis, trustStorePassword.toCharArray());
+    if (superuserKeystoresLoader == null) {
+      throw new GeneralSecurityException("Tried to load system truststore but SuperuserKeystoreLoader has not been " +
+          "initialized");
     }
-    
-    return trustStore;
+    X509SecurityMaterial x509Material = superuserKeystoresLoader.loadSuperUserMaterial();
+    String truststorePassword = HopsUtil.readCryptoMaterialPassword(x509Material.getPasswdLocation().toFile());
+    KeyStore truststore = KeyStore.getInstance(trustStoreType);
+    try (FileInputStream fis = new FileInputStream(x509Material.getTrustStoreLocation().toFile())) {
+      truststore.load(fis, truststorePassword.toCharArray());
+    }
+    return truststore;
   }
   
   @InterfaceAudience.Private
