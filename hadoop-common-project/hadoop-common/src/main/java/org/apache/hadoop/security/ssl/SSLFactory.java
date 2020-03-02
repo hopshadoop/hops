@@ -17,6 +17,7 @@
 */
 package org.apache.hadoop.security.ssl;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -143,6 +144,9 @@ public class SSLFactory implements ConnectionConfigurator {
       = conf.getClass(KEYSTORES_FACTORY_CLASS_KEY,
                       FileBasedKeyStoresFactory.class, KeyStoresFactory.class);
     keystoresFactory = ReflectionUtils.newInstance(klass, sslConf);
+    if (keystoresFactory instanceof HopsFileBasedKeyStoresFactory) {
+      ((HopsFileBasedKeyStoresFactory)keystoresFactory).setSystemConf(conf);
+    }
 
     enabledProtocols = conf.getStrings(SSL_ENABLED_PROTOCOLS_KEY,
         SSL_ENABLED_PROTOCOLS_DEFAULT);

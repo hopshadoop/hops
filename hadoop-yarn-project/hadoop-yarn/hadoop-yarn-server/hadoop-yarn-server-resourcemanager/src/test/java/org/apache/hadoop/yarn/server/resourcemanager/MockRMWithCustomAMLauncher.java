@@ -49,7 +49,7 @@ public class MockRMWithCustomAMLauncher extends MockRM {
     super(conf);
     this.containerManager = containerManager;
   }
-  
+
   @Override
   protected ApplicationMasterLauncher createAMLauncher() {
     return new ApplicationMasterLauncher(getRMContext()) {

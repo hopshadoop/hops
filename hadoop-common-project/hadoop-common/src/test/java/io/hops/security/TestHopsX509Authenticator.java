@@ -88,13 +88,13 @@ public class TestHopsX509Authenticator {
     authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress);
   }
   
-  // In Hops super user's X.509 CN contains the FQDN/hostname of the machine
+  // In Hops super user's X.509 CN contains the FQDN/hostname of the machine and L her username
   @Test
   public void TestAuthenticatedSuperUser() throws Exception {
     InetAddress remoteAddress = InetAddress.getLocalHost();
     String o = "application_id";
     X509Certificate clientCertificate = generateX509Certificate("CN=" + remoteAddress.getCanonicalHostName()
-      + ", O=" + o);
+      + ", O=" + o + ", L=alice");
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser("alice");
     HopsX509Authenticator authenticator = authFactory.getAuthenticator();
     authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress);
@@ -104,17 +104,28 @@ public class TestHopsX509Authenticator {
   @Test
   public void TestNotAuthenticatedSuperUser() throws Exception {
     InetAddress remoteAddress = InetAddress.getLocalHost();
-    X509Certificate clientCertificate = generateX509Certificate("CN=i_hope_this_is_not_routable");
+    X509Certificate clientCertificate = generateX509Certificate("CN=i_hope_this_is_not_routable,L=real_super");
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser("chuck");
     HopsX509Authenticator authenticator = authFactory.getAuthenticator();
     expectedException.expect(HopsX509AuthenticationException.class);
     authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress);
   }
-  
+
+  @Test
+  public void TestNotAuthenticatedSuperUserWithResolvableCN() throws Exception {
+    InetAddress remoteAddress = InetAddress.getLocalHost();
+    X509Certificate clientCertificate = generateX509Certificate("CN=" + remoteAddress.getCanonicalHostName() +
+            ", L=real_super");
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser("chuck");
+    HopsX509Authenticator authenticator = authFactory.getAuthenticator();
+    expectedException.expect(HopsX509AuthenticationException.class);
+    authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress);
+  }
   @Test
   public void TestFQDNCache() throws Exception {
     InetAddress remoteAddress = InetAddress.getLocalHost();
-    X509Certificate clientCertificate = generateX509Certificate("CN=" + remoteAddress.getCanonicalHostName());
+    X509Certificate clientCertificate = generateX509Certificate("CN=" + remoteAddress.getCanonicalHostName()
+      + ",L=alice");
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser("alice");
     CustomHopsX509Authenticator authenticator = new CustomHopsX509Authenticator(conf);
     authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress);

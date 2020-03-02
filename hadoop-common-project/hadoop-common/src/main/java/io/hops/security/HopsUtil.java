@@ -68,6 +68,7 @@ public class HopsUtil {
   private static final Pattern CN_PATTERN = Pattern.compile(".*CN=([^,]+).*");
   private static final Pattern O_PATTERN = Pattern.compile(".*O=([^,]+).*");
   private static final Pattern OU_PATTERN = Pattern.compile(".*OU=([^,]+).*");
+  private static final Pattern L_PATTERN = Pattern.compile(".*L=([^,]+).*");
   
   /**
    * Read password for cryptographic material from a file. The file could be
@@ -119,7 +120,13 @@ public class HopsUtil {
     }
     return null;
   }
-  
+
+  /**
+   * Extracts the OrganizationUnit from an x.509 Subject
+   *
+   * @param subject x.509 Subject
+   * @return OrganizationUnit or null if it cannot be parsed
+   */
   public static String extractOUFromSubject(String subject) {
     Matcher matcher = OU_PATTERN.matcher(subject);
     if (matcher.matches()) {
@@ -127,7 +134,21 @@ public class HopsUtil {
     }
     return null;
   }
-  
+
+  /**
+   * Extracts the Localization (L) from an x.509 Subject
+   *
+   * @param subject x.509 Subject
+   * @return Localization or null if it cannot be parsed
+   */
+  public static String extractLFromSubject(String subject) {
+    Matcher matcher = L_PATTERN.matcher(subject);
+    if (matcher.matches()) {
+      return matcher.group(1);
+    }
+    return null;
+  }
+
   /**
    * Set the default HTTPS trust policy to trust anything.
    *
@@ -166,7 +187,6 @@ public class HopsUtil {
    * It should be used only for testing.
    *
    * Normally the password file should be in container's CWD with the filename specified in
-   * @see HopsSSLSocketFactory#LOCALIZED_PASSWD_FILE_NAME
    *
    * @param passwdFile
    * @param conf
@@ -179,31 +199,12 @@ public class HopsUtil {
       throw new FileNotFoundException("File " + conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
           SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH) + " does not exist " + "in " + cwd);
     }
-    String cryptoMaterialPassword = FileUtils.readFileToString(passwdFile);
-    Configuration sslConf = generateSSLServerConf(conf, cryptoMaterialPassword);
+    Configuration sslConf = generateSSLServerConf(conf);
     writeSSLConf(sslConf, conf, passwdFile);
   }
   
-  private static Configuration generateSSLServerConf(Configuration conf, String cryptoMaterialPassword) {
+  private static Configuration generateSSLServerConf(Configuration conf) {
     Configuration sslConf = new Configuration(false);
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY),
-        conf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH));
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY), cryptoMaterialPassword);
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY), cryptoMaterialPassword);
-    
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY),
-        conf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH));
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY), cryptoMaterialPassword);
-
-    sslConf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY),
-        conf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
-
     Configuration sslClientConf = new Configuration(false);
     String sslClientResource = conf.get(SSLFactory.SSL_CLIENT_CONF_KEY, "ssl-client.xml");
     sslClientConf.addResource(sslClientResource);

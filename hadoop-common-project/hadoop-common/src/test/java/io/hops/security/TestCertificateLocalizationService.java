@@ -17,7 +17,10 @@
  */
 package io.hops.security;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.SecurityMaterial;
 import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.security.ssl.X509SecurityMaterial;
@@ -25,7 +28,9 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -44,6 +49,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
@@ -62,7 +68,12 @@ import java.util.concurrent.TimeUnit;
 
 @RunWith(Parameterized.class)
 public class TestCertificateLocalizationService {
-
+  
+  private static final String BASE_DIR = Paths.get(System.getProperty("test.build.dir",
+      Paths.get("target", "test-dir").toString()),
+      TestCertificateLocalizationService.class.getSimpleName()).toString();
+  private static final File BASE_DIR_FILE = new File(BASE_DIR);
+  
   @Parameterized.Parameters
   public static Collection parameters() {
     return Arrays.asList(new Object[][] {
@@ -82,9 +93,19 @@ public class TestCertificateLocalizationService {
   @Rule
   public final ExpectedException rule = ExpectedException.none();
   
+  @BeforeClass
+  public static void beforeAll() throws IOException {
+    BASE_DIR_FILE.mkdirs();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(null);
+    Path passwdFileLocation = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+    FileUtils.writeStringToFile(passwdFileLocation.toFile(), "password");
+  }
+  
   @Before
   public void setUp() throws Exception {
     conf = new Configuration();
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
     certLocSrv = new CertificateLocalizationService(service);
     certLocSrv.serviceInit(conf);
     certLocSrv.serviceStart();
@@ -94,6 +115,13 @@ public class TestCertificateLocalizationService {
   public void tearDown() throws Exception {
     if (null != certLocSrv) {
       certLocSrv.serviceStop();
+    }
+  }
+  
+  @AfterClass
+  public static void afterAll() throws IOException {
+    if (BASE_DIR_FILE.exists()) {
+      FileUtils.deleteDirectory(BASE_DIR_FILE);
     }
   }
 

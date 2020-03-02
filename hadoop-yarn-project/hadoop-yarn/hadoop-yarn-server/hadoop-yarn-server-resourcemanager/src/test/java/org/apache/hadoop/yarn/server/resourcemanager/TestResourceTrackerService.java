@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+import io.hops.security.CertificateLocalizationService;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -340,7 +341,17 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     conf.setBoolean(YarnConfiguration.RM_JWT_ENABLED, true);
     conf.set(YarnConfiguration.RM_JWT_VALIDITY_PERIOD, "20s");
     conf.set(YarnConfiguration.RM_JWT_EXPIRATION_LEEWAY, "4s");
-    rm = new MockRM(conf);
+    rm = new MockRM(conf){
+      @Override
+      protected CertificateLocalizationService createCertificateLocalizationService() {
+        return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM) {
+          @Override
+          public char[] readSupersuperPassword() throws IOException {
+            return "password".toCharArray();
+          }
+        };
+      }
+    };
     rm.start();
     
     MockNM nm1 = rm.registerNode("localhost:1234", 5 * 1024);

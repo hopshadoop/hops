@@ -179,7 +179,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     sslClientConf.addResource(sslConfResource);
   }
   
-  public void configureCryptoMaterial(CertificateLocalization certificateLocalization, Set<String> proxySuperusers)
+  public HopsSSLCryptoMaterial configureCryptoMaterial(CertificateLocalization certificateLocalization, Set<String> proxySuperusers)
       throws SSLCertificateException {
     
     UserGroupInformation currentUser = null;
@@ -219,6 +219,7 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
         LOG.debug("Finally, the keystore that is used is: " + keyStoreFilePath);
       }
       conf.setBoolean(FORCE_CONFIGURE, false);
+      return configuredCryptoMaterial;
     } catch (IOException ex) {
       String user = currentUser != null ? currentUser.getUserName() : "Could not find user from UGI";
       LOG.error("Error while configuring SocketFactory for user <" + user + "> " + ex.getMessage(), ex);

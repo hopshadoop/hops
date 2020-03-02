@@ -18,8 +18,13 @@
 package org.apache.hadoop.security.ssl;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.security.HopsFileBasedKeyStoresFactory;
+import io.hops.security.HopsUtil;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.net.hopssslchecks.HopsSSLCryptoMaterial;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -55,6 +60,7 @@ public class CRLValidator {
   private final Configuration sslConf;
   private final Path crl;
   private final File trustStoreLocation;
+  private final File truststorePasswordLocation;
   private final AtomicReference<X509CRL> crlReference;
   private final AtomicReference<KeyStore> trustStoreReference;
   
@@ -102,8 +108,22 @@ public class CRLValidator {
       }
     };
     
-    trustStoreLocation = new File(this.sslConf.get(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY)));
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    X509SecurityMaterial x509Material = loader.loadSuperUserMaterial();
+    if (x509Material.getTrustStoreLocation().toFile().exists() && x509Material.getPasswdLocation().toFile().exists()) {
+      trustStoreLocation = x509Material.getTrustStoreLocation().toFile();
+      truststorePasswordLocation = x509Material.getPasswdLocation().toFile();
+    } else {
+      // HopsFileBasedKeyStoresFactory goes through all the checks to identify the proper
+      // crypto material for the user, that is also non-superusers.
+      HopsFileBasedKeyStoresFactory factory = new HopsFileBasedKeyStoresFactory();
+      factory.setConf(conf);
+      factory.setSystemConf(conf);
+      HopsSSLCryptoMaterial material = factory.loadCryptoMaterial(SSLFactory.Mode.SERVER);
+      trustStoreLocation = new File(material.getTrustStoreLocation());
+      truststorePasswordLocation = new File(material.getPasswordFileLocation());
+    }
+    
     trustStoreReference = new AtomicReference<>(loadTruststoreWithRetry.retry());
   }
   
@@ -188,9 +208,7 @@ public class CRLValidator {
     String type = sslConf.get(FileBasedKeyStoresFactory.resolvePropertyName(
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_TYPE_TPL_KEY),
         FileBasedKeyStoresFactory.DEFAULT_KEYSTORE_TYPE);
-    String trustStorePassword = sslConf.get(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
-    
+    String trustStorePassword = HopsUtil.readCryptoMaterialPassword(truststorePasswordLocation);
     KeyStore trustStore = KeyStore.getInstance(type);
     try (FileInputStream in = new FileInputStream(trustStoreLocation)) {
       trustStore.load(in, trustStorePassword.toCharArray());

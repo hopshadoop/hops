@@ -281,7 +281,7 @@ public class ResourceManager extends CompositeService
     loadConfigurationXml(YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
 
     validateConfigs(this.conf);
-    
+
     createAndInitCRLFetcherService();
     
     // Set HA configuration should be done before login
@@ -328,8 +328,15 @@ public class ResourceManager extends CompositeService
     }
 
     rmContext.setYarnConfiguration(conf);
-    
-    createCertificateLocalizationService();
+
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+
+      certificateLocalizationService = createCertificateLocalizationService();
+      CertificateLocalizationCtx.getInstance().setCertificateLocalization(certificateLocalizationService);
+      addService(certificateLocalizationService);
+      rmContext.setCertificateLocalizationService(certificateLocalizationService);
+    }
 
     createAndInitActiveServices(false);
 
@@ -341,7 +348,7 @@ public class ResourceManager extends CompositeService
         createRMApplicationHistoryWriter();
     addService(rmApplicationHistoryWriter);
     rmContext.setRMApplicationHistoryWriter(rmApplicationHistoryWriter);
-    
+
     // initialize the RM timeline collector first so that the system metrics
     // publisher can bind to it
     if (YarnConfiguration.timelineServiceV2Enabled(this.conf)) {
@@ -491,7 +498,7 @@ public class ResourceManager extends CompositeService
     // Use the in memory Placement Constraint Manager.
     return new MemoryPlacementConstraintManager();
   }
-  
+
   protected DelegationTokenRenewer createDelegationTokenRenewer() {
     return new DelegationTokenRenewer();
   }
@@ -527,11 +534,11 @@ public class ResourceManager extends CompositeService
   protected QuotaService createQuotaService() {
     return new QuotaService(rmContext);
   }
-  
+
   protected PriceMultiplicatorService createPriceMultiplicatorService(){
     return new PriceMultiplicatorService(rmContext);
   }
-  
+
   private RMTimelineCollectorManager createRMTimelineCollectorManager() {
     return new RMTimelineCollectorManager(this);
   }
@@ -834,7 +841,7 @@ public class ResourceManager extends CompositeService
       PriceMultiplicatorService priceMultiplicatorService = createPriceMultiplicatorService();
       addService(priceMultiplicatorService);
       rmContext.setPriceMultiplicatorService(priceMultiplicatorService);
-      
+
       super.serviceInit(conf);
     }
 
@@ -1473,18 +1480,8 @@ public class ResourceManager extends CompositeService
     }
   }
   
-  private void createCertificateLocalizationService() {
-    if (conf.getBoolean(CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      boolean isHAEnabled = rmContext.isHAEnabled();
-      
-      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
-      CertificateLocalizationCtx.getInstance().setCertificateLocalization
-          (certificateLocalizationService);
-      addService(certificateLocalizationService);
-      rmContext.setCertificateLocalizationService(certificateLocalizationService);
-    }
+  protected CertificateLocalizationService createCertificateLocalizationService() {
+    return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
   }
   
   @Private

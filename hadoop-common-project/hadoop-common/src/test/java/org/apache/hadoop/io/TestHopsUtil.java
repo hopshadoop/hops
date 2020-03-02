@@ -78,21 +78,6 @@ public class TestHopsUtil {
     File passwdFile = passwdFilePath.toFile();
     String password = "password";
     FileUtils.writeStringToFile(passwdFile, password);
-
-    String keyStorePasswordFileKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY);
-    expected.put(keyStorePasswordFileKey, systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY,
-        SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
-
-    String keyStorePasswordKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_PASSWORD_TPL_KEY);
-    expected.put(keyStorePasswordKey, password);
-    systemConf.set(keyStorePasswordKey, password);
-    
-    String keyStoreKeyPasswordKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_KEYSTORE_KEYPASSWORD_TPL_KEY);
-    expected.put(keyStoreKeyPasswordKey, password);
-    systemConf.set(keyStoreKeyPasswordKey, password);
     
     sslClientFile = Paths.get(CLASSPATH, "ssl-client.xml").toFile();
     Configuration sslClientConf = new Configuration(false);
@@ -110,11 +95,6 @@ public class TestHopsUtil {
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_KEYSTORE_RELOAD_TIMEUNIT_TPL_KEY), keyStoreReloadUnitValue);
     sslClientConf.set(keyStoreReloadUnitKey, keyStoreReloadUnitValue);
-    
-    String trustStorePasswordKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY);
-    expected.put(trustStorePasswordKey, password);
-    systemConf.set(trustStorePasswordKey, password);
     
     String trustStoreReloadIntervalKey = FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.CLIENT,
         FileBasedKeyStoresFactory.SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY);
@@ -153,23 +133,6 @@ public class TestHopsUtil {
     Map<String, String> expected = new HashMap<>();
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
         SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-            .SSL_KEYSTORE_LOCATION_TPL_KEY),
-        systemConf.get(SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH));
-    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-            .SSL_TRUSTSTORE_LOCATION_TPL_KEY),
-        systemConf.get(SSLFactory.LOCALIZED_TRUSTSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH));
-    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-            .SSL_KEYSTORE_PASSWORD_TPL_KEY), password);
-    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-            .SSL_KEYSTORE_KEYPASSWORD_TPL_KEY), password);
-    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
-            .SSL_TRUSTSTORE_PASSWORD_TPL_KEY), password);
-    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(
-        SSLFactory.Mode.SERVER, FileBasedKeyStoresFactory
             .SSL_KEYSTORE_RELOAD_INTERVAL_TPL_KEY),
         String.valueOf(FileBasedKeyStoresFactory.DEFAULT_SSL_KEYSTORE_RELOAD_INTERVAL));
     expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
@@ -180,9 +143,6 @@ public class TestHopsUtil {
             .SSL_TRUSTSTORE_RELOAD_INTERVAL_TPL_KEY),
         String.valueOf(FileBasedKeyStoresFactory
             .DEFAULT_SSL_TRUSTSTORE_RELOAD_INTERVAL));
-    expected.put(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_PASSWORDFILE_LOCATION_TPL_KEY),
-        systemConf.get(SSLFactory.LOCALIZED_PASSWD_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH));
 
     assertSSLConfValues(expected, sslConf);
   }

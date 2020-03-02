@@ -54,7 +54,9 @@ import java.util.regex.Pattern;
 
 import javax.crypto.SecretKey;
 
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -799,6 +801,10 @@ public class ShuffleHandler extends AuxiliaryService {
       if (conf.getBoolean(MRConfig.SHUFFLE_SSL_ENABLED_KEY,
                           MRConfig.SHUFFLE_SSL_ENABLED_DEFAULT)) {
         LOG.info("Encrypted shuffle is enabled.");
+        if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+                CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+          conf.set(SSLFactory.KEYSTORES_FACTORY_CLASS_KEY, HopsFileBasedKeyStoresFactory.class.getCanonicalName());
+        }
         sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
         sslFactory.init();
       }
@@ -1355,7 +1361,7 @@ public class ShuffleHandler extends AuxiliaryService {
       }
     }
   }
-  
+
   static class AttemptPathInfo {
     // TODO Change this over to just store local dir indices, instead of the
     // entire path. Far more efficient.

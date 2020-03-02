@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
+import io.hops.security.CertificateLocalizationService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -80,6 +81,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
+import org.apache.hadoop.yarn.server.resourcemanager.security.*;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -93,20 +95,14 @@ import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.yarn.server.resourcemanager.security.JWTSecurityHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityHandler;
-import org.apache.hadoop.yarn.server.resourcemanager.security.RMAppSecurityManager;
-import org.apache.hadoop.yarn.server.resourcemanager.security.X509SecurityHandler;
 
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Mockito.*;
+
 import org.mockito.Mockito;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 public class TestApplicationMasterLauncher {
 
@@ -259,6 +255,8 @@ public class TestApplicationMasterLauncher {
     MyContainerManagerImpl containerManager = new MyContainerManagerImpl();
     MockRM rm = new MockRMWithCustomAMLauncher(conf, containerManager);
     rm.start();
+    JWTSecurityHandler jwtSecurityHandler = spy(new JWTSecurityHandler(rm.rmContext, rm.rmAppSecurityManager));
+    rm.rmAppSecurityManager.registerRMAppSecurityHandlerWithType(jwtSecurityHandler, JWTSecurityHandler.class);
     MockNM nm = rm.registerNode("127.0.0.1:1234", 10 * 1024);
     // Submit application
     RMApp app = rm.submitApp(1024);
@@ -288,9 +286,7 @@ public class TestApplicationMasterLauncher {
     
     containerManager.cleanedup = false;
     TimeUnit.SECONDS.sleep(3);
-    JWTSecurityHandler jwtSecurityHandler = (JWTSecurityHandler) rm.getRMContext()
-        .getRMAppSecurityManager().getSecurityHandler(JWTSecurityHandler.class);
-    
+
     // Security material should NOT be revoked, there is one more attempt
     verify(jwtSecurityHandler, never()).revokeMaterial(any(JWTSecurityHandler.JWTMaterialParameter.class),
         any(Boolean.class));
@@ -624,6 +620,16 @@ public class TestApplicationMasterLauncher {
     private TestCryptoMockRM(Configuration conf, AtomicBoolean testPass) {
       super(conf);
       this.testPass = testPass;
+    }
+
+    @Override
+    protected CertificateLocalizationService createCertificateLocalizationService() {
+      return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM) {
+        @Override
+        public char[] readSupersuperPassword() throws IOException {
+          return "password".toCharArray();
+        }
+      };
     }
     
     @Override

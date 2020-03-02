@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.security.ssl;
 
+import io.hops.security.MockEnvironmentVariablesService;
+import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -49,6 +51,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.PrivilegedExceptionAction;
 import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -102,8 +105,12 @@ public class TestCRLValidator {
   
   @Test
   public void testServerWithCRLValid() throws Exception {
-    Path serverkeystore = Paths.get(BASE_DIR, "server.kstore.jks");
-    Path serverTruststore = Paths.get(BASE_DIR, "server.tstore.jks");
+    UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path serverKeystore = Paths.get(BASE_DIR, loader.getSuperKeystoreFilename(currentUGI.getUserName()));
+    Path serverTruststore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(currentUGI.getUserName()));
+    Path serverPasswd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    
     Path crlPath = Paths.get(BASE_DIR, "input.server.crl.pem");
     Path fetchedCrlPath = Paths.get(BASE_DIR, "server.crl.pem");
     
@@ -111,22 +118,21 @@ public class TestCRLValidator {
     Path clientKeystore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
     Path clientPasswordLocation = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
-    Path sslServerConfPath = Paths.get(confDir, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
     Server server = null;
     TestRpcBase.TestRpcService proxy = null;
     
     RpcTLSUtils.TLSSetup tlsSetup = new RpcTLSUtils.TLSSetup.Builder()
         .setKeyAlgorithm(keyAlgorithm)
         .setSignatureAlgorithm(signatureAlgorithm)
-        .setServerKstore(serverkeystore)
+        .setServerKstore(serverKeystore)
         .setServerTstore(serverTruststore)
         .setServerStorePassword(password)
+        .setServerStorePasswordLocation(serverPasswd)
         .setClientKstore(clientKeystore)
         .setClientTstore(clientTruststore)
         .setClientStorePassword(password)
         .setClientPasswordLocation(clientPasswordLocation)
         .setClientUserName(clientUsername)
-        .setSslServerConf(sslServerConfPath)
         .build();
     RpcTLSUtils.TestCryptoMaterial testCryptoMaterial = RpcTLSUtils.setupTLSMaterial(conf, tlsSetup,
         TestCRLValidator.class);
@@ -183,8 +189,12 @@ public class TestCRLValidator {
   
   @Test
   public void testServerWithEnabledButMissingCRL() throws Exception {
-    Path serverkeystore = Paths.get(BASE_DIR, "server.kstore.jks");
-    Path serverTruststore = Paths.get(BASE_DIR, "server.tstore.jks");
+    UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path serverKeystore = Paths.get(BASE_DIR, loader.getSuperKeystoreFilename(currentUGI.getUserName()));
+    Path serverTruststore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(currentUGI.getUserName()));
+    Path serverPasswd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    
     Path crlPath = Paths.get(BASE_DIR, "input.server.crl.pem");
     Path fetchedCrlPath = Paths.get(BASE_DIR, "server.crl.pem");
   
@@ -192,7 +202,6 @@ public class TestCRLValidator {
     Path clientKeystore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
     Path clientPasswordLocation = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
-    Path sslServerConfPath = Paths.get(confDir, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
     
     Server server = null;
     TestRpcBase.TestRpcService proxy = null;
@@ -200,15 +209,15 @@ public class TestCRLValidator {
     RpcTLSUtils.TLSSetup tlsSetup = new RpcTLSUtils.TLSSetup.Builder()
         .setKeyAlgorithm(keyAlgorithm)
         .setSignatureAlgorithm(signatureAlgorithm)
-        .setServerKstore(serverkeystore)
+        .setServerKstore(serverKeystore)
         .setServerTstore(serverTruststore)
         .setServerStorePassword(password)
+        .setServerStorePasswordLocation(serverPasswd)
         .setClientKstore(clientKeystore)
         .setClientTstore(clientTruststore)
         .setClientStorePassword(password)
         .setClientPasswordLocation(clientPasswordLocation)
         .setClientUserName(clientUsername)
-        .setSslServerConf(sslServerConfPath)
         .build();
     RpcTLSUtils.TestCryptoMaterial testCryptoMaterial = RpcTLSUtils.setupTLSMaterial(conf, tlsSetup,
         TestCRLValidator.class);
@@ -247,8 +256,12 @@ public class TestCRLValidator {
   
   @Test
   public void testServerWithCRLInvalid() throws Exception {
-    Path serverkeystore = Paths.get(BASE_DIR, "server.kstore.jks");
-    Path serverTruststore = Paths.get(BASE_DIR, "server.tstore.jks");
+    UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path serverKeystore = Paths.get(BASE_DIR, loader.getSuperKeystoreFilename(currentUGI.getUserName()));
+    Path serverTruststore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(currentUGI.getUserName()));
+    Path serverPasswd = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(currentUGI.getUserName()));
+    
     Path crlPath = Paths.get(BASE_DIR, "input.server.crl.pem");
     Path fetchedCrlPath = Paths.get(BASE_DIR, "server.crl.pem");
     
@@ -256,22 +269,20 @@ public class TestCRLValidator {
     Path clientKeystore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.KEYSTORE_SUFFIX);
     Path clientTruststore = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.TRUSTSTORE_SUFFIX);
     Path clientPasswordLocation = Paths.get(BASE_DIR, clientUsername + HopsSSLSocketFactory.PASSWD_FILE_SUFFIX);
-    Path sslServerConfPath = Paths.get(confDir, TestCRLValidator.class.getSimpleName() + ".ssl-server.xml");
     Server server = null;
-    TestRpcBase.TestRpcService proxy = null;
   
     RpcTLSUtils.TLSSetup tlsSetup = new RpcTLSUtils.TLSSetup.Builder()
         .setKeyAlgorithm(keyAlgorithm)
         .setSignatureAlgorithm(signatureAlgorithm)
-        .setServerKstore(serverkeystore)
+        .setServerKstore(serverKeystore)
         .setServerTstore(serverTruststore)
         .setServerStorePassword(password)
+        .setServerStorePasswordLocation(serverPasswd)
         .setClientKstore(clientKeystore)
         .setClientTstore(clientTruststore)
         .setClientStorePassword(password)
         .setClientPasswordLocation(clientPasswordLocation)
         .setClientUserName(clientUsername)
-        .setSslServerConf(sslServerConfPath)
         .build();
     RpcTLSUtils.TestCryptoMaterial testCryptoMaterial = RpcTLSUtils.setupTLSMaterial(conf, tlsSetup,
         TestCRLValidator.class);
@@ -356,12 +367,17 @@ public class TestCRLValidator {
   
   @Test
   public void testValidator() throws Exception {
-    Path caTruststore = Paths.get(BASE_DIR, "ca.truststore.jks");
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path caTruststore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(ugi.getUserName()));
+    Path passwdLocation = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+    FileUtils.writeStringToFile(passwdLocation.toFile(), password);
+    
     Path crlPath = Paths.get(BASE_DIR, "crl.pem");
     
     // Generate CA keypair
     KeyPair cakeyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate caCert = KeyStoreTestUtil.generateCertificate("CN=rootCA", cakeyPair, 60, signatureAlgorithm);
+    X509Certificate caCert = KeyStoreTestUtil.generateCertificate("CN=rootCA", cakeyPair, 60, signatureAlgorithm, true);
     
     // Generate CA truststore
     KeyStoreTestUtil.createTrustStore(caTruststore.toString(), password, "rootca", caCert);
@@ -370,8 +386,6 @@ public class TestCRLValidator {
     KeyPair clientKeyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
     X509Certificate clientCert = KeyStoreTestUtil.generateSignedCertificate("CN=client", clientKeyPair, 30,
         signatureAlgorithm, cakeyPair.getPrivate(), caCert);
-    /*X509Certificate clientCert = KeyStoreTestUtil.generateCertificate("CN=client", clientKeyPair, 30,
-        signatureAlgorithm);*/
 
     // Verify client certificate is signed by CA
     clientCert.verify(cakeyPair.getPublic());
@@ -381,10 +395,7 @@ public class TestCRLValidator {
     writeCRLToFile(crl, crlPath);
   
     // Validate should pass
-    conf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY), caTruststore.toString());
-    conf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY), password);
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
     conf.set(CommonConfigurationKeys.HOPS_CRL_OUTPUT_FILE_KEY, crlPath.toString());
   
     CRLValidator validator = CRLValidatorFactory.getInstance().getValidator(CRLValidatorFactory.TYPE.TESTING, conf,
@@ -411,21 +422,22 @@ public class TestCRLValidator {
   
   @Test
   public void testCRLValidatorFactory() throws Exception {
-    Path truststore = Paths.get(BASE_DIR, "truststore.jks");
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path truststore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(ugi.getUserName()));
+    Path passwdLocation = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+    FileUtils.writeStringToFile(passwdLocation.toFile(), password);
     Path crlPath = Paths.get(BASE_DIR, "crl.pem");
     
     // Generate CA keypair
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=root", keyPair, 60, signatureAlgorithm);
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=root", keyPair, 60, signatureAlgorithm, true);
     // Generate CA truststore
     KeyStoreTestUtil.createTrustStore(truststore.toString(), password, "root", cert);
     X509CRL crl = KeyStoreTestUtil.generateCRL(cert, keyPair.getPrivate(), signatureAlgorithm, null, null);
     writeCRLToFile(crl, crlPath);
-  
-    conf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_LOCATION_TPL_KEY), truststore.toString());
-    conf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
-        FileBasedKeyStoresFactory.SSL_TRUSTSTORE_PASSWORD_TPL_KEY), password);
+    
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
     conf.set(CommonConfigurationKeys.HOPS_CRL_OUTPUT_FILE_KEY, crlPath.toString());
     
     
@@ -442,7 +454,47 @@ public class TestCRLValidator {
     Assert.assertEquals(testingValidator1, testingValidator2);
     Assert.assertNotEquals(normalValidator1, testingValidator1);
   }
-  
+
+  /**
+   * Special use-case where non-superusers start an RPC Server with CRLValidation. The material loaded
+   * is not the ones returned by SuperuserKeystoresLoader but they should be located by HopsSSLSocketFactory instead
+   * which goes through a number of tests - identify material for normal users.
+   */
+  @Test
+  public void testCRLValidatioFactoryNonSuperuser() throws Exception {
+    String username = "application__user";
+    Path keystore = Paths.get(BASE_DIR, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH);
+    Path truststore = Paths.get(BASE_DIR, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH);
+    Path passwdLocation = Paths.get(BASE_DIR, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH);
+    FileUtils.writeStringToFile(passwdLocation.toFile(), password);
+    Path crlPath = Paths.get(BASE_DIR, "crl.pem");
+
+    // Generate CA keypair
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=root", keyPair, 60, signatureAlgorithm, true);
+    // Any file would be enough here, we don't load it - just checking if file exists
+    KeyStoreTestUtil.createKeyStore(keystore.toString(), password, password, "root", keyPair.getPrivate(), cert);
+    // Generate CA truststore
+    KeyStoreTestUtil.createTrustStore(truststore.toString(), password, "root", cert);
+    X509CRL crl = KeyStoreTestUtil.generateCRL(cert, keyPair.getPrivate(), signatureAlgorithm, null, null);
+    writeCRLToFile(crl, crlPath);
+
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
+    conf.set(CommonConfigurationKeys.HOPS_CRL_OUTPUT_FILE_KEY, crlPath.toString());
+    MockEnvironmentVariablesService mockEnvService = new MockEnvironmentVariablesService();
+    mockEnvService.setEnv("PWD", BASE_DIR);
+    EnvironmentVariablesFactory.setInstance(mockEnvService);
+
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(username);
+    CRLValidator validator = ugi.doAs(new PrivilegedExceptionAction<CRLValidator>() {
+      @Override
+      public CRLValidator run() throws Exception {
+        return CRLValidatorFactory.getInstance().getValidator(CRLValidatorFactory.TYPE.NORMAL, conf, conf);
+      }
+    });
+    Assert.assertNotNull(validator);
+  }
+
   @Test
   public void testRetryActions() throws Exception {
     boolean exceptionThrown = false;

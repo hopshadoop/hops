@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
+import io.hops.security.CertificateLocalizationService;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -204,15 +205,23 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
    * @return a new MockRM that will be stopped at the end of the test.
    */
   private MockRM createMockRM(YarnConfiguration conf, RMStateStore store) {
-    MockRM rm = new MockRM(conf, store);
+    MockRM rm = new MockRM(conf, store) {
+      @Override
+      protected CertificateLocalizationService createCertificateLocalizationService() {
+        return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM) {
+          @Override
+          public char[] readSupersuperPassword() throws IOException {
+            return "password".toCharArray();
+          }
+        };
+      }
+    };
     rms.add(rm);
     return rm;
   }
 
   private MockRM createMockRM(YarnConfiguration config) {
-    MockRM rm = new MockRM(config);
-    rms.add(rm);
-    return rm;
+    return createMockRM(config, null);
   }
 
   @Test
@@ -832,7 +841,17 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     private RMWithCustomRTService(Configuration conf) {
       super(conf);
     }
-    
+
+    @Override
+    protected CertificateLocalizationService createCertificateLocalizationService() {
+      return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM) {
+        @Override
+        public char[] readSupersuperPassword() throws IOException {
+          return "password".toCharArray();
+        }
+      };
+    }
+
     @Override
     protected ResourceTrackerService createResourceTrackerService() {
       RMContainerTokenSecretManager containerTokenSecretManager =
@@ -2683,7 +2702,7 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     String nodeLabelFsStoreDirURI = nodeLabelFsStoreDir.toURI().toString(); 
     conf.set(YarnConfiguration.FS_NODE_LABELS_STORE_ROOT_DIR,
         nodeLabelFsStoreDirURI);
-    
+
     conf.setBoolean(YarnConfiguration.NODE_LABELS_ENABLED, true);
     MockRM rm1 = new MockRM(conf) {
       @Override
