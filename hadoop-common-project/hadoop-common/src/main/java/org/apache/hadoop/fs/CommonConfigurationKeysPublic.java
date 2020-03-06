@@ -833,5 +833,17 @@ public class CommonConfigurationKeysPublic {
   public static final String DEFAULT_JWT_MANAGER_SERVICE_INVALIDATE_PATH = "/hopsworks-api/api/jwt/service";
   public static final String JWT_MANAGER_SERVICE_INVALIDATE_PATH = ServiceJWTManager.JWT_MANAGER_PREFIX
       + "service-invalidate-path";
+  
+  // Service Discovery (Consul) properties
+  private static final String SERVICE_DISCOVERY_PREFIX = HOPS_PREFIX + "service-discovery.";
+  
+  public static final String SERVICE_DISCOVERY_ENABLED_KEY = SERVICE_DISCOVERY_PREFIX + "enabled";
+  public static final boolean DEFAULT_SERVICE_DISCOVERY_ENABLED = false;
+  
+  public static final String SERVICE_DISCOVERY_DNS_HOST = SERVICE_DISCOVERY_PREFIX + "dns-host";
+  public static final String DEFAULT_SERVICE_DISCOVERY_DNS_HOST = "127.0.0.1";
+  
+  public static final String SERVICE_DISCOVERY_DNS_PORT = SERVICE_DISCOVERY_PREFIX + "dns-port";
+  public static final int DEFAULT_SERVICE_DISCOVERY_DNS_PORT = 53;
 }
 

@@ -328,6 +328,11 @@
       <groupId>io.hops.gpu</groupId>
       <artifactId>hops-gpu-management</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.logicalclocks</groupId>
+      <artifactId>service-discovery-client</artifactId>
+      <version>${sd-client.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
