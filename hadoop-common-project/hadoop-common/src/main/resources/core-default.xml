@@ -2549,4 +2549,22 @@
       invalidate master token.
     </description>
   </property>
+
+  <property>
+    <name>hops.service-discovery.enabled</name>
+    <value>false</value>
+    <description>Flag to get NameNode RPC addresses from Service Discovery instead of configuration file.</description>
+  </property>
+
+  <property>
+    <name>hops.service-discovery.dns-host</name>
+    <value>127.0.0.1</value>
+    <description>IP address of the DNS server used to resolve service discovery domains.</description>
+  </property>
+
+  <property>
+    <name>hops.service-discovery.dns-port</name>
+    <value>53</value>
+    <description>Port of the DNS server used to resolve service discovery domains.</description>
+  </property>
 </configuration>
