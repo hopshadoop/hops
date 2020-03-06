@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdfs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_ADMIN;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
@@ -44,6 +45,13 @@ import java.util.Random;
 import java.util.Set;
 
 
+import com.logicalclocks.servicediscoverclient.Builder;
+import com.logicalclocks.servicediscoverclient.ServiceDiscoveryClient;
+import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
+import com.logicalclocks.servicediscoverclient.resolvers.Type;
+import com.logicalclocks.servicediscoverclient.service.Service;
+import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
+import io.hops.net.ServiceDiscoveryClientFactory;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.Option;
@@ -57,23 +65,17 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderFactory;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocolPB.ClientDatanodeProtocolTranslatorPB;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.ToolRunner;
 
 import javax.net.SocketFactory;
@@ -90,7 +92,7 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
-import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
+
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.security.SecurityUtil;
@@ -101,6 +103,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.protobuf.BlockingService;
 import java.net.InetAddress;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @InterfaceAudience.Private
 public class DFSUtil {
@@ -703,6 +707,10 @@ public class DFSUtil {
     List<InetSocketAddress> addresses = getNameNodesRPCAddresses(conf,
         DFSConfigKeys.DFS_NAMENODES_SERVICE_RPC_ADDRESS_KEY, DFS_NAMENODES_RPC_ADDRESS_KEY,
         DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, DFS_NAMENODE_RPC_ADDRESS_KEY);
+    if (addresses.isEmpty() && conf.getBoolean(SERVICE_DISCOVERY_ENABLED_KEY, DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
+      throw new IOException("Could not resolve Namenode RPC address and Service Discovery is *enabled*. Check your " +
+          "configuration");
+    }
     if (addresses.isEmpty()) {
       addresses = getNameNodesRPCAddresses(conf);
     }
@@ -758,14 +766,21 @@ public class DFSUtil {
   private static List<URI> getNameNodesRPCAddressesAsURIs(Configuration conf,
       String listKey, String defaultListKey, String singleKey, String defaultSingleKey) {
     List<URI> uris = new ArrayList<>();
-    for (String nn : getNameNodesRPCAddressesInternal(conf, listKey,
-        singleKey)) {
-      uris.add(DFSUtil.createHDFSUri(nn));
-    }
-    if(uris.isEmpty()){
-     for (String nn : getNameNodesRPCAddressesInternal(conf, defaultListKey, defaultSingleKey)) {
-      uris.add(DFSUtil.createHDFSUri(nn));
-      } 
+    
+    if (conf.getBoolean(SERVICE_DISCOVERY_ENABLED_KEY, DEFAULT_SERVICE_DISCOVERY_ENABLED)) {
+      for (String nn : getNameNodesRPCAddressesFromServiceDiscovery(conf)) {
+        uris.add(DFSUtil.createHDFSUri(nn));
+      }
+    } else {
+      for (String nn : getNameNodesRPCAddressesInternal(conf, listKey,
+          singleKey)) {
+        uris.add(DFSUtil.createHDFSUri(nn));
+      }
+      if (uris.isEmpty()) {
+        for (String nn : getNameNodesRPCAddressesInternal(conf, defaultListKey, defaultSingleKey)) {
+          uris.add(DFSUtil.createHDFSUri(nn));
+        }
+      }
     }
     return uris;
   }
@@ -782,7 +797,44 @@ public class DFSUtil {
   public static String joinNameNodesHostPortString(List<String> namenodes) {
     return Joiner.on(",").join(namenodes);
   }
-
+  
+  private static Set<String> getNameNodesRPCAddressesFromServiceDiscovery(Configuration conf) {
+    // Try with rpc-addresses
+    String nnAddress = null;
+    Set<String> nns = getNameNodesRPCAddressesInternal(conf, DFS_NAMENODES_RPC_ADDRESS_KEY, "dont.want.single.key");
+    if (nns != null && !nns.isEmpty()) {
+      nnAddress = nns.iterator().next();
+    } else {
+      // And fallback to defaultFS
+      nnAddress = conf.get(DFSConfigKeys.FS_DEFAULT_NAME_KEY);
+    }
+    if (!Strings.isNullOrEmpty(nnAddress)) {
+      ServiceDiscoveryClient client = null;
+      final URI defaultFS = createHDFSUri(nnAddress);
+      try {
+        Builder sdBuilder = new Builder(Type.DNS)
+            .withDnsHost(conf.get(SERVICE_DISCOVERY_DNS_HOST, DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
+            .withDnsPort(conf.getInt(SERVICE_DISCOVERY_DNS_PORT, DEFAULT_SERVICE_DISCOVERY_DNS_PORT));
+        client = ServiceDiscoveryClientFactory.getInstance().getClient(sdBuilder);
+        return client.getService(
+            ServiceQuery.of(defaultFS.getHost(), Collections.<String>emptySet()))
+            .collect(Collectors.mapping(new Function<Service, String>() {
+              @Override
+              public String apply(Service service) {
+                return service.getAddress() + ":" + defaultFS.getPort();
+              }
+            }, Collectors.<String>toSet()));
+      } catch (ServiceDiscoveryException ex) {
+        LOG.warn("Could not resolve Service", ex);
+      } finally {
+        if (client != null) {
+          client.close();
+        }
+      }
+    }
+    return Collections.emptySet();
+  }
+  
   private static Set<String> getNameNodesRPCAddressesInternal(
       Configuration conf, String listKey, String singleKey) {
     String namenodes = conf.get(listKey);

@@ -27,8 +27,17 @@ import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
 import static org.junit.Assert.assertArrayEquals;
 
 import java.io.File;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.logicalclocks.servicediscoverclient.exceptions.ServiceNotFoundException;
+import com.logicalclocks.servicediscoverclient.resolvers.DnsResolver;
+import com.logicalclocks.servicediscoverclient.service.Service;
+import com.logicalclocks.servicediscoverclient.service.ServiceQuery;
+import io.hops.net.ServiceDiscoveryClientFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -38,20 +47,28 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.apache.hadoop.security.alias.JavaKeyStoreProvider;
+import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+
+import static org.mockito.Mockito.*;
 
 public class TestDFSUtil {
   
@@ -277,5 +294,50 @@ public class TestDFSUtil {
 
     // let's make sure that a password that doesn't exist returns null
     Assert.assertEquals(null, DFSUtil.getPassword(conf,"invalid-alias"));
+  }
+  
+  @Test
+  public void testNamenodeURIsFromServiceDiscovery() throws Exception {
+    Set<Service> nns = Sets.newHashSet(
+        Service.of("namenode.service.consul", "10.0.0.1", 8020),
+        Service.of("namenode.service.consul", "10.0.0.2", 8020),
+        Service.of("namenode.service.consul", "10.0.0.1", 50470),
+        Service.of("namenode.service.consul", "10.0.0.2", 50470));
+    List<InetSocketAddress> expected = Lists.newArrayList(
+        new InetSocketAddress(InetAddress.getByName("10.0.0.1"), 8020),
+        new InetSocketAddress(InetAddress.getByName("10.0.0.2"), 8020));
+    
+    DnsResolver dnsResolver = Mockito.mock(DnsResolver.class);
+    when(dnsResolver.getService(any(ServiceQuery.class))).thenReturn(nns.stream());
+    
+    ServiceDiscoveryClientFactory.getInstance().setClient(dnsResolver);
+    
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY, true);
+    conf.set(DFSConfigKeys.DFS_NAMENODES_RPC_ADDRESS_KEY, "namenode.service.lc:8020");
+    List<InetSocketAddress> nnIps = DFSUtil.getNameNodesRPCAddresses(conf);
+    assertNotNull(nnIps);
+    assertEquals(2, nnIps.size());
+    assertThat(nnIps, Matchers.equalTo(expected));
+  
+    // Test fallback to defaultFS
+    // We need to reset the stream here
+    when(dnsResolver.getService(any(ServiceQuery.class))).thenReturn(nns.stream());
+    conf = new Configuration(false);
+    conf.setBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY, true);
+    conf.set(DFSConfigKeys.FS_DEFAULT_NAME_KEY, "namenode.service.lc:8020");
+    nnIps = DFSUtil.getNameNodesRPCAddresses(conf);
+    assertNotNull(nnIps);
+    assertEquals(2, nnIps.size());
+    assertThat(nnIps, Matchers.equalTo(expected));
+    
+    // Service not found
+    when(dnsResolver.getService(any(ServiceQuery.class))).thenThrow(new ServiceNotFoundException("Service not found"));
+    conf = new Configuration(false);
+    conf.setBoolean(CommonConfigurationKeysPublic.SERVICE_DISCOVERY_ENABLED_KEY, true);
+    conf.set(DFSConfigKeys.FS_DEFAULT_NAME_KEY, "namenode.service.lc:8020");
+    nnIps = DFSUtil.getNameNodesRPCAddresses(conf);
+    assertNotNull(nnIps);
+    assertTrue(nnIps.isEmpty());
   }
 }

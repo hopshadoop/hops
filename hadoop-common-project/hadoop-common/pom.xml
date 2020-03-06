@@ -339,6 +339,11 @@
       <artifactId>dnsjava</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>com.logicalclocks</groupId>
+      <artifactId>service-discovery-client</artifactId>
+      <version>${sd-client.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
