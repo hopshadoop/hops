@@ -116,76 +116,13 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
   @Test
   public void testOps() throws Exception {
     prepareFS();
-    
-    // Generate certificates for user project__name
-    Pair<KeyPair, X509Certificate> clientMaterial = createClientCertificate("CN=" + ugi.getUserName());
+    testOpsPrivate("CN=" + ugi.getUserName(), null);
+  }
   
-    java.nio.file.Path c_keystore = Paths.get(classpathDir, ugi.getUserName() + "_kstore.jks");
-    java.nio.file.Path c_truststore = Paths.get(classpathDir, ugi.getUserName() + "_tstore.jks");
-    filesToPurge.add(c_keystore);
-    filesToPurge.add(c_truststore);
-    KeyStoreTestUtil.createKeyStore(c_keystore.toString(), passwd, passwd, ugi.getUserName(),
-        clientMaterial.getFirst().getPrivate(), clientMaterial.getSecond());
-    KeyStoreTestUtil.createTrustStore(c_truststore.toString(), passwd, "CARoot", caMaterial.getSecond());
-  
-    Pair<String, String> keystoresBase64 = readStoresBase64(c_keystore, c_truststore);
-    
-    TestingFsSecurityActions actor = (TestingFsSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
-        conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY));
-    HopsworksFsSecurityActions.X509CredentialsDTO credentialsDTO = new HopsworksFsSecurityActions.X509CredentialsDTO();
-    credentialsDTO.setFileExtension("jks");
-    credentialsDTO.setkStore(keystoresBase64.getFirst());
-    credentialsDTO.settStore(keystoresBase64.getSecond());
-    credentialsDTO.setPassword(passwd);
-    
-    actor.setX509Credentials(ugi.getUserName(), credentialsDTO);
-    
-    // Set client configuration
-    final Configuration clientConfiguration = new Configuration(conf);
-    createClientSSLConf(c_keystore, c_truststore, clientConfiguration);
-    
-    final Path testPath = new Path("/testfile");
-    final byte[] data = new byte[64 * 1024];
-    
-    rand.nextBytes(data);
-    ugi.doAs(new PrivilegedExceptionAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(clientConfiguration, WebHdfsConstants.SWEBHDFS_SCHEME);
-        FSDataOutputStream out = fs.create(testPath);
-        out.write(data, 0, data.length);
-        out.hflush();
-        out.close();
-        TimeUnit.SECONDS.sleep(1);
-        Assert.assertTrue(fs.exists(testPath));
-        fs.setPermission(testPath, FsPermission.valueOf("-rwxrwxrwx"));
-        return null;
-      }
-    });
-    
-    ugi.doAs(new PrivilegedExceptionAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(clientConfiguration, WebHdfsConstants.SWEBHDFS_SCHEME);
-        byte[] buffer = new byte[data.length];
-        FSDataInputStream in = fs.open(testPath);
-        in.readFully(buffer);
-        return null;
-      }
-    });
-    
-    ugi.doAs(new PrivilegedExceptionAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(clientConfiguration, WebHdfsConstants.SWEBHDFS_SCHEME);
-        FSDataOutputStream out = fs.append(testPath);
-        out.write(data, 0, data.length);
-        out.hflush();
-        out.close();
-        TimeUnit.MILLISECONDS.sleep(500);
-        return null;
-      }
-    });
+  @Test
+  public void testOpsWithAppId() throws Exception {
+    prepareFS();
+    testOpsPrivate("CN=" + ugi.getUserName(), "application_1573690044319_1560");
   }
   
   @Test
@@ -267,9 +204,86 @@ public class TestWebHDFSHopsTLS extends HopsSSLTestUtils {
     dfs.addUserToGroup(ugi.getUserName(), ugi.getUserName());
   }
   
+  
+  private void testOpsPrivate(String  cn, String ou) throws Exception {
+    // Generate certificates for user project__name
+    Pair<KeyPair, X509Certificate> clientMaterial = createClientCertificate(cn, ou);
+  
+    java.nio.file.Path c_keystore = Paths.get(classpathDir, ugi.getUserName() + "_kstore.jks");
+    java.nio.file.Path c_truststore = Paths.get(classpathDir, ugi.getUserName() + "_tstore.jks");
+    filesToPurge.add(c_keystore);
+    filesToPurge.add(c_truststore);
+    KeyStoreTestUtil.createKeyStore(c_keystore.toString(), passwd, passwd, ugi.getUserName(),
+      clientMaterial.getFirst().getPrivate(), clientMaterial.getSecond());
+    KeyStoreTestUtil.createTrustStore(c_truststore.toString(), passwd, "CARoot", caMaterial.getSecond());
+  
+    Pair<String, String> keystoresBase64 = readStoresBase64(c_keystore, c_truststore);
+  
+    TestingFsSecurityActions actor = (TestingFsSecurityActions) HopsSecurityActionsFactory.getInstance().getActor(conf,
+      conf.get(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY));
+    HopsworksFsSecurityActions.X509CredentialsDTO credentialsDTO = new HopsworksFsSecurityActions.X509CredentialsDTO();
+    credentialsDTO.setFileExtension("jks");
+    credentialsDTO.setkStore(keystoresBase64.getFirst());
+    credentialsDTO.settStore(keystoresBase64.getSecond());
+    credentialsDTO.setPassword(passwd);
+  
+    actor.setX509Credentials(ugi.getUserName(), credentialsDTO);
+  
+    // Set client configuration
+    final Configuration clientConfiguration = new Configuration(conf);
+    createClientSSLConf(c_keystore, c_truststore, clientConfiguration);
+  
+    final Path testPath = new Path("/testfile");
+    final byte[] data = new byte[64 * 1024];
+  
+    rand.nextBytes(data);
+    ugi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(clientConfiguration, WebHdfsConstants.SWEBHDFS_SCHEME);
+        FSDataOutputStream out = fs.create(testPath);
+        out.write(data, 0, data.length);
+        out.hflush();
+        out.close();
+        TimeUnit.SECONDS.sleep(1);
+        Assert.assertTrue(fs.exists(testPath));
+        fs.setPermission(testPath, FsPermission.valueOf("-rwxrwxrwx"));
+        return null;
+      }
+    });
+  
+    ugi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(clientConfiguration, WebHdfsConstants.SWEBHDFS_SCHEME);
+        byte[] buffer = new byte[data.length];
+        FSDataInputStream in = fs.open(testPath);
+        in.readFully(buffer);
+        return null;
+      }
+    });
+  
+    ugi.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(clientConfiguration, WebHdfsConstants.SWEBHDFS_SCHEME);
+        FSDataOutputStream out = fs.append(testPath);
+        out.write(data, 0, data.length);
+        out.hflush();
+        out.close();
+        TimeUnit.MILLISECONDS.sleep(500);
+        return null;
+      }
+    });
+  }
+  
   private Pair<KeyPair, X509Certificate> createClientCertificate(String cn) throws Exception {
+    return createClientCertificate(cn, null);
+  }
+  
+  private Pair<KeyPair, X509Certificate> createClientCertificate(String cn, String ou) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(KEY_ALG);
-    X509Certificate x509 = KeyStoreTestUtil.generateSignedCertificate(cn, keyPair, 42, SIGN_ALG,
+    X509Certificate x509 = KeyStoreTestUtil.generateSignedCertificate(cn, ou, keyPair, 42, SIGN_ALG,
         caMaterial.getFirst().getPrivate(), caMaterial.getSecond());
     return new Pair<>(keyPair, x509);
   }
