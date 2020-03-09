@@ -19,6 +19,7 @@ package io.hops.security;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.apache.commons.logging.Log;
@@ -72,7 +73,7 @@ public class HopsX509Authenticator {
     
     // Hops X.509 certificates use O field for ApplicationID
     String org = HopsUtil.extractOFromSubject(subjectDN);
-    if (org != null) {
+    if (org != null && (Strings.isNullOrEmpty(protocolName) || !protocolName.equalsIgnoreCase("WebHDFS"))) {
       user.addApplicationId(org);
     }
     

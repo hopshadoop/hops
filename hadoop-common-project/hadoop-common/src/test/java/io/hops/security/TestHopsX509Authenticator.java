@@ -67,6 +67,18 @@ public class TestHopsX509Authenticator {
   }
   
   @Test
+  public void TestAuthenticatedNormalUserWebHDFS() throws Exception {
+    String o = "application_id";
+    X509Certificate clientCertificate = generateX509Certificate("CN=bob, O=" + o);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser("bob");
+    InetAddress remoteAddress = InetAddress.getLocalHost();
+    
+    HopsX509Authenticator authenticator = authFactory.getAuthenticator();
+    authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress, "WebHDFS");
+    Assert.assertNull(ugi.getApplicationId());
+  }
+  
+  @Test
   public void TestNotAuthenticatedNormalUser() throws Exception {
     X509Certificate clientCertificate = generateX509Certificate("CN=bob");
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser("trudy");

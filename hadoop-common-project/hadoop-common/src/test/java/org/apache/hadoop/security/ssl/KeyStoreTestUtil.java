@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.security.ssl;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.alias.CredentialProvider;
@@ -58,6 +59,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.Extension;
@@ -120,9 +123,19 @@ public class KeyStoreTestUtil {
       throw new InvalidKeyException(ex);
     }
   }
-
-  public static X509Certificate generateSignedCertificate(String dn, KeyPair pair, int days, String algorithm,
-      PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
+  
+  public static X509Certificate generateSignedCertificate(String dn, KeyPair pair, int days, String algorithm, 
+    PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
+    CertificateEncodingException,
+    NoSuchAlgorithmException,
+    SignatureException,
+    InvalidKeyException,
+    NoSuchProviderException {
+    return generateSignedCertificate(dn, null, pair, days, algorithm, caKey, caCert);
+  }
+  
+  public static X509Certificate generateSignedCertificate(String dn, String appId, KeyPair pair, int days,
+    String algorithm, PrivateKey caKey, X509Certificate caCert) throws CertificateParsingException,
       CertificateEncodingException,
       NoSuchAlgorithmException,
       SignatureException,
@@ -132,12 +145,17 @@ public class KeyStoreTestUtil {
     Date to = new Date(from.getTime() + days * 86400000l);
     BigInteger sn = new BigInteger(64, new SecureRandom());
   
-    X500Name x500Name = new X500Name(dn);
+    X500NameBuilder x500NameBuilder = new X500NameBuilder();
+    x500NameBuilder.addRDN(BCStyle.CN, dn.split("=")[1]); //CN=XXX we need to get the value, not the entire string
+    if (!Strings.isNullOrEmpty(appId)){
+      x500NameBuilder.addRDN(BCStyle.OU, appId);
+    }
+  
     X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
     try {
       JcaX509ExtensionUtils extUtil = new JcaX509ExtensionUtils();
       ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(caKey);
-      X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer, sn, from, to, x500Name,
+      X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer, sn, from, to, x500NameBuilder.build(),
           pair.getPublic())
           .addExtension(Extension.authorityKeyIdentifier, false, extUtil.createAuthorityKeyIdentifier(caCert
               .getPublicKey()))
