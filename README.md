@@ -82,7 +82,7 @@ git checkout master
 ```
 ##### Building a Distribution
 ```sh
-mvn package -Pdist,native,docs -DskipTests -Dtar
+mvn package generate-sources -Pdist,native -DskipTests -Dtar
 ```
 
 ##### Compiling and Running Unit Tests Locally
@@ -204,13 +204,11 @@ The U.S. Government Department of Commerce, Bureau of Industry and Security (BIS
 
 The following provides more details on the included cryptographic software: Hadoop Core uses the SSL libraries from the Jetty project written by mortbay.org.
 
-#Contact 
+# Contact 
 
 <ul>
+<li><a href="https://community.hopsworks.ai/">Get support and report issues</a></li>
 <li><a href="https://twitter.com/hopshadoop">Follow our Twitter account.</a></li>
-<li><a href="https://gitter.im/hopshadoop/hopsworks">Chat with Hops developers in Gitter.</a></li>
-<li><a href="https://groups.google.com/forum/#!forum/hopshadoop">Join our developer mailing list.</a></li>
-<li><a href="https://cloud17.sics.se/jenkins/view/develop/">Checkout the current build status.</a></li>
 </ul>
 
 # License
