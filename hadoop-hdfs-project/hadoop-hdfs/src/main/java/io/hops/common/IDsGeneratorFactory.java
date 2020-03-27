@@ -16,6 +16,7 @@
 package io.hops.common;
 
 import com.google.common.collect.Lists;
+import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsVariables;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -110,21 +111,21 @@ public class IDsGeneratorFactory {
         cacheDirectiveIdsThreshold));
   }
 
-  public long getUniqueINodeID(){
+  public long getUniqueINodeID() throws StorageException {
     long id = iDsGenerators.get(0).getUniqueID();
     LOG.debug("Unique INode generated. id="+id);
     return id;
   }
 
-  public long getUniqueBlockID(){
+  public long getUniqueBlockID() throws StorageException {
     return iDsGenerators.get(1).getUniqueID();
   }
 
-  public int getUniqueQuotaUpdateID(){
+  public int getUniqueQuotaUpdateID() throws StorageException {
     return (int)iDsGenerators.get(2).getUniqueID();
   }
 
-  public long getUniqueCacheDirectiveID() {
+  public long getUniqueCacheDirectiveID() throws StorageException {
     long id = iDsGenerators.get(3).getUniqueID();
     if (id == 0) {
       id = iDsGenerators.get(3).getUniqueID();
