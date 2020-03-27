@@ -88,7 +88,7 @@ public class QuotaUpdateManager {
     }
   }
 
-  private int nextId() {
+  private int nextId() throws StorageException {
     return IDsGeneratorFactory.getInstance().getUniqueQuotaUpdateID();
   }
 

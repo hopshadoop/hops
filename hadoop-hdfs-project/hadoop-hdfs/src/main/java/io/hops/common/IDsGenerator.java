@@ -15,10 +15,16 @@
  */
 package io.hops.common;
 
+import io.hops.exception.StorageException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.IOException;
 
 public abstract class IDsGenerator{
 
+  private static final Log LOG =
+          LogFactory.getLog(IDsGenerator.class);
   private int batchSize;
   private int threshold;
   private CountersQueue cQ;
@@ -29,17 +35,29 @@ public abstract class IDsGenerator{
     cQ = new CountersQueue();
   }
 
-  public long getUniqueID() {
+  public synchronized long getUniqueID() throws StorageException {
+    if(!cQ.has(1)){
+      LOG.warn("ID Generator has run out of cached IDs. Fetching new set of IDs from DB");
+      getMoreIdsIfNeeded();
+    }
     return cQ.next();
   }
 
-  protected synchronized  boolean getMoreIdsIfNeeded()
-      throws IOException {
-    if (!cQ.has(threshold)) {
-      cQ.addCounter(incrementCounter(batchSize));
-      return true;
+  protected synchronized boolean getMoreIdsIfNeeded()
+          throws StorageException {
+    try {
+      if (!cQ.has(threshold)) {
+        cQ.addCounter(incrementCounter(batchSize));
+        return true;
+      }
+      return false;
+    } catch (IOException e) {
+      if (e instanceof StorageException) {
+        throw (StorageException) e;
+      } else {
+        throw new StorageException(e);
+      }
     }
-    return false;
   }
 
   protected CountersQueue getCQ() {
