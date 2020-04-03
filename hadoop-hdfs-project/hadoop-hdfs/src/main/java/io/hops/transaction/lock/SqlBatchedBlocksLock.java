@@ -17,6 +17,7 @@ package io.hops.transaction.lock;
 
 
 import java.io.IOException;
+
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 
 public final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
@@ -24,15 +25,17 @@ public final class SqlBatchedBlocksLock extends BaseIndividualBlockLock {
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     Lock inodeLock = locks.getLock(Type.INode);
+    long[] inodeIds = null;
     if (inodeLock instanceof BatchedINodeLock) {
-      long[] inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
-      blocks.addAll(
-          acquireLockList(DEFAULT_LOCK_TYPE, BlockInfoContiguous.Finder.ByINodeIds,
-              inodeIds));
+      inodeIds = ((BatchedINodeLock) inodeLock).getINodeIds();
+    } else if (inodeLock instanceof MultipleINodesLock) {
+      inodeIds = ((MultipleINodesLock) inodeLock).getINodeIds();
     } else {
       throw new TransactionLocks.LockNotAddedException(
-          "HopsBatchedINodeLock wasn't added");
+              "HopsBatchedINodeLock wasn't added");
     }
+    blocks.addAll(
+            acquireLockList(DEFAULT_LOCK_TYPE, BlockInfoContiguous.Finder.ByINodeIds,
+                    inodeIds));
   }
-
 }

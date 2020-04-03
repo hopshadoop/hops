@@ -1611,7 +1611,7 @@ public class TestFileCreation {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getLeaseLock(lockType, holder));
+            locks.add(lf.getLeaseLockAllPaths(lockType, holder));
           }
 
           @Override

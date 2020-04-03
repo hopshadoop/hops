@@ -38,7 +38,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
-import static org.apache.hadoop.util.Time.monotonicNow;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -178,7 +177,7 @@ public class LeaseManager {
               leasePaths.toArray(new String[leasePaths.size()]))
               .setNameNodeID(fsnamesystem.getNameNode().getId())
               .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
-          locks.add(il).add(lf.getLeaseLock(LockType.READ, holder))
+          locks.add(il).add(lf.getLeaseLockAllPaths(LockType.READ, holder))
               .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
               .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
         }
@@ -276,6 +275,7 @@ public class LeaseManager {
 
     if(src != null) {
       LeasePath lPath = new LeasePath(src, lease.getHolderID());
+      LOG.info("inc");
       lease.addFirstPath(lPath);
       EntityManager.add(lPath);
     }
@@ -590,7 +590,7 @@ public class LeaseManager {
                 .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
 
             locks.add(il).add(lf.getNameNodeLeaseLock(LockType.WRITE))
-                .add(lf.getLeaseLock(LockType.WRITE, holder))
+                .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder))
                 .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
                 .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
           }

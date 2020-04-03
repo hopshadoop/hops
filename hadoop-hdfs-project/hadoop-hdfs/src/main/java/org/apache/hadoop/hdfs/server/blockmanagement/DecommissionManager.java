@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.hops.transaction.lock.TransactionLockTypes;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -559,7 +560,8 @@ public class DecommissionManager {
                 LockFactory lf = LockFactory.getInstance();
                 if (!inodeIdentifiers.isEmpty()) {
                   locks.add(
-                      lf.getBatchedINodesLock(inodeIdentifiers))
+                      lf.getMultipleINodesLock(inodeIdentifiers,
+                              TransactionLockTypes.INodeLockType.WRITE))
                       .add(lf.getSqlBatchedBlocksLock()).add(
                       lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.PE));
                 }
@@ -653,7 +655,8 @@ public class DecommissionManager {
               public void acquireLock(TransactionLocks locks) throws IOException {
                 LockFactory lf = LockFactory.getInstance();
                 locks.add(
-                    lf.getBatchedINodesLock(inodeIdentifiers))
+                    lf.getMultipleINodesLock(inodeIdentifiers,
+                            TransactionLockTypes.INodeLockType.WRITE))
                     .add(lf.getSqlBatchedBlocksLock()).add(
                     lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UR, BLK.PE));
               }

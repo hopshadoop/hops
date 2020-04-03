@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.util.ExitUtil;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -30,13 +31,15 @@ import static org.junit.Assert.fail;
  */
 public class TestFormatAll {
 
-  //@Test
-  public void testFormatAll() throws IOException {
+  @Test
+  public void testFormatAlll() throws IOException {
     MiniDFSCluster cluster = null;
     Configuration conf = new HdfsConfiguration();
+    ExitUtil.disableSystemExit();
     String[] argv = {"-formatAll"};
     try {
       NameNode.createNameNode(argv, conf);
+    } catch (ExitUtil.ExitException e) {
     } catch (Exception e) {
       fail();
     }

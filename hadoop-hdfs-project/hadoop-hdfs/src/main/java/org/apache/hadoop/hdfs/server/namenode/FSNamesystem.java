@@ -1680,7 +1680,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
                     .add(lf.getAllUsedHashBucketsLock());
-        locks.add(lf.getLeaseLock(LockType.WRITE, clientName))
+        locks.add(lf.getLeaseLockAllPaths(LockType.WRITE, clientName))
               .add(lf.getLeasePathLock(LockType.WRITE));
         if (isErasureCodingEnabled()) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE.WRITE, src));
@@ -2054,10 +2054,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             .setNameNodeID(nameNode.getId())
             .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
             .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-        locks.add(il)
-            .add(lf.getBlockLock())
-            .add(lf.getLeaseLock(LockType.WRITE, holder))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
+        locks.add(il).add(lf.getBlockLock());
+        LeaseLock leaseLock = (LeaseLock)lf.getLeaseLockSinglePath(LockType.WRITE, holder, src);
+        locks.add(leaseLock).add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
             lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
                 BLK.PE, BLK.IV));
 
@@ -2457,7 +2456,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                     .setNameNodeID(nameNode.getId())
                     .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
             locks.add(il)
-                    .add(lf.getLeaseLock(LockType.WRITE, holder))
+                    .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR))
                     .add(lf.getAcesLock());
@@ -2642,7 +2641,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                     .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
                     .skipReadingQuotaAttr(!dir.isQuotaEnabled());
             locks.add(il).add(lf.getBlockLock())
-                    .add(lf.getLeaseLock(LockType.WRITE, holder))
+                    .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
                     .add(lf.getLastBlockHashBucketsLock());
@@ -2820,7 +2819,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           locks.add(il)
               .add(lf.getLastTwoBlocksLock(fileId));
         }
-        locks.add(lf.getLeaseLock(LockType.READ, clientName))
+        //we have to lock all leasse for the client becuase the file could have been renamed
+        locks.add(lf.getLeaseLockAllPaths(LockType.READ, clientName))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
       }
@@ -3145,7 +3145,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               locks.add(il);
             }
 
-            locks.add(lf.getLeaseLock(LockType.READ, clientName));
+            locks.add(lf.getLeaseLockAllPaths(LockType.READ, clientName));
           }
 
           @Override
@@ -3234,7 +3234,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                   .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
               locks.add(il);
             }
-            locks.add(lf.getLeaseLock(LockType.READ))
+            locks.add(lf.getLeaseLockAllPaths(LockType.READ))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
                     .add(lf.getBlockLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.ER));
@@ -3363,8 +3363,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                   .skipReadingQuotaAttr(!dir.isQuotaEnabled());
               locks.add(il);
             }
-            locks.add(lf.getLeaseLock(LockType.WRITE, holder))
-                .add(lf.getLeasePathLock(LockType.WRITE))
+            //we have to lock all leasse for the client becuase the file could have been renamed
+            LeaseLock leaseLock = (LeaseLock)lf.getLeaseLockAllPaths(LockType.WRITE, holder);
+            locks.add(leaseLock).add(lf.getLeasePathLock(LockType.WRITE))
                 .add(lf.getBlockLock());
 
             if (data == null) { // the data is stored on the datanodes.
@@ -3831,7 +3832,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
           locks.add(il);
         }
-        locks.add(lf.getLeaseLock(LockType.READ, clientName))
+        locks.add(lf.getLeaseLockAllPaths(LockType.READ, clientName))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
             .add(lf.getBlockLock());
       }
@@ -4099,7 +4100,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = getInstance();
         locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-                .add(lf.getLeaseLock(LockType.WRITE))
+                .add(lf.getLeaseLockAllPaths(LockType.WRITE))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
@@ -4303,7 +4304,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getLeaseLock(LockType.WRITE, holder));
+        locks.add(lf.getLeaseLockAllPaths(LockType.WRITE, holder));
       }
 
       @Override
@@ -6068,7 +6069,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add( lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
-                .add(lf.getLeaseLock(LockType.READ))
+                .add(lf.getLeaseLockAllPaths(LockType.READ))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.UC))
@@ -6197,7 +6198,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       if (cookieTab[0] == null) {
         cookieTab[0] = String.valueOf(getIntCookie(cookieTab[0]));
       }
-      LOG.info("there are no corrupt file blocks.");
+      LOG.debug("there are no corrupt file blocks.");
       return corruptFiles;
     }
 
@@ -9079,7 +9080,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           }
           numRun++;
         } catch (Throwable e) {
-          FSNamesystem.LOG.error("Exception in RetryCacheCleaner: ", e);
+          if (e instanceof InterruptedException) {
+            FSNamesystem.LOG.warn("RetryCacheCleaner Interrupted");
+          } else {
+            FSNamesystem.LOG.error("Exception in RetryCacheCleaner: ", e);
+          }
         }
       }
     }

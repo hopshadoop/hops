@@ -44,7 +44,6 @@ import static org.junit.Assert.assertFalse;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import org.mockito.stubbing.Answer;
 
 public class TestFSNamesystem {
 
@@ -76,7 +75,7 @@ public class TestFSNamesystem {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getLeaseLock(LockType.WRITE, holder));
+        locks.add(lf.getLeaseLockAllPaths(LockType.WRITE, holder));
       }
       
       @Override

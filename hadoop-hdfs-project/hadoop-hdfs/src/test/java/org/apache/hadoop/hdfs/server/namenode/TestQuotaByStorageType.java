@@ -599,7 +599,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = LockFactory.getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -624,7 +624,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -648,7 +648,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, foo.toString());
-        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -675,7 +675,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, foo.toString());
-        locks.add(il).add(lf.getLeaseLock(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));

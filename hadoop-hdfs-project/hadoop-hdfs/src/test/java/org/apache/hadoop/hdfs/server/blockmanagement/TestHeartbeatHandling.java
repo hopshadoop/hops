@@ -56,9 +56,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.util.Time;
 
 import static org.junit.Assert.assertEquals;
 
@@ -283,7 +281,7 @@ public class TestHeartbeatHandling {
         locks.add(
             lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(
-                lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
