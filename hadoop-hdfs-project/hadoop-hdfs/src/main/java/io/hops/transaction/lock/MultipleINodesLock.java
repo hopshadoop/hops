@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 hops.io.
+ * Copyright (C) 2020 hops.io.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
@@ -27,53 +26,61 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class BatchedINodeLock extends BaseINodeLock {
+public class MultipleINodesLock extends BaseINodeLock {
 
   private final List<INodeIdentifier> inodeIdentifiers;
+  private final TransactionLockTypes.INodeLockType lockType;
   private long[] inodeIds;
 
-  public BatchedINodeLock(List<INodeIdentifier> inodeIdentifiers) {
+  public MultipleINodesLock(List<INodeIdentifier> inodeIdentifiers,
+                            TransactionLockTypes.INodeLockType lockType) {
     this.inodeIdentifiers = inodeIdentifiers;
     this.inodeIds = new long[inodeIdentifiers.size()];
+    this.lockType = lockType;
+    if (lockType == TransactionLockTypes.INodeLockType.READ_COMMITTED) {
+      throw new IllegalArgumentException("For READ_COMMITTED locks BatchedINodeLocks as better " +
+              "performance");
+    }
   }
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
     if (inodeIdentifiers != null && !inodeIdentifiers.isEmpty()) {
 
-      List<INode> inodes = batchRead();
+      List<INode> inodes = orderedReadWithLock();
 
       for (INode inode : inodes) {
         if (inode != null) {
           List<INode> pathInodes = readUpInodes(inode);
           addPathINodesAndUpdateResolvingCache(INodeUtil.constructPath(pathInodes),
-              pathInodes);
+                  pathInodes);
         }
       }
       addIndividualINodes(inodes);
     } else {
       throw new StorageException(
-          "INodeIdentifier object is not properly initialized ");
+              "INodeIdentifier object is not properly initialized ");
     }
   }
 
-  private List<INode> batchRead() throws TransactionContextException, StorageException {
-    String[] names = new String[inodeIdentifiers.size()];
-    long[] parentIds = new long[inodeIdentifiers.size()];
-    long[] partitionIds = new long[inodeIdentifiers.size()];
+  private List<INode> orderedReadWithLock() throws TransactionContextException, StorageException {
+    List<INode> inodes = new ArrayList();
+    Collections.sort(inodeIdentifiers);
     for (int i = 0; i < inodeIdentifiers.size(); i++) {
       INodeIdentifier inodeIdentifier = inodeIdentifiers.get(i);
-      names[i] = inodeIdentifier.getName();
-      parentIds[i] = inodeIdentifier.getPid();
-      partitionIds[i] = inodeIdentifier.getPartitionId();
       inodeIds[i] = inodeIdentifier.getInodeId().longValue();
+      INode inode = find(lockType,
+              inodeIdentifier.getName(),
+              inodeIdentifier.getPid(),
+              inodeIdentifier.getPartitionId(),
+              inodeIdentifier.getInodeId());
+      if (inode != null) {
+        inodes.add(inode);
+      }
     }
-
-    List<INode> inodes = find(TransactionLockTypes.INodeLockType.READ_COMMITTED,
-            names, parentIds,partitionIds,
-            false);
     return inodes;
   }
+
 
   long[] getINodeIds() {
     return inodeIds;
@@ -81,9 +88,9 @@ public class BatchedINodeLock extends BaseINodeLock {
 
   @Override
   public String toString() {
-    if(inodeIdentifiers != null){
-      return "Batch INode Lock = { "+inodeIdentifiers.size()+" inodes locked "+" }";
+    if (inodeIdentifiers != null) {
+      return "Multiple INode Lock = { " + inodeIdentifiers.size() + " inodes locked " + " }";
     }
-    return "No inodes selected for batch locking";
+    return "No inodes selected for locking";
   }
 }

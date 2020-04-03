@@ -30,7 +30,7 @@ import java.util.Arrays;
  * file is not less than the height of the tree minus one.
  */
 public class FileNameGenerator {
-  private static final int DEFAULT_FILES_PER_DIRECTORY = 32;
+  public static final int DEFAULT_FILES_PER_DIRECTORY = 32;
   
   private int[] pathIndecies = new int[20];
       // this will support up to 32**20 = 2**100 = 10**30 files

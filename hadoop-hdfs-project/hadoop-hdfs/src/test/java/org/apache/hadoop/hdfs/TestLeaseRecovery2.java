@@ -40,6 +40,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -116,7 +117,7 @@ public class TestLeaseRecovery2 {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout=300000)
   public void testImmediateRecoveryOfLease() throws Exception {
     //create a file
     // write bytes into the file.
@@ -159,8 +160,8 @@ public class TestLeaseRecovery2 {
     stm.close();
     verifyFile(dfs, filepath1, actual, size);
   }
-  
-  @Test
+
+  @Test(timeout=300000)
   public void testLeaseRecoverByAnotherUser() throws Exception {
     byte [] actual = new byte[FILE_SIZE];
     cluster.setLeasePeriod(SHORT_LEASE_PERIOD, LONG_LEASE_PERIOD);
@@ -278,7 +279,7 @@ public class TestLeaseRecovery2 {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout=300000)
   public void testHardLeaseRecovery() throws Exception {
     //create a file
     String filestr = "/hardLeaseRecovery";
@@ -337,7 +338,7 @@ public class TestLeaseRecovery2 {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout=300000)
   public void testSoftLeaseRecovery() throws Exception {
     Map<String, String[]> u2g_map = new HashMap<>(1);
     u2g_map.put(fakeUsername, new String[]{fakeGroup});
@@ -430,17 +431,17 @@ public class TestLeaseRecovery2 {
    *
    * @throws Exception
    */
-  @Test
+  @Test(timeout=300000)
   public void testHardLeaseRecoveryAfterNameNodeRestart() throws Exception {
     hardLeaseRecoveryRestartHelper(false, -1);
   }
 
-  @Test
+  @Test(timeout=300000)
   public void testHardLeaseRecoveryAfterNameNodeRestart2() throws Exception {
     hardLeaseRecoveryRestartHelper(false, 1535);
   }
 
-  @Test
+  @Test(timeout=300000)
   public void testHardLeaseRecoveryWithRenameAfterNameNodeRestart()
       throws Exception {
     hardLeaseRecoveryRestartHelper(true, -1);

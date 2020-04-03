@@ -318,9 +318,9 @@ public abstract class BaseINodeLock extends Lock {
       key[2] = "";
       EntityManager.setPartitionKey(INodeDataAccess.class, key);
       isPartitionKeyAlreaySet=true; //to avoid setting partition key multiple times. It can happen during rename
-      LOG.debug("Setting PartitionKey to be " + partitionId);
+      LOG.trace("Setting PartitionKey to be " + partitionId);
     } else {
-      LOG.debug("Transaction PartitionKey is not Set");
+      LOG.trace("Transaction PartitionKey is not Set");
     }
   }
 
@@ -431,7 +431,7 @@ public abstract class BaseINodeLock extends Lock {
       Long partId = null;
       if (partial) {
         if (setRandomParitionKeyEnabled && partId == null) {
-          LOG.debug("Setting Random PartitionKey");
+          LOG.trace("Setting Random PartitionKey");
           partId = Math.abs(rand.nextLong());
         }
       } else {

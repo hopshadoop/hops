@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
@@ -25,7 +24,6 @@ import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
-import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
@@ -76,7 +74,7 @@ public class TestLeaseManager {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE, holder));
+        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, holder));
       }
 
       @Override
@@ -113,7 +111,7 @@ public class TestLeaseManager {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE, path));
       }
 
