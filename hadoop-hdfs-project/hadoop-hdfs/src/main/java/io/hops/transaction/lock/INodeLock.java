@@ -246,7 +246,7 @@ public class INodeLock extends BaseINodeLock {
         throw new RetriableException("The subtree "+iNode.getLocalName() +" is locked by " +
                 "Namenode Id: " + iNode.getSTOLockOwner() + ". Active Namenodes are: "+activeNamenodes);
       } else {
-        LOG.debug("Ignoring subtree lock for inode id: "+iNode.getId());
+        LOG.trace("Ignoring subtree lock for inode id: "+iNode.getId());
       }
     }
   }
@@ -341,13 +341,13 @@ public class INodeLock extends BaseINodeLock {
         children.addAll(clist);
       }
     }
-    LOG.debug("Added " + children.size() + " children.");
+    LOG.trace("Added " + children.size() + " children.");
     return children;
   }
 
   private INode acquireLockOnRoot(TransactionLockTypes.INodeLockType lock)
       throws StorageException, TransactionContextException {
-    LOG.debug("Acquiring " + lock + " on the root node");
+    LOG.trace("Acquiring " + lock + " on the root node");
     return find(lock, INodeDirectory.ROOT_NAME, HdfsConstantsClient.GRANDFATHER_INODE_ID, INodeDirectory.
         getRootDirPartitionKey());
   }

@@ -18,6 +18,7 @@ package io.hops.transaction.lock;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
+import io.hops.transaction.lock.TransactionLockTypes.LeaseHolderResolveType;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,19 +33,31 @@ public final class LeaseLock extends Lock {
   private final TransactionLockTypes.LockType lockType;
   private final String leaseHolder;
   private final List<Lease> leases;
+  private final String singleFileLock;
+  private final LeaseHolderResolveType resolveType;
 
-  LeaseLock(TransactionLockTypes.LockType lockType, String leaseHolder) {
+  LeaseLock(TransactionLockTypes.LockType lockType, LeaseHolderResolveType resolveType,
+            String leaseHolder, String singleFileLock ) {
     this.lockType = lockType;
     this.leaseHolder = leaseHolder;
     this.leases = new ArrayList<>();
+    this.resolveType = resolveType;
+    this.singleFileLock = singleFileLock;
+
+    if(resolveType == LeaseHolderResolveType.SINGLE_PATH &&
+            (singleFileLock == null || singleFileLock.isEmpty())) {
+      throw new IllegalArgumentException("Please specify a lease path to lock");
+    }
   }
 
   LeaseLock(TransactionLockTypes.LockType lockType) {
-    this(lockType, null);
+    this(lockType, LeaseHolderResolveType.ALL_PATHS, null, null);
   }
 
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
+    setLockMode(lockType);
+
     Set<String> hldrs = new HashSet<>();
     if (leaseHolder != null) {
       hldrs.add(leaseHolder);
@@ -60,13 +73,12 @@ public final class LeaseLock extends Lock {
       }
     }
 
-    setLockMode(lockType);
     List<String> holders = new ArrayList<>(hldrs);
     Collections.sort(holders);
-    if(holders.isEmpty() && !locks.containsLock(Type.INode)){
-      Collection<Lease> leases = acquireLockList(lockType, Lease.Finder.All);
+    if (holders.isEmpty() && !locks.containsLock(Type.INode)) {
+      Collection<Lease> allLeases = acquireLockList(lockType, Lease.Finder.All);
       if (leases != null) {
-        leases.addAll(leases);
+        leases.addAll(allLeases);
       }
     }
     for (String h : holders) {
@@ -88,5 +100,17 @@ public final class LeaseLock extends Lock {
   @Override
   protected final Type getType() {
     return Type.Lease;
+  }
+
+  public String getSingleFileLock(){
+    return singleFileLock;
+  }
+
+  public LeaseHolderResolveType getResolveType(){
+    return resolveType;
+  }
+
+  public String getLeaseHolder(){
+    return leaseHolder;
   }
 }

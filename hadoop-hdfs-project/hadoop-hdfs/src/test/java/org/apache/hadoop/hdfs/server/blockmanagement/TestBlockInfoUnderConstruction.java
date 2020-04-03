@@ -132,7 +132,7 @@ public class TestBlockInfoUnderConstruction {
         locks.add(
             lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(
-                lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
@@ -170,7 +170,7 @@ public class TestBlockInfoUnderConstruction {
         locks.add(
             lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(
-                lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,

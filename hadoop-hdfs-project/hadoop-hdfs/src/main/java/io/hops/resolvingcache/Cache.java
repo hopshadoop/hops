@@ -135,7 +135,7 @@ public abstract class Cache {
       final long startTime = System.currentTimeMillis();
       long[] result = getInternal(path);
       final long elapsed =  (System.currentTimeMillis() - startTime);
-      LOG.debug("GET for path (" + path + ")  got value = " + Arrays.toString
+      LOG.trace("GET for path (" + path + ")  got value = " + Arrays.toString
           (result) + " in " + elapsed + " " +
           "msec");
       if(TransactionsStats.getInstance().isEnabled()){
@@ -154,7 +154,7 @@ public abstract class Cache {
       final long startTime = System.currentTimeMillis();
       INodeIdentifier result = getInternal(inodeId);
       final long elapsed = (System.currentTimeMillis() - startTime);
-      LOG.debug("GET for inodeId (" + inodeId + ")  got value = " + result + " in " + elapsed + " " + "msec");
+      LOG.trace("GET for inodeId (" + inodeId + ")  got value = " + result + " in " + elapsed + " " + "msec");
       if (TransactionsStats.getInstance().isEnabled()) {
         TransactionsStats.getInstance().pushResolvingCacheStats(
             new ResolvingCacheStat(ResolvingCacheStat.Op.GET, elapsed, 1));

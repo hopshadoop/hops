@@ -53,6 +53,7 @@ import org.apache.hadoop.hdfs.server.protocol.StorageBlockReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
+import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.Groups;
@@ -114,7 +115,8 @@ public class NNThroughputBenchmark implements Tool {
   private static final String GENERAL_OPTIONS_USAGE =
       "     [-keepResults] | [-logLevel L] | [-UGCacheRefreshCount G]";
   private static int NUM_BUCKETS;
-  
+  private final int retryCount = 10;
+
   static Configuration config;
   static NameNode nameNode;
   static NamenodeProtocols nameNodeProto;
@@ -145,6 +147,10 @@ public class NNThroughputBenchmark implements Tool {
     config.set(DFSConfigKeys.FS_DEFAULT_NAME_KEY, "localhost");
     NUM_BUCKETS = conf.getInt(DFSConfigKeys.DFS_NUM_BUCKETS_KEY,
         DFSConfigKeys.DFS_NUM_BUCKETS_DEFAULT);
+
+    config.setInt(DFSConfigKeys.DFS_NAMENODE_TX_RETRY_COUNT_KEY, retryCount);
+    LOG.info("NNThroughputBenchmark. Tx Retry Count: " + retryCount);
+
   }
 
   void close() {
@@ -307,7 +313,14 @@ public class NNThroughputBenchmark implements Tool {
       nameNodeProto
           .setSafeMode(HdfsConstants.SafeModeAction.SAFEMODE_LEAVE, false);
       if (!keepResults) {
-        nameNodeProto.delete(getBaseDir(), true);
+        for (int i = 0; i <retryCount;i++ ){
+          try {
+            nameNodeProto.delete(getBaseDir(), true);
+            return;
+          } catch (RetriableException e) {
+            LOG.warn("Delete Failed. Exception("+e.getMessage()+"). Retrying delete operation");
+          }
+        }
       }
     }
 
@@ -545,7 +558,7 @@ public class NNThroughputBenchmark implements Tool {
     static final String OP_CREATE_USAGE =
         "-op create [-threads T] [-files N] [-filesPerDir P] [-close]";
 
-    protected FileNameGenerator nameGenerator;
+    protected int filePerDirectory = FileNameGenerator.DEFAULT_FILES_PER_DIRECTORY;
     protected String[][] fileNames;
     private boolean closeUponCreate;
 
@@ -586,7 +599,7 @@ public class NNThroughputBenchmark implements Tool {
           printUsage();
         }
       }
-      nameGenerator = new FileNameGenerator(getBaseDir(), nrFilesPerDir);
+      filePerDirectory = nrFilesPerDir;
     }
 
     @Override
@@ -600,6 +613,8 @@ public class NNThroughputBenchmark implements Tool {
       for (int idx = 0; idx < numThreads; idx++) {
         int threadOps = opsPerThread[idx];
         fileNames[idx] = new String[threadOps];
+        FileNameGenerator nameGenerator = new FileNameGenerator(
+                getBaseDir()+"/thread-"+idx, filePerDirectory);
         for (int jdx = 0; jdx < threadOps; jdx++) {
           fileNames[idx][jdx] = nameGenerator.
               getNextFileName("ThroughputBench");
@@ -634,6 +649,7 @@ public class NNThroughputBenchmark implements Tool {
               clientName, new EnumSetWritable<>(
                   EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
               replication, BLOCK_SIZE, null);
+
       long end = Time.now();
       for(boolean written = !closeUponCreate; !written; 
         written = nameNodeProto.complete(fileNames[daemonId][inputIdx],
@@ -646,7 +662,7 @@ public class NNThroughputBenchmark implements Tool {
       LOG.info("--- " + getOpName() + " inputs ---");
       LOG.info("nrFiles = " + numOpsRequired);
       LOG.info("nrThreads = " + numThreads);
-      LOG.info("nrFilesPerDir = " + nameGenerator.getFilesPerDirectory());
+      LOG.info("nrFilesPerDir = " + filePerDirectory);
       printStats();
     }
   }
@@ -663,7 +679,8 @@ public class NNThroughputBenchmark implements Tool {
     static final String OP_MKDIRS_USAGE = "-op mkdirs [-threads T] [-dirs N] " +
         "[-dirsPerDir P]";
 
-    protected FileNameGenerator nameGenerator;
+
+    int dirsPerDir;
     protected String[][] dirPaths;
 
     MkdirsStats(List<String> args) {
@@ -693,7 +710,7 @@ public class NNThroughputBenchmark implements Tool {
         } else if(!ignoreUnrelatedOptions)
           printUsage();
       }
-      nameGenerator = new FileNameGenerator(getBaseDir(), nrDirsPerDir);
+      dirsPerDir = nrDirsPerDir;
     }
 
     @Override
@@ -706,9 +723,12 @@ public class NNThroughputBenchmark implements Tool {
       for(int idx=0; idx < numThreads; idx++) {
         int threadOps = opsPerThread[idx];
         dirPaths[idx] = new String[threadOps];
-        for(int jdx=0; jdx < threadOps; jdx++)
+        FileNameGenerator nameGenerator = new FileNameGenerator(
+                getBaseDir()+"/thread-"+idx, dirsPerDir);
+        for(int jdx=0; jdx < threadOps; jdx++) {
           dirPaths[idx][jdx] = nameGenerator.
-              getNextFileName("ThroughputBench");
+                  getNextFileName("ThroughputBench");
+        }
       }
     }
 
@@ -738,7 +758,7 @@ public class NNThroughputBenchmark implements Tool {
       LOG.info("--- " + getOpName() + " inputs ---");
       LOG.info("nrDirs = " + numOpsRequired);
       LOG.info("nrThreads = " + numThreads);
-      LOG.info("nrDirsPerDir = " + nameGenerator.getFilesPerDirectory());
+      LOG.info("nrDirsPerDir = " + dirsPerDir);
       printStats();
     }
   }
@@ -783,7 +803,7 @@ public class NNThroughputBenchmark implements Tool {
       String[] createArgs = new String[]{"-op", "create", "-threads",
           String.valueOf(this.numThreads), "-files",
           String.valueOf(numOpsRequired), "-filesPerDir",
-          String.valueOf(nameGenerator.getFilesPerDirectory()), "-close"};
+          String.valueOf(filePerDirectory), "-close"};
       CreateFileStats opCreate = new CreateFileStats(Arrays.asList(createArgs));
 
       if (!useExisting) {  // create files if they were not created before
