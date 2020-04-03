@@ -949,7 +949,7 @@ public class NameNode implements NameNodeStatusMXBean {
 
   @VisibleForTesting
   public static boolean formatAll(Configuration conf) throws IOException {
-    System.out.println("Formatting HopsFS and HopsYarn");
+    LOG.warn("Formatting HopsFS and HopsYarn");
     initializeGenericKeys(conf);
 
     if (UserGroupInformation.isSecurityEnabled()) {

@@ -3644,7 +3644,7 @@ public class BlockManager {
             @Override
             public void acquireLock(TransactionLocks locks) throws IOException {
               LockFactory lf = LockFactory.getInstance();
-              locks.add(lf.getBatchedINodesLock(inodeIdentifiers))
+              locks.add(lf.getMultipleINodesLock(inodeIdentifiers, INodeLockType.WRITE))
                   .add(lf.getSqlBatchedBlocksLock()).add(
                   lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
                       BLK.ER));
@@ -3654,8 +3654,14 @@ public class BlockManager {
             @Override
             public Object performTask() throws IOException {
               for (INodeIdentifier inodeIdentifier : inodeIdentifiers) {
-                INode inode = EntityManager
-                    .find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
+                INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS,
+                        inodeIdentifier.getInodeId());
+                if(inode == null){
+                  LOG.info("Process misreplicated blocks File with ID: "+inodeIdentifier.getInodeId()+
+                          " not found. File is overritten or deleted");
+                  continue;
+                }
+
                 for (BlockInfoContiguous block : ((INodeFile) inode).getBlocks()) {
                   MisReplicationResult res = processMisReplicatedBlock(block);
                   if (LOG.isTraceEnabled()) {
@@ -4183,7 +4189,7 @@ public class BlockManager {
             public void acquireLock(TransactionLocks locks) throws IOException {
               LockFactory lf = LockFactory.getInstance();
               locks.add(
-                  lf.getBatchedINodesLock(inodeIdentifiers))
+                  lf.getMultipleINodesLock(inodeIdentifiers, INodeLockType.READ))
                   .add(lf.getSqlBatchedBlocksLock())
                   .add(lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV));
             }
@@ -4589,7 +4595,7 @@ public class BlockManager {
             public void acquireLock(TransactionLocks locks) throws IOException {
               LockFactory lf = LockFactory.getInstance();
               locks.add(
-                  lf.getBatchedINodesLock(inodeIdentifiers))
+                  lf.getMultipleINodesLock(inodeIdentifiers, INodeLockType.WRITE))
                   .add(lf.getSqlBatchedBlocksLock()).add(
                   lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
                       BLK.ER));
@@ -5200,7 +5206,7 @@ public class BlockManager {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(
-            lf.getBatchedINodesLock(inodeIdentifiers))
+            lf.getMultipleINodesLock(inodeIdentifiers, INodeLockType.WRITE))
             .add(lf.getSqlBatchedBlocksLock()).add(
             lf.getSqlBatchedBlocksRelated(BLK.RE, BLK.IV, BLK.CR, BLK.UR,
                 BLK.ER));

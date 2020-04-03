@@ -20,9 +20,11 @@ import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.LeasePath;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
+import io.hops.transaction.lock.TransactionLockTypes.LeaseHolderResolveType;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -64,10 +66,16 @@ public final class LeasePathLock extends Lock {
     }
 
     LeaseLock leaseLock = (LeaseLock) locks.getLock(Type.Lease);
+    LeaseHolderResolveType resolveType = leaseLock.getResolveType();
     for (Lease lease : leaseLock.getLeases()) {
-      acquireLeasePaths(lease);
+      if(resolveType == LeaseHolderResolveType.SINGLE_PATH ) {
+        acquireLeasePath(lease, leaseLock.getSingleFileLock());
+      } else {
+        assert resolveType == LeaseHolderResolveType.ALL_PATHS;
+        acquireLeasePaths(lease);
+      }
     }
-    
+
     if(src != null && !src.equals("")){
       acquireAllLeasePathsForDir(src);
     }
@@ -87,6 +95,15 @@ public final class LeasePathLock extends Lock {
     if (!lease.getHolder().equals(
         HdfsServerConstants.NAMENODE_LEASE_HOLDER)) { // We don't need to keep the lps result for namenode-lease.
       leasePaths.addAll(result);
+    }
+  }
+
+  private void acquireLeasePath(Lease lease, String path)
+          throws StorageException, TransactionContextException {
+    setLockMode(lockType);
+    LeasePath leasePath = acquireLock(lockType, LeasePath.Finder.ByPath, path);
+    if (leasePath != null) {
+      leasePaths.add(leasePath);
     }
   }
 

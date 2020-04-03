@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import io.hops.exception.LockUpgradeException;
+import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
@@ -267,7 +268,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
       if (!isNewlyAdded(parentId) && !containsRemoved(parentId, name)) {
         if (canReadCachedRootINode(name, parentId)) {
           result = RootINodeCache.getRootINode();
-          LOG.debug("Reading root inode from the cache. "+result);
+          LOG.trace("Reading root inode from the cache. "+result);
        } else {
           aboutToAccessStorage(inodeFinder, params);
           result = dataAccess.findInodeByNameParentIdAndPartitionIdPK(name, parentId, partitionId);
@@ -382,7 +383,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
       rootINode = RootINodeCache.getRootINode();
       if (rootINode != null) {
         if(names[0].equals(INodeDirectory.ROOT_NAME) && parentIds[0] == HdfsConstantsClient.GRANDFATHER_INODE_ID){
-          LOG.debug("Reading root inode from the cache "+rootINode);
+          LOG.trace("Reading root inode from the cache "+rootINode);
           //remove root from the batch operation. Cached root inode will be added later to the results
           names = Arrays.copyOfRange(names, 1, names.length);
           parentIds = Arrays.copyOfRange(parentIds, 1, parentIds.length);
@@ -438,11 +439,32 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
   }
 
   private void gotFromDBWithPossibleInodeId(INode result,
-      Long possibleInodeId) {
-    if (result == null && possibleInodeId != null) {
-      gotFromDB(possibleInodeId, result);
-    } else {
+                                            Long possibleInodeId) {
+
+    if (result != null) {
       gotFromDB(result);
+    }
+
+    //Inode does not exists
+    if ((result == null && possibleInodeId != null) ||
+       //Special Case
+       //Note: Inode PK consists of name, pid, and partID.
+       //Each Inode also has ID (candidate PK).
+       //Here in this fn we are trying to update
+       //the ID -> INode Mapping in the cache.
+       //The INode is read using PK operation, that is using, name, pid, and partID.
+       //Assume INodeIdentifier {ID:1, PID:0, Name:"file", PARTID:1}
+       //This INodeIdentifier object is created in the setup phase
+       //out side the transaction, and without any locking.
+       //There is a special case that the file is overwritten by a new
+       //file with the same name. In that case the PK of the file
+       //will remain the same but INode ID will change.
+       //So we might end up in a situation like following
+       //INode{ID:2, PID:0, Name:"file", PARTID:1}
+       //possibleInodeId:1
+       (result != null && possibleInodeId != null &&
+               result.getId() != possibleInodeId)) {
+      gotFromDB(possibleInodeId, null);
     }
   }
 

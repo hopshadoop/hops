@@ -165,6 +165,11 @@ public class LockFactory {
     return new BatchedINodeLock(inodeIdentifiers);
   }
 
+  public Lock getMultipleINodesLock(List<INodeIdentifier> inodeIdentifiers,
+                                    TransactionLockTypes.INodeLockType lockType) {
+    return new MultipleINodesLock(inodeIdentifiers, lockType);
+  }
+
   /**
    * @param lockType the lock to acquire
    * @param inodeIdentifier the id of the inode
@@ -207,12 +212,19 @@ public class LockFactory {
     return new RenameINodeLock(lockType, resolveType, src, dst, true);
   }
 
-  public Lock getLeaseLock(TransactionLockTypes.LockType lockType,
-      String leaseHolder) {
-    return new LeaseLock(lockType, leaseHolder);
+  public Lock getLeaseLockAllPaths(TransactionLockTypes.LockType lockType,
+                                   String leaseHolder) {
+    return new LeaseLock(lockType, TransactionLockTypes.LeaseHolderResolveType.ALL_PATHS,
+            leaseHolder, null);
   }
 
-  public Lock getLeaseLock(TransactionLockTypes.LockType lockType) {
+  public Lock getLeaseLockSinglePath(TransactionLockTypes.LockType lockType,
+                                     String leaseHolder, String path) {
+    return new LeaseLock(lockType, TransactionLockTypes.LeaseHolderResolveType.SINGLE_PATH,
+            leaseHolder, path);
+  }
+
+  public Lock getLeaseLockAllPaths(TransactionLockTypes.LockType lockType) {
     return new LeaseLock(lockType);
   }
 

@@ -71,7 +71,7 @@ public class MDCleaner {
 
           Thread.sleep(3000);
         } catch (InterruptedException e) {
-          LOG.warn(e, e);
+          LOG.warn("Metadata Cleaner Interrupted");
         } catch (IOException e){
           LOG.warn(e, e);
         }

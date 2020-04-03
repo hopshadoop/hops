@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URI;
 import java.net.InetSocketAddress;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -801,8 +802,9 @@ public class TestBalancer {
    * A partially filled datanode is excluded during balancing.
    * This triggers a situation where one of the block's location is unknown.
    */
-  @Test//(timeout=300000)
-  public void testUnknownDatanode() throws Exception {
+  @Test(timeout=300000)
+  public void testUnknownDatanode()
+          throws IOException, InterruptedException, TimeoutException, URISyntaxException {
     Configuration conf = new HdfsConfiguration();
     initConf(conf);
     long distribution[] = new long[] {50*CAPACITY/100, 70*CAPACITY/100, 0*CAPACITY/100};
@@ -819,46 +821,42 @@ public class TestBalancer {
 
     // fill the cluster
     ExtendedBlock[] blocks = generateBlocks(conf, totalUsedSpace,
-        (short) numDatanodes);
+            (short) numDatanodes);
 
     // redistribute blocks
     Block[][] blocksDN = distributeBlocks(
-        blocks, (short)(numDatanodes-1), distribution);
+            blocks, (short)(numDatanodes-1), distribution);
 
     // restart the cluster: do NOT format the cluster
     conf.set(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, "0.0f");
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(numDatanodes)
-        .format(false)
-        .racks(racks)
-        .simulatedCapacities(capacities)
-        .build();
-    try {
-      cluster.waitActive();
-      client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
-          ClientProtocol.class).getProxy();
+            .format(false)
+            .racks(racks)
+            .simulatedCapacities(capacities)
+            .build();
+    cluster.waitActive();
+    client = NameNodeProxies.createProxy(conf, cluster.getFileSystem(0).getUri(),
+            ClientProtocol.class).getProxy();
 
-      Thread.sleep(2000);
-      for(int i = 0; i < 3; i++) {
-        cluster.injectBlocks(i, Arrays.asList(blocksDN[i]), null);
-      }
-
-      cluster.startDataNodes(conf, 1, true, null,
-          new String[]{RACK0}, null,new long[]{CAPACITY});
-      cluster.triggerHeartbeats();
-
-      Collection<URI> namenodes = DFSUtil.getNsServiceRpcUris(conf);
-      Set<String>  datanodes = new HashSet<String>();
-      datanodes.add(cluster.getDataNodes().get(0).getDatanodeId().getHostName());
-      Balancer.Parameters p = new Balancer.Parameters(
-          Balancer.Parameters.DEFAULT.policy,
-          Balancer.Parameters.DEFAULT.threshold,
-          Balancer.Parameters.DEFAULT.maxIdleIteration,
-          datanodes, Balancer.Parameters.DEFAULT.nodesToBeIncluded);
-      final int r = Balancer.run(namenodes, p, conf);
-      assertEquals(ExitStatus.SUCCESS.getExitCode(), r);
-    } finally {
-      cluster.shutdown();
+    Thread.sleep(2000);
+    for(int i = 0; i < 3; i++) {
+      cluster.injectBlocks(i, Arrays.asList(blocksDN[i]), null);
     }
+
+    cluster.startDataNodes(conf, 1, true, null,
+            new String[]{RACK0}, null,new long[]{CAPACITY});
+    cluster.triggerHeartbeats();
+
+    Collection<URI> namenodes = DFSUtil.getNsServiceRpcUris(conf);
+    Set<String>  datanodes = new HashSet<String>();
+    datanodes.add(cluster.getDataNodes().get(0).getDatanodeId().getHostName());
+    Balancer.Parameters p = new Balancer.Parameters(
+            Balancer.Parameters.DEFAULT.policy,
+            Balancer.Parameters.DEFAULT.threshold,
+            Balancer.Parameters.DEFAULT.maxIdleIteration,
+            datanodes, Balancer.Parameters.DEFAULT.nodesToBeIncluded);
+    final int r = Balancer.run(namenodes, p, conf);
+    assertEquals(ExitStatus.SUCCESS.getExitCode(), r);
   }
 
   /**

@@ -19,23 +19,26 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
-import io.hops.metadata.hdfs.entity.ProjectedINode;
-import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
-import io.hops.metadata.hdfs.entity.SubTreeOperation;
+import io.hops.metadata.hdfs.entity.*;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.LockFactory.BLK;
-import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
+import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
+import org.apache.hadoop.ipc.RetriableException;
+import org.apache.hadoop.ipc.RetryCache;
+import org.apache.hadoop.ipc.RetryCacheDistributed;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.util.ChunkedArrayList;
 
 import java.io.IOException;
@@ -45,14 +48,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.permission.AclEntry;
-import org.apache.hadoop.ipc.RetriableException;
 
-import org.apache.hadoop.ipc.RetryCache;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
-import org.apache.hadoop.ipc.Server;
 import static org.apache.hadoop.util.Time.now;
 
 class FSDirDeleteOp {
@@ -196,27 +192,40 @@ class FSDirDeleteOp {
       final AbstractFileTree.FileTree fileTree, int level) throws TransactionContextException, IOException {
     ArrayList<Future> barrier = new ArrayList<>();
 
-    for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
-      if (fileTree.countChildren(dir.getId()) <= BIGGEST_DELETABLE_DIR) {
-        final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-        Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
-        barrier.add(f);
-      } else {
-        //delete the content of the directory one by one.
-        for (final ProjectedINode inode : fileTree.getChildren(dir.getId())) {
-          if (!inode.isDirectory()) {
-            final String path = fileTree.createAbsolutePath(subtreeRootPath, inode);
-            Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
-            barrier.add(f);
+      List<ProjectedINode> emptyDirs = new ArrayList();
+      for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
+        if (fileTree.countChildren(dir.getId()) <= BIGGEST_DELETABLE_DIR) {
+          final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
+          Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
+          barrier.add(f);
+        } else {
+          //delete the content of the directory one by one.
+          for (final ProjectedINode inode : fileTree.getChildren(dir.getId())) {
+            if (!inode.isDirectory()) {
+              final String path = fileTree.createAbsolutePath(subtreeRootPath, inode);
+              Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
+              barrier.add(f);
+            }
           }
+          emptyDirs.add(dir);
         }
-        // the dir is empty now. delete it.
+      }
+
+      boolean success = processResponses(barrier);
+      if (!success)
+        return false;
+
+      //delete the empty Dirs
+      for (ProjectedINode dir : emptyDirs) {
         final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
         Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
         barrier.add(f);
       }
-    }
 
+      return processResponses(barrier);
+  }
+
+  private static boolean processResponses(ArrayList<Future> barrier) throws IOException {
     boolean result = true;
     for (Future f : barrier) {
       try {
@@ -259,7 +268,7 @@ class FSDirDeleteOp {
                 .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes())
                 .skipReadingQuotaAttr(!fsd.isQuotaEnabled())
                 .setIgnoredSTOInodes(subTreeRootId);
-            locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
+            locks.add(il).add(lf.getLeaseLockAllPaths(LockType.WRITE))
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV, BLK.ER));
@@ -311,7 +320,7 @@ class FSDirDeleteOp {
             .setNameNodeID(fsn.getNamenodeId())
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes())
             .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
-        locks.add(il).add(lf.getLeaseLock(LockType.WRITE))
+        locks.add(il).add(lf.getLeaseLockAllPaths(LockType.WRITE))
             .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,BLK.PE, BLK.IV,BLK.ER));
         if (fsn.isRetryCacheEnabled()) {

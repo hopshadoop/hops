@@ -36,7 +36,7 @@ import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
-import static org.hamcrest.CoreMatchers.equalTo;
+
 import static org.hamcrest.core.Is.is;
 
 import java.io.IOException;
@@ -44,7 +44,6 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -61,7 +60,6 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
@@ -576,7 +574,7 @@ public class TestFileTruncate {
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
-        locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE))
+        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
         
         locks.add(lf.getAcesLock());
@@ -601,7 +599,7 @@ public class TestFileTruncate {
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
-        locks.add(lf.getLeaseLock(TransactionLockTypes.LockType.WRITE, client))
+        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, client))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
         
         locks.add(lf.getAcesLock());
