@@ -1106,7 +1106,7 @@ public class ContainerImpl implements Container {
   public synchronized void identifyCryptoMaterialLocation() {
     if (keyStoreLocalizedPath == null || trustStoreLocalizedPath == null || passwordFileLocalizedPath == null
         || jwtLocalizedPath == null) {
-      for (Map.Entry<Path, List<String>> localizedResource : getLocalizedResources().entrySet()) {
+      for (Map.Entry<Path, List<String>> localizedResource : resourceSet.getLocalizedResources().entrySet()) {
         if (keyStoreLocalizedPath == null && localizedResource.getValue().contains(daemonConf.get(
             SSLFactory.LOCALIZED_KEYSTORE_FILE_PATH_KEY, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH))) {
           keyStoreLocalizedPath = new File(localizedResource.getKey().toString());
