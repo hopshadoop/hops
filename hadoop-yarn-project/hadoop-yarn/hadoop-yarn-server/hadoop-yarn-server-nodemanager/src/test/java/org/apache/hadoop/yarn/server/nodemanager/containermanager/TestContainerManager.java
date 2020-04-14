@@ -288,6 +288,8 @@ public class TestContainerManager extends BaseContainerManagerTest {
     stateStore.start();
     Context context = createContext(conf, stateStore, true, true);
     final ContainerManagerImpl cm = createContainerManager(delSrvc, context);
+    ((NodeManager.NMContext) context).setContainerManager(cm);
+    ((NodeManager.NMContext) context).setNodeStatusUpdater(nodeStatusUpdater);
     cm.init(conf);
     cm.start();
     
