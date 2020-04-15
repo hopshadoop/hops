@@ -21,6 +21,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.logicalclocks.servicediscoverclient.Builder;
 import com.logicalclocks.servicediscoverclient.ServiceDiscoveryClient;
 import com.logicalclocks.servicediscoverclient.exceptions.ServiceDiscoveryException;
+import org.apache.commons.math3.util.Pair;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 
 public class ServiceDiscoveryClientFactory {
   
@@ -44,7 +47,21 @@ public class ServiceDiscoveryClientFactory {
   public ServiceDiscoveryClient getClient(Builder builder) throws ServiceDiscoveryException {
     return testClient != null ? testClient : builder.build();
   }
-  
+
+  public Pair<String, Integer> getNameserver(Configuration conf) {
+    String dnsHost = conf.get(CommonConfigurationKeys.SERVICE_DISCOVERY_DNS_HOST,
+            CommonConfigurationKeys.DEFAULT_SERVICE_DISCOVERY_DNS_HOST);
+    if (dnsHost.isEmpty()) {
+      dnsHost = null;
+    }
+    Integer dnsPort = conf.getInt(CommonConfigurationKeys.SERVICE_DISCOVERY_DNS_PORT,
+            CommonConfigurationKeys.DEFAULT_SERVICE_DISCOVERY_DNS_PORT);
+    if (dnsPort == -1) {
+      dnsPort = null;
+    }
+    return new Pair<>(dnsHost, dnsPort);
+  }
+
   @VisibleForTesting
   public void setClient(ServiceDiscoveryClient sdClient) {
     testClient = sdClient;

@@ -60,6 +60,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.math3.util.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -812,10 +813,12 @@ public class DFSUtil {
       ServiceDiscoveryClient client = null;
       final URI defaultFS = createHDFSUri(nnAddress);
       try {
+        ServiceDiscoveryClientFactory factory = ServiceDiscoveryClientFactory.getInstance();
+        Pair<String, Integer> nameserver = factory.getNameserver(conf);
         Builder sdBuilder = new Builder(Type.DNS)
-            .withDnsHost(conf.get(SERVICE_DISCOVERY_DNS_HOST, DEFAULT_SERVICE_DISCOVERY_DNS_HOST))
-            .withDnsPort(conf.getInt(SERVICE_DISCOVERY_DNS_PORT, DEFAULT_SERVICE_DISCOVERY_DNS_PORT));
-        client = ServiceDiscoveryClientFactory.getInstance().getClient(sdBuilder);
+            .withDnsHost(nameserver.getFirst())
+            .withDnsPort(nameserver.getSecond());
+        client = factory.getClient(sdBuilder);
         return client.getService(
             ServiceQuery.of(defaultFS.getHost(), Collections.<String>emptySet()))
             .collect(Collectors.mapping(new Function<Service, String>() {
