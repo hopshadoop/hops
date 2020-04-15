@@ -2558,13 +2558,13 @@
 
   <property>
     <name>hops.service-discovery.dns-host</name>
-    <value>127.0.0.1</value>
+    <value></value>
     <description>IP address of the DNS server used to resolve service discovery domains.</description>
   </property>
 
   <property>
     <name>hops.service-discovery.dns-port</name>
-    <value>53</value>
+    <value>-1</value>
     <description>Port of the DNS server used to resolve service discovery domains.</description>
   </property>
 </configuration>
