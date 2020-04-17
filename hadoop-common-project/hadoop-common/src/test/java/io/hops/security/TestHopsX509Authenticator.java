@@ -139,10 +139,10 @@ public class TestHopsX509Authenticator {
     }
     
     @Override
-    protected String isTrustedAddress(InetAddress address) {
-      String cachedFQDN = super.isTrustedAddress(address);
-      iscached = cachedFQDN != null;
-      return cachedFQDN;
+    protected InetAddress isTrustedFQDN(String fqdn) {
+      InetAddress address = super.isTrustedFQDN(fqdn);
+      iscached = address != null;
+      return address;
     }
   }
 }

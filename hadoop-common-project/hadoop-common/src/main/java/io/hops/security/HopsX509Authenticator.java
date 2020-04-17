@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.TimeUnit;
 
@@ -36,7 +37,7 @@ public class HopsX509Authenticator {
   private static final Log LOG = LogFactory.getLog(HopsX509Authenticator.class);
   
   private final Configuration conf;
-  private final Cache<InetAddress, String> trustedHostnames;
+  private final Cache<String, InetAddress> trustedHostnames;
   
   HopsX509Authenticator(Configuration conf) {
     this.conf = conf;
@@ -82,37 +83,36 @@ public class HopsX509Authenticator {
       return;
     }
     
-    // The CN could also be the machine FQDN.
+    // CN could also be the machine FQDN.
     // These certificates will be used by Hops services RM, NM, NN, DN
-    // Assume that reverse DNS will succeed only for machines that we
-    // trust
-    // Try reverse DNS of the address to check if the CN matches
+    // Assume that if a domain name is resolvable and matches the incoming
+    // IP address the connection is trusted
     Preconditions.checkNotNull(remoteAddress, "Remote address should not be null");
-    String fqdn = isTrustedAddress(remoteAddress);
-    if (fqdn != null) {
+    InetAddress address = isTrustedFQDN(cn);
+    if (address != null && address.equals(remoteAddress)) {
       LOG.debug("CN " + cn + " is an FQDN and it has already been authenticated");
       return;
     }
-    fqdn = remoteAddress.getCanonicalHostName();
-    if (cn.equals(fqdn)) {
-      trustedHostnames.put(remoteAddress, fqdn);
-      LOG.debug("CN " + cn + " is an FQDN and we managed to resolve it and it matches the remote address FQDN");
-      return;
-    } else {
-      // Check also the hostname for backward compatibility
-      String hostname = remoteAddress.getHostName();
-      if (cn.equals(hostname)) {
-        trustedHostnames.put(remoteAddress, hostname);
-        LOG.debug("CN " + cn + " is a hostname and we managed to resolve it and it matches the remote address " +
-            "Hostname");
+
+    try {
+      address = InetAddress.getByName(cn);
+      if (address.equals(remoteAddress)) {
+        trustedHostnames.put(cn, address);
+        LOG.debug("CN " + cn + " is an FQDN and we managed to resolve it and it matches the remote address");
         return;
       }
+    } catch (UnknownHostException ex) {
+      LOG.error("Could not resolve host " + cn, ex);
+      throw new HopsX509AuthenticationException("Hostname " + cn + " is not resolvable and could not authenticate " +
+              "user " + username);
     }
     
     // Could not authenticate incoming connection
     StringBuilder sb = new StringBuilder();
     sb.append("Could not authenticate client with CN ")
         .append(cn)
+        .append(" remote IP ")
+        .append(remoteAddress)
         .append(" and username ")
         .append(username);
     if (protocolName != null) {
@@ -128,7 +128,7 @@ public class HopsX509Authenticator {
   }
   
   @VisibleForTesting
-  protected String isTrustedAddress(InetAddress address) {
-    return trustedHostnames.getIfPresent(address);
+  protected InetAddress isTrustedFQDN(String fqdn) {
+    return trustedHostnames.getIfPresent(fqdn);
   }
 }
