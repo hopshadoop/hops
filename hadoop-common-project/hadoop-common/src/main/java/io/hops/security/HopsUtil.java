@@ -68,6 +68,7 @@ public class HopsUtil {
   private static final Pattern CN_PATTERN = Pattern.compile(".*CN=([^,]+).*");
   private static final Pattern O_PATTERN = Pattern.compile(".*O=([^,]+).*");
   private static final Pattern OU_PATTERN = Pattern.compile(".*OU=([^,]+).*");
+  private static final Pattern L_PATTERN = Pattern.compile(".*L=([^,]+).*");
   
   /**
    * Read password for cryptographic material from a file. The file could be
@@ -119,7 +120,13 @@ public class HopsUtil {
     }
     return null;
   }
-  
+
+  /**
+   * Extracts the OrganizationUnit from an x.509 Subject
+   *
+   * @param subject x.509 Subject
+   * @return OrganizationUnit or null if it cannot be parsed
+   */
   public static String extractOUFromSubject(String subject) {
     Matcher matcher = OU_PATTERN.matcher(subject);
     if (matcher.matches()) {
@@ -127,7 +134,21 @@ public class HopsUtil {
     }
     return null;
   }
-  
+
+  /**
+   * Extracts the Localization (L) from an x.509 Subject
+   *
+   * @param subject x.509 Subject
+   * @return Localization or null if it cannot be parsed
+   */
+  public static String extractLFromSubject(String subject) {
+    Matcher matcher = L_PATTERN.matcher(subject);
+    if (matcher.matches()) {
+      return matcher.group(1);
+    }
+    return null;
+  }
+
   /**
    * Set the default HTTPS trust policy to trust anything.
    *

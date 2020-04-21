@@ -88,15 +88,21 @@ public class HopsX509Authenticator {
     // Assume that if a domain name is resolvable and matches the incoming
     // IP address the connection is trusted
     Preconditions.checkNotNull(remoteAddress, "Remote address should not be null");
+    // In the case of system users certificates the L field of the Subject is the username
+    String locality = HopsUtil.extractLFromSubject(subjectDN);
+    if (locality == null) {
+      throw new HopsX509AuthenticationException("Incoming RPC claims to be a from a system user but the Locality (L) " +
+              "field of its X.509 is null or cannot be parsed");
+    }
     InetAddress address = isTrustedFQDN(cn);
-    if (address != null && address.equals(remoteAddress)) {
+    if (address != null && isTrustedConnection(remoteAddress, address, username, locality)) {
       LOG.debug("CN " + cn + " is an FQDN and it has already been authenticated");
       return;
     }
 
     try {
       address = InetAddress.getByName(cn);
-      if (address.equals(remoteAddress)) {
+      if (isTrustedConnection(remoteAddress, address, username, locality)) {
         trustedHostnames.put(cn, address);
         LOG.debug("CN " + cn + " is an FQDN and we managed to resolve it and it matches the remote address");
         return;
@@ -126,7 +132,24 @@ public class HopsX509Authenticator {
     return conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT);
   }
-  
+
+  private boolean isTrustedConnection(InetAddress expectedAddress, InetAddress actualAddress,
+          String expectedUsername, String actualUsername) {
+    return doesAddressMatch(expectedAddress, actualAddress) && doesUsernameMatch(expectedUsername, actualUsername);
+  }
+
+  private boolean doesAddressMatch(InetAddress expected, InetAddress actual) {
+    // If both are loopback addresses skip comparing them, one might be 127.0.0.1 and another 127.0.1.1 depending
+    // on hosts configuration
+    if (expected.isLoopbackAddress() && actual.isLoopbackAddress()) {
+      return true;
+    }
+    return expected.equals(actual);
+  }
+
+  private boolean doesUsernameMatch(String expected, String actual) {
+    return expected.equals(actual);
+  }
   @VisibleForTesting
   protected InetAddress isTrustedFQDN(String fqdn) {
     return trustedHostnames.getIfPresent(fqdn);

@@ -118,7 +118,8 @@ public class TestDFSStartupWithCRL {
   
     // Generate server certificate
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
-    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + hostname, keyPair, 10, signatureAlgorithm);
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + hostname + ",L=" + ugi.getUserName(), keyPair, 10,
+            signatureAlgorithm);
   
     // Create server keystore and truststore
     KeyStoreTestUtil.createKeyStore(keyStore.toString(), password, "server", keyPair.getPrivate(), cert);

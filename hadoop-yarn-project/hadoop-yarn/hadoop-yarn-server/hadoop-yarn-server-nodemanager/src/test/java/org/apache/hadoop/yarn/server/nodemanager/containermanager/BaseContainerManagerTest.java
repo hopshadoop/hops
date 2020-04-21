@@ -396,7 +396,13 @@ public abstract class BaseContainerManagerTest {
     context.getContainerTokenSecretManager().setMasterKey(masterKey);
     context.getNMTokenSecretManager().setMasterKey(masterKey);
     if (context.isHopsTLSEnabled() || context.isJWTEnabled()) {
-      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.NM);
+      certificateLocalizationService =
+              new CertificateLocalizationService(CertificateLocalizationService.ServiceType.NM){
+                @Override
+                public char[] readSupersuperPassword() throws IOException {
+                  return "password".toCharArray();
+                }
+              };
       certificateLocalizationService.init(conf);
       certificateLocalizationService.start();
       context.setCertificateLocalizationService(certificateLocalizationService);
