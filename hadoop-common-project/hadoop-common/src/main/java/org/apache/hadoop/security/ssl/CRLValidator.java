@@ -18,10 +18,13 @@
 package org.apache.hadoop.security.ssl;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.hops.security.HopsFileBasedKeyStoresFactory;
 import io.hops.security.HopsUtil;
 import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.net.hopssslchecks.HopsSSLCryptoMaterial;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -107,8 +110,19 @@ public class CRLValidator {
     
     SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
     X509SecurityMaterial x509Material = loader.loadSuperUserMaterial();
-    trustStoreLocation = x509Material.getTrustStoreLocation().toFile();
-    truststorePasswordLocation = x509Material.getPasswdLocation().toFile();
+    if (x509Material.getTrustStoreLocation().toFile().exists() && x509Material.getPasswdLocation().toFile().exists()) {
+      trustStoreLocation = x509Material.getTrustStoreLocation().toFile();
+      truststorePasswordLocation = x509Material.getPasswdLocation().toFile();
+    } else {
+      // HopsFileBasedKeyStoresFactory goes through all the checks to identify the proper
+      // crypto material for the user, that is also non-superusers.
+      HopsFileBasedKeyStoresFactory factory = new HopsFileBasedKeyStoresFactory();
+      factory.setConf(conf);
+      factory.setSystemConf(conf);
+      HopsSSLCryptoMaterial material = factory.loadCryptoMaterial(SSLFactory.Mode.SERVER);
+      trustStoreLocation = new File(material.getTrustStoreLocation());
+      truststorePasswordLocation = new File(material.getPasswordFileLocation());
+    }
     
     trustStoreReference = new AtomicReference<>(loadTruststoreWithRetry.retry());
   }

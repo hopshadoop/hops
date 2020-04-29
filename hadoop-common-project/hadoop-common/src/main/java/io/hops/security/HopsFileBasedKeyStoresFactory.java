@@ -68,7 +68,7 @@ public class HopsFileBasedKeyStoresFactory implements KeyStoresFactory {
     createTrustManagers(mode, material);
   }
   
-  private HopsSSLCryptoMaterial loadCryptoMaterial(SSLFactory.Mode mode) throws IOException {
+  public HopsSSLCryptoMaterial loadCryptoMaterial(SSLFactory.Mode mode) throws IOException {
     try {
       CertificateLocalizationCtx certificateLocalizationCtx = CertificateLocalizationCtx.getInstance();
       certificateLocalizationCtx.setProxySuperusers(systemConf);

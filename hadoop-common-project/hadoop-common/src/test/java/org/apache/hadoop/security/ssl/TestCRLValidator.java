@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.security.ssl;
 
+import io.hops.security.MockEnvironmentVariablesService;
 import io.hops.security.SuperuserKeystoresLoader;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -50,6 +51,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.PrivilegedExceptionAction;
 import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -452,7 +454,47 @@ public class TestCRLValidator {
     Assert.assertEquals(testingValidator1, testingValidator2);
     Assert.assertNotEquals(normalValidator1, testingValidator1);
   }
-  
+
+  /**
+   * Special use-case where non-superusers start an RPC Server with CRLValidation. The material loaded
+   * is not the ones returned by SuperuserKeystoresLoader but they should be located by HopsSSLSocketFactory instead
+   * which goes through a number of tests - identify material for normal users.
+   */
+  @Test
+  public void testCRLValidatioFactoryNonSuperuser() throws Exception {
+    String username = "application__user";
+    Path keystore = Paths.get(BASE_DIR, SSLFactory.DEFAULT_LOCALIZED_KEYSTORE_FILE_PATH);
+    Path truststore = Paths.get(BASE_DIR, SSLFactory.DEFAULT_LOCALIZED_TRUSTSTORE_FILE_PATH);
+    Path passwdLocation = Paths.get(BASE_DIR, SSLFactory.DEFAULT_LOCALIZED_PASSWD_FILE_PATH);
+    FileUtils.writeStringToFile(passwdLocation.toFile(), password);
+    Path crlPath = Paths.get(BASE_DIR, "crl.pem");
+
+    // Generate CA keypair
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair(keyAlgorithm);
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=root", keyPair, 60, signatureAlgorithm, true);
+    // Any file would be enough here, we don't load it - just checking if file exists
+    KeyStoreTestUtil.createKeyStore(keystore.toString(), password, password, "root", keyPair.getPrivate(), cert);
+    // Generate CA truststore
+    KeyStoreTestUtil.createTrustStore(truststore.toString(), password, "root", cert);
+    X509CRL crl = KeyStoreTestUtil.generateCRL(cert, keyPair.getPrivate(), signatureAlgorithm, null, null);
+    writeCRLToFile(crl, crlPath);
+
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
+    conf.set(CommonConfigurationKeys.HOPS_CRL_OUTPUT_FILE_KEY, crlPath.toString());
+    MockEnvironmentVariablesService mockEnvService = new MockEnvironmentVariablesService();
+    mockEnvService.setEnv("PWD", BASE_DIR);
+    EnvironmentVariablesFactory.setInstance(mockEnvService);
+
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(username);
+    CRLValidator validator = ugi.doAs(new PrivilegedExceptionAction<CRLValidator>() {
+      @Override
+      public CRLValidator run() throws Exception {
+        return CRLValidatorFactory.getInstance().getValidator(CRLValidatorFactory.TYPE.NORMAL, conf, conf);
+      }
+    });
+    Assert.assertNotNull(validator);
+  }
+
   @Test
   public void testRetryActions() throws Exception {
     boolean exceptionThrown = false;
