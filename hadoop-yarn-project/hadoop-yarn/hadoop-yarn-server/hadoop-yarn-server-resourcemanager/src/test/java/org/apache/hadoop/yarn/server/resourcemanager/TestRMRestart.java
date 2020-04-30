@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
+import io.hops.security.CertificateLocalizationService;
 import io.hops.util.DBUtility;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -206,7 +207,17 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
   }
 
   private MockRM createMockRM(YarnConfiguration conf) {
-    MockRM rm = new MockRM(conf);
+    MockRM rm = new MockRM(conf) {
+      @Override
+      protected CertificateLocalizationService createCertificateLocalizationService() {
+        return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM) {
+          @Override
+          public char[] readSupersuperPassword() throws IOException {
+            return "password".toCharArray();
+          }
+        };
+      }
+    };
     rms.add(rm);
     return rm;
   }
@@ -843,7 +854,17 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     private RMWithCustomRTService(Configuration conf) {
       super(conf);
     }
-    
+
+    @Override
+    protected CertificateLocalizationService createCertificateLocalizationService() {
+      return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM) {
+        @Override
+        public char[] readSupersuperPassword() throws IOException {
+          return "password".toCharArray();
+        }
+      };
+    }
+
     @Override
     protected ResourceTrackerService createResourceTrackerService() {
       RMContainerTokenSecretManager containerTokenSecretManager =

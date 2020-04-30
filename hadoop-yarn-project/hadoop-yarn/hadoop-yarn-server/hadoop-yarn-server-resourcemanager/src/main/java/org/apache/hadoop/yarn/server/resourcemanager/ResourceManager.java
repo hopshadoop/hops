@@ -355,8 +355,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
     addService(systemMetricsPublisher);
     rmContext.setSystemMetricsPublisher(systemMetricsPublisher);
 
-    createCertificateLocalizationService();
-    
+    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+            CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+
+      certificateLocalizationService = createCertificateLocalizationService();
+      CertificateLocalizationCtx.getInstance().setCertificateLocalization(certificateLocalizationService);
+      addService(certificateLocalizationService);
+      rmContext.setCertificateLocalizationService(certificateLocalizationService);
+    }
+
     super.serviceInit(this.conf);
   }
 
@@ -1516,17 +1523,8 @@ LOG.info("+");
     }
   }
   
-  private void createCertificateLocalizationService() {
-    if (conf.getBoolean(CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED, CommonConfigurationKeysPublic
-        .IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      
-      certificateLocalizationService = new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
-      CertificateLocalizationCtx.getInstance().setCertificateLocalization
-          (certificateLocalizationService);
-      addService(certificateLocalizationService);
-      rmContext.setCertificateLocalizationService(certificateLocalizationService);
-    }
+  protected CertificateLocalizationService createCertificateLocalizationService() {
+    return new CertificateLocalizationService(CertificateLocalizationService.ServiceType.RM);
   }
   
   @Private
