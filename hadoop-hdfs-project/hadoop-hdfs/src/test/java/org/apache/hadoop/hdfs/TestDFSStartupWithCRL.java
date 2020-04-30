@@ -105,7 +105,7 @@ public class TestDFSStartupWithCRL {
   
   @Test(timeout = 20000)
   public void testDFSStartup() throws Exception {
-    String hostname = NetUtils.getLocalCanonicalHostname();
+    String hostname = "localhost";
     Path inputCRLPath = Paths.get(BASE_DIR, "input.crl.pem");
     Path fetchedCRLPath = Paths.get(BASE_DIR, "fetched.crl.pem");
   
