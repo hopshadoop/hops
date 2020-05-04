@@ -1317,4 +1317,36 @@ public abstract class FSAclBaseTest {
       throws IOException {
     AclTestHelpers.assertPermission(fs, pathToCheck, perm);
   }
+  
+  @Test
+  public void testModifyAclMask() throws IOException {
+    FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short)0750));
+    List<AclEntry> aclSpec = Lists.newArrayList(
+        aclEntry(ACCESS, USER, ALL),
+        aclEntry(ACCESS, USER, "foo", ALL),
+        aclEntry(ACCESS, GROUP, READ_EXECUTE),
+        aclEntry(ACCESS, GROUP, "bar", ALL),
+        aclEntry(ACCESS, OTHER, NONE));
+    fs.setAcl(path, aclSpec);
+    AclStatus s = fs.getAclStatus(path);
+    AclEntry[] returned = s.getEntries().toArray(new AclEntry[0]);
+    assertArrayEquals(new AclEntry[] {
+        aclEntry(ACCESS, USER, "foo", ALL),
+        aclEntry(ACCESS, GROUP, READ_EXECUTE),
+        aclEntry(ACCESS, GROUP, "bar", ALL)}, returned);
+    assertPermission((short)010770);
+    assertAclFeature(true);
+    
+    aclSpec = Lists.newArrayList(
+        aclEntry(ACCESS, MASK, READ));
+    fs.modifyAclEntries(path, aclSpec);
+    s = fs.getAclStatus(path);
+    returned = s.getEntries().toArray(new AclEntry[0]);
+    assertArrayEquals(new AclEntry[] {
+        aclEntry(ACCESS, USER, "foo", ALL),
+        aclEntry(ACCESS, GROUP, READ_EXECUTE),
+        aclEntry(ACCESS, GROUP, "bar", ALL)}, returned);
+    assertPermission((short)010740);
+    assertAclFeature(true);
+  }
 }
