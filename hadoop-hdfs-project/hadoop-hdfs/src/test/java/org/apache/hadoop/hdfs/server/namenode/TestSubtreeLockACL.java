@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
@@ -405,5 +406,44 @@ public class TestSubtreeLockACL extends TestCase{
     }
     
     assertTrue("Did not manage to update acl for path " + path.toString(), found);
+  }
+  
+  @Test
+  public void testRenameFileInAclSubtree() throws IOException,
+      InterruptedException {
+    testRenameFileInAclSubtreeInt(false);
+  }
+  
+  @Test
+  public void testOldRenameFileInAclSubtree() throws IOException,
+      InterruptedException {
+    testRenameFileInAclSubtreeInt(true);
+  }
+  
+  private void testRenameFileInAclSubtreeInt(boolean oldRename)throws IOException,
+      InterruptedException{
+    try {
+      setup();
+      setReadOnlyUserAccessAcl(user2.getShortUserName(), subtree2);
+      FileSystem user1fs =
+          user1.doAs(new PrivilegedExceptionAction<FileSystem>() {
+            @Override
+            public FileSystem run() throws Exception {
+              return FileSystem.get(conf);
+            }
+          });
+      renameTo(user1fs,level2file1, new Path(subtree2, "newname"), oldRename);
+    } finally {
+      teardown();
+    }
+  }
+  private void renameTo(FileSystem fileSystem, Path src, Path dst,
+      boolean oldRename) throws IOException {
+    DistributedFileSystem dfs = (DistributedFileSystem) fileSystem;
+    if(oldRename){
+      dfs.rename(src, dst);
+    }else{
+      dfs.rename(src, dst, Options.Rename.NONE);
+    }
   }
 }
