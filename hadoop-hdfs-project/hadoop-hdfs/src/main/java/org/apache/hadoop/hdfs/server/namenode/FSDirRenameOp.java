@@ -303,6 +303,7 @@ class FSDirRenameOp {
         }
         locks.add(lf.getEZLock());
         locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE));
+        locks.add(lf.getAcesLock());
       }
 
       @Override
