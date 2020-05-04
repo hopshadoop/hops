@@ -70,14 +70,6 @@ class FSDirAclOp {
         fsd.checkOwner(pc, iip);
         AclStorage.validateAclSpec(aclSpec);
         INode inode = FSDirectory.resolveLastINode(iip);
-        if (aclSpec.size() == 1 && aclSpec.get(0).getType().equals(AclEntryType.MASK)) {
-          //HOPS: We allow setting
-          FsPermission fsPermission = inode.getFsPermission();
-          inode.setPermission(new FsPermission(fsPermission.getUserAction(), aclSpec.get(0).getPermission(),
-              fsPermission
-                  .getOtherAction()));
-          return AclStorage.readINodeLogicalAcl(inode);
-        }
         List<AclEntry> existingAcl;
         if (AclStorage.hasOwnAcl(inode)) {
           existingAcl = AclStorage.readINodeLogicalAcl(inode);
