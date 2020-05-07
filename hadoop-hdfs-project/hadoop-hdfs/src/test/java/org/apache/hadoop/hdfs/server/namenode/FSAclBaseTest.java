@@ -1334,6 +1334,9 @@ public abstract class FSAclBaseTest {
         aclEntry(ACCESS, USER, "foo", ALL),
         aclEntry(ACCESS, GROUP, READ_EXECUTE),
         aclEntry(ACCESS, GROUP, "bar", ALL)}, returned);
+    for(AclEntry entry : returned){
+      assertEquals(entry.getPermission(), s.getEffectivePermission(entry));
+    }
     assertPermission((short)010770);
     assertAclFeature(true);
     
@@ -1346,7 +1349,80 @@ public abstract class FSAclBaseTest {
         aclEntry(ACCESS, USER, "foo", ALL),
         aclEntry(ACCESS, GROUP, READ_EXECUTE),
         aclEntry(ACCESS, GROUP, "bar", ALL)}, returned);
+    for(AclEntry entry : returned){
+      assertEquals(READ, s.getEffectivePermission(entry));
+    }
     assertPermission((short)010740);
     assertAclFeature(true);
+  }
+  
+  @Test
+  public void testSettingMaskOnInheritedAcl() throws IOException {
+    FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 0750));
+    Path file = new Path(path, "file1");
+    
+    List<AclEntry> aclEntries = Lists.newArrayList(
+        aclEntry(ACCESS, USER, "charlie", ALL),
+        aclEntry(ACCESS, GROUP, WRITE_EXECUTE),
+        aclEntry(ACCESS, GROUP, "sales", ALL),
+        aclEntry(ACCESS, MASK, READ_EXECUTE),
+        aclEntry(DEFAULT, USER, "charlie", ALL),
+        aclEntry(DEFAULT, GROUP, READ_EXECUTE),
+        aclEntry(DEFAULT, GROUP, "sales", ALL)
+    );
+    
+    fs.modifyAclEntries(path, aclEntries);
+    
+    DFSTestUtil.createFile(fs, file, 0, (short) 1, 0);
+    
+    aclEntries = Lists.newArrayList(
+        aclEntry(ACCESS, MASK, READ_WRITE)
+    );
+    
+    fs.modifyAclEntries(file, aclEntries);
+    
+    AclStatus aclStatus = fs.getAclStatus(file);
+    AclEntry[] returned = aclStatus.getEntries().toArray(new AclEntry[0]);
+    
+    assertArrayEquals(new AclEntry[]{
+        aclEntry(ACCESS, USER, "charlie", ALL),
+        aclEntry(ACCESS, GROUP, READ_EXECUTE),
+        aclEntry(ACCESS, GROUP, "sales", ALL)
+    }, returned);
+    
+    assertArrayEquals(new FsAction[]{
+        READ_WRITE,
+        READ,
+        READ_WRITE
+    }, new FsAction[]{
+        aclStatus.getEffectivePermission(returned[0]),
+        aclStatus.getEffectivePermission(returned[1]),
+        aclStatus.getEffectivePermission(returned[2])
+    });
+    
+    //HopsFS default inheritance
+  
+    aclEntries = Lists.newArrayList(
+        aclEntry(DEFAULT, USER, "charlie", READ),
+        aclEntry(DEFAULT, GROUP, READ_EXECUTE),
+        aclEntry(DEFAULT, GROUP, "sales", READ)
+    );
+  
+    fs.modifyAclEntries(path, aclEntries);
+  
+    aclStatus = fs.getAclStatus(file);
+    returned = aclStatus.getEntries().toArray(new AclEntry[0]);
+  
+    assertArrayEquals(new AclEntry[]{
+        aclEntry(ACCESS, USER, "charlie", READ),
+        aclEntry(ACCESS, GROUP, READ_EXECUTE),
+        aclEntry(ACCESS, GROUP, "sales", READ)
+    }, returned);
+    
+    for(AclEntry entry: returned){
+      assertEquals(READ, aclStatus.getEffectivePermission(entry));
+    }
+    
+    //Set the
   }
 }

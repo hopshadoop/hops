@@ -70,6 +70,15 @@ class FSDirAclOp {
         fsd.checkOwner(pc, iip);
         AclStorage.validateAclSpec(aclSpec);
         INode inode = FSDirectory.resolveLastINode(iip);
+        if (aclSpec.size() == 1 && aclSpec.get(0).getType().equals(AclEntryType.MASK)) {
+          //HOPS: to handle cases when the parent inode has default acls
+          //default acls in HopsFS are inherited not copied like HDFS
+          FsPermission fsPermission = inode.getFsPermission();
+          inode.setPermission(new FsPermission(fsPermission.getUserAction(), aclSpec.get(0).getPermission(),
+              fsPermission
+                  .getOtherAction()));
+          return fsd.getAuditFileInfo(iip);
+        }
         List<AclEntry> existingAcl;
         if (AclStorage.hasOwnAcl(inode)) {
           existingAcl = AclStorage.readINodeLogicalAcl(inode);
