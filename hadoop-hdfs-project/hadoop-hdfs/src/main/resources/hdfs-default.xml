@@ -2063,4 +2063,11 @@
       get X.509 security material for a Hopsworks user.
     </description>
   </property>
+
+  <property>
+    <name>dfs.mover.retry.max.attempts</name>
+    <value>10</value>
+    <description>No of retries for moving a block</description>
+  </property>
+
 </configuration>
