@@ -145,7 +145,7 @@ public class ReplicaContext
       aboutToAccessStorage(iFinder, params);
       results = dataAccess.findReplicasById(blockId, inodeId);
       gotFromDB(new BlockPK(blockId, null), results);
-      miss(iFinder, results, "bid", blockId);
+      miss(iFinder, results, "bid", blockId, "inodeid", inodeId);
     }
     return results;
   }
