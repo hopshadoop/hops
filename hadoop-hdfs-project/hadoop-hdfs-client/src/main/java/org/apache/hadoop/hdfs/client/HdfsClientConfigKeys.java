@@ -40,6 +40,8 @@ public interface HdfsClientConfigKeys {
   int     DFS_NAMENODE_HTTPS_PORT_DEFAULT = 50470;
   String  DFS_NAMENODE_HTTPS_ADDRESS_KEY = "dfs.namenode.https-address";
   String DFS_HA_NAMENODES_KEY_PREFIX = "dfs.ha.namenodes";
+  String  DFS_CLIENT_USE_DN_HOSTNAME = "dfs.client.use.datanode.hostname";
+  boolean DFS_CLIENT_USE_DN_HOSTNAME_DEFAULT = false;
 
   /** dfs.client.retry configuration properties */
   interface Retry {

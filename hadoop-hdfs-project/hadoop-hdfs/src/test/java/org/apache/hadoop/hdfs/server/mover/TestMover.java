@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
@@ -52,7 +53,7 @@ public class TestMover {
     final List<NameNodeConnector> nncs = NameNodeConnector.newNameNodeConnectors(
         nnMap, Mover.class.getSimpleName(), Mover.MOVER_ID_PATH, conf,
         NameNodeConnector.DEFAULT_MAX_IDLE_ITERATIONS);
-    return new Mover(nncs.get(0), conf);
+    return new Mover(nncs.get(0), conf, new AtomicInteger(0));
   }
 
   @Test

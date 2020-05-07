@@ -230,7 +230,7 @@ public class Balancer {
 
     this.dispatcher = new Dispatcher(theblockpool, p.nodesToBeIncluded,
         p.nodesToBeExcluded, movedWinWidth, moverThreads, dispatcherThreads,
-        maxConcurrentMovesPerNode, conf);
+            maxConcurrentMovesPerNode, conf);
     this.threshold = p.threshold;
     this.policy = p.policy;
   }
