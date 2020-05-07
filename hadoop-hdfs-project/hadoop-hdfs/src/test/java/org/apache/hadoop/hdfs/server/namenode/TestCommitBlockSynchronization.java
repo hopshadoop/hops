@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -43,7 +45,10 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
+import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -125,14 +130,19 @@ public class TestCommitBlockSynchronization {
             .add(
                 lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
                 LockFactory.BLK.UR));
+        EntityManager.snapshotMaintenance
+                (HdfsTransactionContextMaintenanceCmds.EmptyFile, inodeIdentifier.getInodeId());
+
       }
 
       @Override
       public Object performTask() throws IOException {
-        
+
+
         BlockInfoContiguousUnderConstruction blockInfo = new BlockInfoContiguousUnderConstruction(
         block, 1, HdfsServerConstants.BlockUCState.UNDER_CONSTRUCTION, targets);
         blockInfo.setBlockCollection(file);

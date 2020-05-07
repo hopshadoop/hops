@@ -231,7 +231,6 @@ abstract class BaseReplicaContext<Key extends BlockPK, Entity>
   }
 
   private void blockDoesNotExist(long blockId, long inodeId){
-    emptyFile(inodeId);
     if (!containsByBlock(blockId)) {
       blocksToReplicas.put(blockId, null);
     }

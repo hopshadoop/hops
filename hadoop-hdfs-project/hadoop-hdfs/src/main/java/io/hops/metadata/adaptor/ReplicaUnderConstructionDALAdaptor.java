@@ -77,6 +77,11 @@ public class ReplicaUnderConstructionDALAdaptor extends
   }
 
   @Override
+  public int countAll() throws StorageException {
+    return dataAccces.countAll();
+  }
+
+  @Override
   public ReplicaUnderConstruction convertHDFStoDAL(
       org.apache.hadoop.hdfs.server.blockmanagement.ReplicaUnderConstruction hdfsClass)
       throws StorageException {
