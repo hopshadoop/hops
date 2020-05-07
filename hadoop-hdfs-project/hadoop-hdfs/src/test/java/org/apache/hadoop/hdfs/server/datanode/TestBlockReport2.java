@@ -1157,7 +1157,8 @@ public class TestBlockReport2 {
     }
   }
 
-  private Map<DatanodeStorage, BlockReport> getDNBR(MiniDFSCluster cluster, DataNode dn, int numBuckets) {
+  private static Map<DatanodeStorage, BlockReport> getDNBR(MiniDFSCluster cluster, DataNode dn,
+                                               int numBuckets) {
     String poolId = cluster.getNamesystem().getBlockPoolId();
     Map<DatanodeStorage, BlockReport> br = dn.getFSDataset().getBlockReports(poolId);
     for (BlockReport reportedBlocks : br.values()) {
@@ -1168,7 +1169,7 @@ public class TestBlockReport2 {
     return br;
   }
 
-  private void sendAndCheckBR(int nnId, int numDataNodes,
+  public static void sendAndCheckBR(int nnId, int numDataNodes,
                               MiniDFSCluster cluster, String poolId,
                               int tolerance, int numBuckets) throws IOException {
     int mismatched = 0;
