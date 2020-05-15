@@ -78,12 +78,12 @@ public class XAttrStorage {
   public static void updateINodeXAttr(INode inode, XAttr xAttr, boolean xAttrExists, long namenodeId)
       throws IOException {
     XAttrFeature f = getXAttrFeature(inode);
-    f.addXAttr(xAttr);
-    
     if(!xAttrExists) {
+      f.addXAttr(xAttr);
       logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Add);
       inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_ADD, xAttr);
     }else{
+      f.updateXAttr(xAttr);
       logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Update);
       inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_UPDATE, xAttr);
     }
@@ -120,9 +120,28 @@ public class XAttrStorage {
   }
   
   public static int getMaxXAttrSize(){
-    return StoredXAttr.MAX_XATTR_NAME_SIZE + StoredXAttr.MAX_XATTR_VALUE_SIZE;
+    return getMaxXAttrNameSize() + getMaxXAttrValueSize();
   }
   
+  public static int getDefaultXAttrSize(){
+    return getMaxXAttrNameSize() + getDefaultXAttrValueSize();
+  }
+  
+  public static int getMaxXAttrNameSize(){
+    return StoredXAttr.MAX_XATTR_NAME_SIZE;
+  }
+  
+  public static int getDefaultXAttrValueSize(){
+    return StoredXAttr.MAX_XATTR_VALUE_ROW_SIZE;
+  }
+  
+  public static int getMaxXAttrValueSize(){
+    return StoredXAttr.MAX_XATTR_VALUE_SIZE;
+  }
+  
+  public static int getXAttrByteSize(String str){
+    return StoredXAttr.getXAttrBytes(str).length;
+  }
   
   private static void logMetadataEvent(INode inode, XAttr attr,
       XAttrMetadataLogEntry.Operation operation)
@@ -136,8 +155,9 @@ public class XAttrStorage {
       
   
       XAttrMetadataLogEntry logEntry = new XAttrMetadataLogEntry(datasetId,
-          inodeId, logicaltime, attr.getNameSpace().getId(), attr.getName(),
-          operation);
+          inodeId, logicaltime, inode.getPartitionId(), inode.getParentId(),
+          inode.getLocalName(), attr.getValue(),
+          attr.getNameSpace().getId(), attr.getName(), operation);
   
       EntityManager.add(logEntry);
     }

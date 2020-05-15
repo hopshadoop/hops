@@ -33,6 +33,8 @@ import com.google.common.collect.ImmutableList;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -43,6 +45,14 @@ public class XAttrFeature implements INode.Feature {
   
   public static final ImmutableList<XAttr> EMPTY_ENTRY_LIST =
       ImmutableList.of();
+  
+  private static final Comparator<XAttr> XATTR_NAME_COMPARTOR =
+      new Comparator<XAttr>() {
+    @Override
+    public int compare(XAttr o1, XAttr o2) {
+      return o1.getName().compareTo(o2.getName());
+    }
+  };
   
   private final long inodeId;
   
@@ -77,6 +87,16 @@ public class XAttrFeature implements INode.Feature {
     EntityManager.add(storedXAttr);
   }
   
+  public void updateXAttr(XAttr attr)
+      throws TransactionContextException, StorageException {
+    StoredXAttr updatedStoredXAttr = convertXAttrtoStored(attr);
+    StoredXAttr oldStoredXAttr =
+        EntityManager.find(StoredXAttr.Finder.ByPrimaryKeyLocal,
+        getPrimaryKey(inodeId, attr));
+    updatedStoredXAttr.setOldNumParts(oldStoredXAttr.getNumParts());
+    EntityManager.add(updatedStoredXAttr);
+  }
+  
   public void removeXAttr(XAttr attr)
       throws TransactionContextException, StorageException {
     StoredXAttr storedXAttr = convertXAttrtoStored(attr);
@@ -96,6 +116,7 @@ public class XAttrFeature implements INode.Feature {
     for(StoredXAttr attr : extendedAttributes){
       attrs.add(convertStoredtoXAttr(attr));
     }
+    Collections.sort(attrs, XATTR_NAME_COMPARTOR);
     return ImmutableList.copyOf(attrs);
   }
   
@@ -107,7 +128,7 @@ public class XAttrFeature implements INode.Feature {
         XAttrDataAccess xda = (XAttrDataAccess) HdfsStorageFactory
             .getDataAccess(XAttrDataAccess.class);
         int removed = xda.removeXAttrsByInodeId(inodeId);
-        requestHandlerLOG.trace("Successfully removed " + removed + " XAttrs " +
+        requestHandlerLOG.debug("Successfully removed " + removed + " XAttrs " +
             "out of " + numXAttrs + " for inode (" + inodeId + ")");
         return null;
       }

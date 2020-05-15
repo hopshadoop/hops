@@ -155,6 +155,7 @@ public class FileProvenance {
       ? parents[ProvParents.PARENT_P2.ordinal()].getLocalName() : "";
     
     String xattrName = xattr.isPresent() ? xattr.get().getName() : "";
+    byte[] xattrVal = xattr.isPresent() ? xattr.get().getValue() : null;
     
     FileProvenanceEntry ple = new FileProvenanceEntry(inode.getId(), op, inode.getLogicalTime(), timestamp,
       appId, remoteUserId, tieBreaker, inode.getPartitionId(), projectIId,
@@ -162,7 +163,7 @@ public class FileProvenance {
       inode.getLocalName(), projectName, parents[ProvParents.DATASET.ordinal()].getLocalName(),
       p1Name, p2Name, parents[ProvParents.PARENT_DIRECT.ordinal()].getLocalName(),
       remoteUserName, xattrName, inode.getLogicalTime(), timestamp,
-      parents[ProvParents.DATASET.ordinal()].getLogicalTime());
+      parents[ProvParents.DATASET.ordinal()].getLogicalTime(), xattrVal);
     
     try {
       if (xattr.isPresent()) {

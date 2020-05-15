@@ -1590,6 +1590,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 dirNode.getLogicalTime(),
                 INodeMetadataLogEntry.Operation.Add);
         EntityManager.add(dslogEntry);
+        if(dirNode.getNumUserXAttrs() > 0){
+          dirNode.incrementLogicalTime();
+          XAttrMetadataLogEntry xattrLogEntry =
+              new XAttrMetadataLogEntry(dirNode.getId(), dirNode.getId(),
+                  dirNode.getLogicalTime(), dirNode.getPartitionId(),
+                  dirNode.getParentId(), dirNode.getLocalName());
+          EntityManager.add(xattrLogEntry);
+        }
       }
       EntityManager.update(dirNode);
     }
@@ -1617,7 +1625,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         node.incrementLogicalTime();
         XAttrMetadataLogEntry xattrLogEntry =
             new XAttrMetadataLogEntry(dataSetDir.getId(), node.getId(),
-                node.getLogicalTime());
+                node.getLogicalTime(), node.getPartitionId(),
+                node.getParentId(), node.getName());
         EntityManager.add(xattrLogEntry);
         //dummy log entry to update the logical time on the inode
         logEntry = new INodeMetadataLogEntry(dataSetDir.getId(),
@@ -8473,67 +8482,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws UnresolvedLinkException
    * @throws IOException
    */
-  void setXAttr(final String srcArg,final XAttr xAttr,
+  void setXAttr(final String srcArg, final XAttr xAttr,
       final EnumSet<XAttrSetFlag> flag)
       throws AccessControlException, SafeModeException,
       UnresolvedLinkException, IOException {
-  
-    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
-    final FSPermissionChecker pc = getPermissionChecker();
-    final String src = dir.resolvePath(pc, srcArg, pathComponents);
-    new HopsTransactionalRequestHandler(HDFSOperationType.SET_XATTR) {
-  
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH, src)
-            .setNameNodeID(nameNode.getId())
-            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-        locks.add(il);
-        List<XAttr> xAttrsToLock = new ArrayList<>();
-        xAttrsToLock.add(xAttr);
-        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
-        xAttrsToLock.add(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE);
-        locks.add(lf.getXAttrLock(xAttrsToLock));
-        locks.add(lf.getAcesLock());
-        locks.add(lf.getEZLock());
-        
-        if(isRetryCacheEnabled) {
-          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
-        }
-      }
-      
-      @Override
-      public Object performTask() throws IOException {
-        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(retryCache);
-        if (cacheEntry != null && cacheEntry.isSuccess()) {
-          return null;
-        }
-        boolean success = false;
-        try {
-          setXAttr(srcArg, src, xAttr, flag, cacheEntry != null);
-          success = true;
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "setXAttr", srcArg);
-          throw e;
-        } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
-        }
-        return null;
-      }
-    }.handle();
-  }
-  
-  
-  private void setXAttr(String srcArg, String src, XAttr xAttr, EnumSet<XAttrSetFlag> flag,
-      boolean logRetryCache)
-      throws IOException {
     HdfsFileStatus auditStat = null;
+    byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
+    final FSPermissionChecker pc = dir.getPermissionChecker();
+    final String src = dir.resolvePath(pc, srcArg, pathComponents);
     try {
       checkNameNodeSafeMode("Cannot set XAttr on " + src);
-      auditStat = FSDirXAttrOp.setXAttr(dir, srcArg, src, xAttr, flag, logRetryCache);
+      auditStat = FSDirXAttrOp.setXAttr(dir, srcArg, src, xAttr, flag);
     } catch (AccessControlException e) {
       logAuditEvent(false, "setXAttr", src);
       throw e;
@@ -8541,65 +8500,29 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     logAuditEvent(true, "setXAttr", src, null, auditStat);
   }
   
+  
   List<XAttr> getXAttrs(final String srcArg, final List<XAttr> xAttrs) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     final FSPermissionChecker pc = getPermissionChecker();
     final String src = dir.resolvePath(pc, srcArg, pathComponents);
-    return (List<XAttr>) new HopsTransactionalRequestHandler(HDFSOperationType.GET_XATTRS) {
-
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH
-            , src)
-            .setNameNodeID(nameNode.getId())
-            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-        locks.add(il);
-        locks.add(lf.getXAttrLock(xAttrs));
-        locks.add(lf.getAcesLock());
-      }
-      
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          return FSDirXAttrOp.getXAttrs(dir, srcArg, src, xAttrs);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "getXAttrs", src);
-          throw e;
-        }
-      }
-    }.handle();
+    try {
+      return FSDirXAttrOp.getXAttrs(dir, srcArg, src, xAttrs);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "getXAttrs", src);
+      throw e;
+    }
   }
   
   List<XAttr> listXAttrs(final String srcArg) throws IOException {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     final FSPermissionChecker pc = getPermissionChecker();
     final String src = dir.resolvePath(pc, srcArg, pathComponents);
-    return (List<XAttr>) new HopsTransactionalRequestHandler(HDFSOperationType.LIST_XATTRS) {
-    
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH
-            , src)
-            .setNameNodeID(nameNode.getId())
-            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-        locks.add(il);
-        locks.add(lf.getXAttrLock());
-      }
-    
-      @Override
-      public Object performTask() throws IOException {
-        try {
-          return FSDirXAttrOp.listXAttrs(dir, srcArg, src);
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "listXAttrs", srcArg);
-          throw e;
-        }
-      }
-    }.handle();
+    try {
+      return FSDirXAttrOp.listXAttrs(dir, srcArg, src);
+    } catch (AccessControlException e) {
+      logAuditEvent(false, "listXAttrs", srcArg);
+      throw e;
+    }
   }
   
 
@@ -8607,63 +8530,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     final FSPermissionChecker pc = getPermissionChecker();
     final String src = dir.resolvePath(pc, srcArg, pathComponents);
-    new HopsTransactionalRequestHandler(HDFSOperationType.GET_XATTRS){
-      @Override
-      public void acquireLock(TransactionLocks locks) throws IOException {
-        LockFactory lf = getInstance();
-        INodeLock il = lf.getINodeLock(INodeLockType.WRITE, INodeResolveType.PATH
-            , src)
-            .setNameNodeID(nameNode.getId())
-            .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes())
-            .skipReadingQuotaAttr(!dir.isQuotaEnabled());
-        locks.add(il);
-        List<XAttr> xAttrsToLock = new ArrayList<>();
-        xAttrsToLock.add(xAttr);
-        xAttrsToLock.add(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO);
-        locks.add(lf.getXAttrLock(xAttrsToLock));
-        locks.add(lf.getAcesLock());
-        if(isRetryCacheEnabled) {
-          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
-        }
-        locks.add(lf.getEZLock());
-      }
-      
-      @Override
-      public Object performTask() throws IOException {
-        CacheEntry cacheEntry = RetryCache.waitForCompletion(retryCache);
-        if (cacheEntry != null && cacheEntry.isSuccess()) {
-          return null; // Return previous response
-        }
-        boolean success = false;
-        try {
-          removeXAttr(srcArg, src, xAttr, cacheEntry != null);
-          success = true;
-        } catch (AccessControlException e) {
-          logAuditEvent(false, "removeXAttr", src);
-          throw e;
-        } finally {
-          RetryCache.setState(cacheEntry, success);
-        }
-        return null;
-      }
-      
-    }.handle();
-  }
-  
-  void removeXAttr(String srcArg, String src, XAttr xAttr, boolean logRetryCache)
-      throws IOException {
     HdfsFileStatus auditStat = null;
     try{
       checkNameNodeSafeMode("Cannot remove XAttr entry on " + src);
-      auditStat = FSDirXAttrOp.removeXAttr(dir, srcArg, src, xAttr, logRetryCache);
+      auditStat = FSDirXAttrOp.removeXAttr(dir, srcArg, src, xAttr);
     } catch (AccessControlException e) {
       logAuditEvent(false, "removeXAttr", src);
       throw e;
     }
     logAuditEvent(true, "removeXAttr", src, null, auditStat);
   }
-
+  
   /**
    * @see org.apache.hadoop.hdfs.protocol.ClientProtocol#getRepairedBlockLocations
    */
