@@ -951,7 +951,16 @@ class FSDirRenameOp {
               INodeMetadataLogEntry.Operation.Delete));
         } else {
           //rename across datasets or the same dataset
-          srcChild.logMetadataEvent(INodeMetadataLogEntry.Operation.Rename);
+          //recalculate the partitionId for the new destination, for the
+          // inode it is already handled using the INodePKChanged snapshot
+          // maintaince command
+          long partitionId = INode.calculatePartitionId(srcChild.getParentId(),
+              srcChild.getLocalName(), srcChild.myDepth());
+          EntityManager.add(new INodeMetadataLogEntry(dstDataset.getId(),
+              srcChild.getId(), partitionId, srcChild
+              .getParentId(), srcChild.getLocalName(), srcChild
+              .incrementLogicalTime(),
+              INodeMetadataLogEntry.Operation.Rename));
         }
       }
     }

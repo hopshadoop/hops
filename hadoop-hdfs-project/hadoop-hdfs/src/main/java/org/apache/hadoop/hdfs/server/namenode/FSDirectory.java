@@ -196,16 +196,19 @@ public class FSDirectory implements Closeable {
         DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY,
         DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_DEFAULT);
     LOG.info("XAttrs enabled? " + xattrsEnabled);
-    int xattrMS = conf.getInt(
+    this.xattrMaxSize = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY,
         DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_DEFAULT);
-    Preconditions.checkArgument(xattrMS >= 0,
-        "Cannot set a negative value for the maximum size of an xattr (%s).",
+  
+    Preconditions.checkArgument(xattrMaxSize > 0,
+        "The maximum size of an xattr should be > 0: (%s).",
         DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY);
-    if(xattrMS == 0 || xattrMS > XAttrStorage.getMaxXAttrSize()){
-      xattrMS = XAttrStorage.getMaxXAttrSize();
-    }
-    this.xattrMaxSize = xattrMS;
+    Preconditions.checkArgument(xattrMaxSize <=
+            DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_HARD_LIMIT,
+        "The maximum size of an xattr should be <= maximum size"
+            + " hard limit " + DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_HARD_LIMIT
+            + ": (%s).", DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY);
+    
     LOG.info("Maximum size of an xattr: " + xattrMaxSize );
     
     int configuredLimit = conf.getInt(DFSConfigKeys.DFS_LIST_LIMIT,

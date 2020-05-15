@@ -36,6 +36,8 @@ import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
+import org.apache.hadoop.fs.XAttr;
+import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
+import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -450,4 +453,56 @@ public class TestNamenodeRetryCache {
     assertEquals(0, cacheSet.size());
   }
   
+ 
+  @Test
+  public void testSetXAttr() throws Exception {
+    resetCall();
+    String src = "/testNamenodeRetryCache/testSetXAttr/src";
+    // Create a file with partial block
+    DFSTestUtil.createFile(filesystem, new Path(src), 128, (short)1, 0L);
+  
+    XAttr xAttr = XAttrHelper.buildXAttr("user.test", "test".getBytes());
+    
+    newCall();
+    nnRpc.setXAttr(src, xAttr, EnumSet.of(XAttrSetFlag.CREATE));
+    nnRpc.setXAttr(src, xAttr, EnumSet.of(XAttrSetFlag.CREATE));
+    nnRpc.setXAttr(src, xAttr, EnumSet.of(XAttrSetFlag.CREATE));
+    
+    // A non-retried setXAttr request fails
+    newCall();
+    try {
+      // Second non-retry call should fail with an exception
+      nnRpc.setXAttr(src, xAttr, EnumSet.of(XAttrSetFlag.CREATE));
+      Assert.fail("testSetXAttr - expected exception is not thrown");
+    } catch (IOException e) {
+      // Expected
+    }
+  }
+  
+  @Test
+  public void testRemoveXAttr() throws Exception {
+    resetCall();
+    String src = "/testNamenodeRetryCache/testRemoveXAttr/src";
+    // Create a file with partial block
+    DFSTestUtil.createFile(filesystem, new Path(src), 128, (short)1, 0L);
+    XAttr xAttr = XAttrHelper.buildXAttr("user.test", "test".getBytes());
+    
+    filesystem.setXAttr(new Path(src), XAttrHelper.getPrefixName(xAttr),
+        xAttr.getValue());
+    
+    newCall();
+    nnRpc.removeXAttr(src, xAttr);
+    nnRpc.removeXAttr(src, xAttr);
+    nnRpc.removeXAttr(src, xAttr);
+    
+    // A non-retried removeXAttr request fails
+    newCall();
+    try {
+      // Second non-retry call should fail with an exception
+      nnRpc.removeXAttr(src, xAttr);
+      Assert.fail("testRemoveXAttr - expected exception is not thrown");
+    } catch (IOException e) {
+      // Expected
+    }
+  }
 }
