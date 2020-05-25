@@ -89,7 +89,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <distMgmtSnapshotsId>Hops</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Hops Repo</distMgmtSnapshotsName>
-    <distMgmtSnapshotsUrl>https://bbc1.sics.se/archiva/repository/Hops/</distMgmtSnapshotsUrl>
+    <distMgmtSnapshotsUrl>https://archiva.hops.works/repository/Hops/</distMgmtSnapshotsUrl>
     <distMgmtStagingId>Hops</distMgmtStagingId>
     <distMgmtStagingName>Hops Repo</distMgmtStagingName>
     <distMgmtStagingUrl>https://archiva.hops.works/repository/Hops/</distMgmtStagingUrl>
