@@ -275,7 +275,6 @@ public class LeaseManager {
 
     if(src != null) {
       LeasePath lPath = new LeasePath(src, lease.getHolderID());
-      LOG.info("inc");
       lease.addFirstPath(lPath);
       EntityManager.add(lPath);
     }
@@ -288,6 +287,12 @@ public class LeaseManager {
    */
   void removeLease(Lease lease, LeasePath src)
       throws StorageException, TransactionContextException {
+    if(lease == null){
+      LOG.warn("Lease not found. Removing lease path");
+      EntityManager.remove(src);
+      return;
+    }
+
     if (lease.removePath(src)) {
       EntityManager.remove(src);
     } else {
@@ -442,7 +447,6 @@ public class LeaseManager {
     }
   }
   
-
   void removeLeaseWithPrefixPath(String prefix)
       throws StorageException, TransactionContextException {
     for (Map.Entry<LeasePath, Lease> entry : findLeaseWithPrefixPath(prefix)

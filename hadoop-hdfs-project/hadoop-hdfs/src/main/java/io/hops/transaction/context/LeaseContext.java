@@ -69,6 +69,7 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
     switch (lFinder) {
       case ByHolder:
         return findByHolder(lFinder, params);
+
       case ByHolderId:
         return findByHolderId(lFinder, params);
 
@@ -125,9 +126,7 @@ public class LeaseContext extends BaseEntityContext<String, Lease> {
       aboutToAccessStorage(lFinder, params);
       result = dataAccess.findByPKey(holder, holderId);
       gotFromDB(holder, result);
-      if (result != null) {
-        idToLease.put(result.getHolderID(), result);
-      }
+      idToLease.put(holderId, result);
       miss(lFinder, result, "holder", holder, "holderId", holderId);
     }
     return result;
