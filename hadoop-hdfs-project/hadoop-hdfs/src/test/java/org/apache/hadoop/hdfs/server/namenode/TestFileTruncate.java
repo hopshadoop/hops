@@ -93,7 +93,7 @@ public class TestFileTruncate {
   static Configuration conf;
   static MiniDFSCluster cluster;
   static DistributedFileSystem fs;
-
+  static int leaseCreationLockRows;
   @BeforeClass
   public static void startUp() throws IOException {
     conf = new HdfsConfiguration();
@@ -103,6 +103,8 @@ public class TestFileTruncate {
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, SHORT_HEARTBEAT);
     conf.setLong(
         DFSConfigKeys.DFS_NAMENODE_REPLICATION_PENDING_TIMEOUT_SEC_KEY, 1);
+    leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     cluster = new MiniDFSCluster.Builder(conf)
         .format(true)
         .numDataNodes(DATANODE_NUM)
@@ -574,7 +576,7 @@ public class TestFileTruncate {
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
-        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
         
         locks.add(lf.getAcesLock());
@@ -599,7 +601,7 @@ public class TestFileTruncate {
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
-        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, client))
+        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, client, leaseCreationLockRows))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
         
         locks.add(lf.getAcesLock());

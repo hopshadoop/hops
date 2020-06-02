@@ -2071,4 +2071,11 @@
     <description>No of retries for moving a block</description>
   </property>
 
+  <property>
+    <name>dfs.lease.creation.locks.count.key</name>
+    <value>1000</value>
+    <description>Number of lock rows to serialize the creation of new file leases.
+      Changing this parameter require cluster restart.</description>
+  </property>
+
 </configuration>

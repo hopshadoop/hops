@@ -24,8 +24,11 @@ import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
+import io.hops.metadata.hdfs.dal.LeaseCreationLocksDataAccess;
 import io.hops.security.HopsUGException;
 import io.hops.security.UsersGroups;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.handler.RequestHandler;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -620,6 +623,7 @@ public class NameNode implements NameNodeStatusMXBean {
       //that is cluster was restarted and we can reset the number of default
       // concurrent block reports
       HdfsVariables.setMaxConcurrentBrs(maxConcurrentBRs, null);
+      createLeaseLocks(conf);
     }
   }
 
@@ -941,6 +945,7 @@ public class NameNode implements NameNodeStatusMXBean {
       }
       StorageInfo.storeStorageInfoToDB(clusterId, Time.now());  //this adds new row to the db
       UsersGroups.createSyncRow();
+      createLeaseLocks(conf);
     } catch (StorageException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -1443,6 +1448,20 @@ public class NameNode implements NameNodeStatusMXBean {
   @VisibleForTesting
   NameNodeRpcServer getNameNodeRpcServer(){
     return rpcServer;
+  }
+
+  static void createLeaseLocks(Configuration conf) throws IOException {
+    int count = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
+    new LightWeightRequestHandler(HDFSOperationType.CREATE_LEASE_LOCKS) {
+      @Override
+      public Object performTask() throws IOException {
+        LeaseCreationLocksDataAccess da = (LeaseCreationLocksDataAccess) HdfsStorageFactory
+                .getDataAccess(LeaseCreationLocksDataAccess.class);
+        da.createLockRows(count);
+        return null;
+      }
+    }.handle();
   }
 }
 

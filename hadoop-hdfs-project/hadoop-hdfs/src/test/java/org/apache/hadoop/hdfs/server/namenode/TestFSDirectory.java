@@ -91,11 +91,14 @@ public class TestFSDirectory {
   private static final int numGeneratedXAttrs = 127;
   private static final ImmutableList<XAttr> generatedXAttrs =
       ImmutableList.copyOf(generateXAttrs(numGeneratedXAttrs));
+  private int leaseCreationLockRows;
 
   @Before
   public void setUp() throws Exception {
     conf = new Configuration();
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_KEY, 2);
+    leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     cluster = new MiniDFSCluster.Builder(conf)
       .numDataNodes(REPLICATION)
       .build();
@@ -133,7 +136,7 @@ public class TestFSDirectory {
                 TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY,  dir.toString())
                 .setNameNodeID(cluster.getNameNode().getId())
                 .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
                 .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
                 .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR, LockFactory.BLK.PE, LockFactory.BLK.IV));
@@ -174,7 +177,7 @@ public class TestFSDirectory {
                 TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, dir.toString())
                 .setNameNodeID(cluster.getNameNode().getId())
                 .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
                 .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
                 .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC,

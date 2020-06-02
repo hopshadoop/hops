@@ -17,10 +17,17 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.LeaseCreationLocksDataAccess;
+import io.hops.metadata.hdfs.dal.LeaseDataAccess;
+import io.hops.metadata.hdfs.dal.LeasePathDataAccess;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
+import io.hops.metadata.hdfs.entity.LeaseCreationLock;
 import io.hops.metadata.hdfs.entity.LeasePath;
+import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.BaseTestLock;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -36,12 +43,15 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
+import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.util.Time;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -49,12 +59,19 @@ import org.mockito.Mockito;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.*;
+
 import org.apache.hadoop.hdfs.server.namenode.TestSubtreeLock;
 import static org.junit.Assert.assertFalse;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.io.EnumSetWritable;
+
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.anyShort;
@@ -113,7 +130,7 @@ public class TestLease {
     return NameNodeAdapter.getLeaseManager(cluster.getNamesystem())
         .countLease();
   }
-  
+
   static final String dirString = "/test/lease";
   final Path dir = new Path(dirString);
   static final Log LOG = LogFactory.getLog(TestLease.class);
@@ -159,7 +176,7 @@ public class TestLease {
         d_out.write(buf, 0, 1024);
         LOG.info("Write worked beyond the soft limit as expected.");
       } catch (IOException e) {
-        Assert.fail("Write failed.");
+        fail("Write failed.");
       }
 
       // make it look like the hard limit has been exceeded.
@@ -171,7 +188,7 @@ public class TestLease {
       try {
         d_out.write(buf, 0, 1024);
         d_out.close();
-        Assert.fail(
+        fail(
             "Write did not fail even after the fatal lease renewal failure");
       } catch (IOException e) {
         LOG.info("Write failed as expected. ", e);
@@ -188,12 +205,12 @@ public class TestLease {
       try {
         int num = c_in.read(buf, 0, 1);
         if (num != 1) {
-          Assert.fail("Failed to read 1 byte");
+          fail("Failed to read 1 byte");
         }
         c_in.close();
       } catch (IOException e) {
         LOG.error("Read failed with ", e);
-        Assert.fail("Read after lease renewal failure failed");
+        fail("Read after lease renewal failure failed");
       }
 
       // new file writes should work.
@@ -203,7 +220,7 @@ public class TestLease {
         c_out.close();
       } catch (IOException e) {
         LOG.error("Write failed with ", e);
-        Assert.fail("Write failed");
+        fail("Write failed");
       }
     } finally {
       cluster.shutdown();
@@ -226,7 +243,7 @@ public class TestLease {
       //out.hsync();
       Assert.assertTrue(hasLease(cluster, p));
       Assert.assertEquals(1, leaseCount(cluster));
-      
+
       // just to ensure first fs doesn't have any logic to twiddle leases
       DistributedFileSystem fs2 = (DistributedFileSystem) FileSystem
           .newInstance(fs.getUri(), fs.getConf());
@@ -236,7 +253,7 @@ public class TestLease {
       Path pRenamed = new Path(d, p.getName());
       fs2.mkdirs(d);
       fs2.rename(p, pRenamed);
-      
+
       assertFalse("Subtree locks were not cleared properly",TestSubtreeLock.subTreeLocksExists());
       Assert.assertFalse(p + " exists", fs2.exists(p));
       Assert.assertTrue(pRenamed + " not found", fs2.exists(pRenamed));
@@ -245,14 +262,14 @@ public class TestLease {
           .assertTrue("no lease for " + pRenamed, hasLease(cluster, pRenamed));
       Assert.assertEquals(1, leaseCount(cluster));
 
-      
-      
+
+
       // rename the parent dir to a new non-existent dir
       LOG.info("DMS: rename parent dir");
       Path pRenamedAgain = new Path(d2, pRenamed.getName());
       fs2.rename(d, d2);
       assertFalse("Subtree locks were not cleared properly",TestSubtreeLock.subTreeLocksExists());
-      
+
       // src gone
       Assert.assertFalse(d + " exists", fs2.exists(d));
       Assert.assertFalse("has lease for " + pRenamed,
@@ -273,7 +290,7 @@ public class TestLease {
       fs2.mkdirs(d);
       assertFalse("Subtree locks were not cleared properly",TestSubtreeLock.subTreeLocksExists());
       fs2.rename(d2, d);
-      
+
       // src gone
       Assert.assertFalse(d2 + " exists", fs2.exists(d2));
       Assert
@@ -285,7 +302,7 @@ public class TestLease {
       Assert.assertTrue("no lease for " + pRenamedAgain,
           hasLease(cluster, pRenamedAgain));
       Assert.assertEquals(1, leaseCount(cluster));
-      
+
       // rename with opts to non-existent dir
       pRenamed = pRenamedAgain;
       pRenamedAgain = new Path(d2, p.getName());
@@ -324,7 +341,7 @@ public class TestLease {
       cluster.shutdown();
     }
   }
-  
+
   /**
    * Test that we can open up a file for write, move it to another location,
    * and then create a new file in the previous location, without causing any
@@ -363,7 +380,7 @@ public class TestLease {
       cluster.shutdown();
     }
   }
-  
+
   @Test
   public void testLease() throws Exception {
     MiniDFSCluster cluster =
@@ -371,7 +388,7 @@ public class TestLease {
     try {
       FileSystem fs = cluster.getFileSystem();
       Assert.assertTrue(fs.mkdirs(dir));
-      
+
       Path a = new Path(dir, "a");
       Path b = new Path(dir, "b");
 
@@ -380,7 +397,7 @@ public class TestLease {
 
       Assert.assertTrue(hasLease(cluster, a));
       Assert.assertTrue(!hasLease(cluster, b));
-      
+
       DataOutputStream b_out = fs.create(b);
       b_out.writeBytes("something");
 
@@ -392,7 +409,7 @@ public class TestLease {
 
       Assert.assertTrue(!hasLease(cluster, a));
       Assert.assertTrue(!hasLease(cluster, b));
-      
+
       fs.delete(dir, true);
     } finally {
       if (cluster != null) {
@@ -440,7 +457,7 @@ public class TestLease {
     Assert.assertTrue(c1.getLeaseRenewer() != c5.getLeaseRenewer());
     Assert.assertTrue(c3.getLeaseRenewer() != c5.getLeaseRenewer());
   }
-  
+
   private FSDataOutputStream createFsOut(DFSClient dfs, String path)
       throws IOException {
     return new FSDataOutputStream(dfs.create(path, true), null);
@@ -456,5 +473,126 @@ public class TestLease {
         return new DFSClient(null, mcp, conf, null);
       }
     });
+  }
+
+
+  @Test
+  public void TestLeaseLock() {
+
+    Logger.getRootLogger().setLevel(Level.ERROR);
+    Logger.getLogger(TestLease.class).setLevel(Level.TRACE);
+
+    final Configuration conf = new Configuration();
+    final int BLOCK_SIZE = 1024 * 1024;
+    conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+    MiniDFSCluster cluster = null;
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+      cluster.waitActive();
+
+      ExecutorService threadExecutor = Executors.newFixedThreadPool(2);
+      List tasks = new ArrayList();
+
+      int numPaths = 10;
+      for(int i = 0; i < numPaths; i++){
+        tasks.add(new LeaseLockThread(conf, "holder1", 1));
+      }
+
+      List<Future<Object>> futures = threadExecutor.invokeAll(tasks);
+
+      for(Future f : futures){
+        f.get();
+      }
+
+      assert countLeasePaths() == numPaths;
+      assert getLease("holder1", 1).getCount() == numPaths;
+
+   } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.toString());
+
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  class LeaseLockThread implements Callable {
+    private int holderID;
+    private String holderName;
+    private long sleep = 0;
+    private Lease lease;
+    private Random rand = new Random(System.currentTimeMillis());
+    private Configuration conf;
+
+    public LeaseLockThread(Configuration conf, String holderName, int holderID) {
+      this.holderID = holderID;
+      this.holderName = holderName;
+      this.conf = conf;
+    }
+
+    public LeaseLockThread(Configuration conf, String holderName, int holderID, long sleep) {
+      this(conf, holderName, holderID);
+      this.sleep = sleep;
+    }
+
+    @Override
+    public Object call() throws Exception {
+      new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+
+        @Override
+        public void acquireLock(TransactionLocks locks) throws IOException {
+          int lockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+                  DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
+          LOG.info("Locking TID: " + Thread.currentThread().getId() + " Connector " + HdfsStorageFactory.getConnector());
+          EntityManager.writeLock();
+          EntityManager.find(LeaseCreationLock.Finder.ByRowID, holderID % lockRows);
+          lease = EntityManager.find(Lease.Finder.ByHolder, holderName, holderID);
+        }
+
+        @Override
+        public Object performTask() throws IOException {
+
+          if (lease == null) {
+            lease = new Lease(holderName, holderID, 0, 0);
+            lease.savePersistent();
+          }
+
+          LeasePath leasePath = new LeasePath("/testpath/"+rand.nextInt(), holderID);
+          lease.addPath(leasePath);
+          return null;
+        }
+      }.handle();
+      return null;
+    }
+  }
+
+  private Lease getLease(String holderName, int holderID) throws IOException {
+    final LightWeightRequestHandler handler = new LightWeightRequestHandler(
+            HDFSOperationType.TEST) {
+
+      @Override
+      public Object performTask() throws IOException {
+        LeaseDataAccess da = (LeaseDataAccess) HdfsStorageFactory
+                .getDataAccess(LeaseDataAccess.class);
+        return da.findByPKey(holderName, holderID);
+      }
+    };
+    return (Lease) handler.handle();
+  }
+
+  private int countLeasePaths() throws IOException {
+    final LightWeightRequestHandler handler = new LightWeightRequestHandler(
+            HDFSOperationType.TEST) {
+
+      @Override
+      public Object performTask() throws IOException {
+        LeasePathDataAccess da = (LeasePathDataAccess) HdfsStorageFactory
+                .getDataAccess(LeasePathDataAccess.class);
+        return da.findAll().size();
+      }
+    };
+    return (int) handler.handle();
   }
 }

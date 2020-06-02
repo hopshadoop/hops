@@ -82,7 +82,7 @@ public class LeaseDALAdaptor
       throws StorageException {
     if (hdfsClass != null) {
       return new Lease(hdfsClass.getHolder(), hdfsClass.getHolderID(),
-          hdfsClass.getLastUpdate());
+          hdfsClass.getLastUpdate(), hdfsClass.getCount());
     } else {
       return null;
     }
@@ -94,7 +94,7 @@ public class LeaseDALAdaptor
     if (dalClass != null) {
       return new org.apache.hadoop.hdfs.server.namenode.Lease(
           dalClass.getHolder(), dalClass.getHolderId(),
-          dalClass.getLastUpdate());
+          dalClass.getLastUpdate(), dalClass.getCount());
     } else {
       return null;
     }

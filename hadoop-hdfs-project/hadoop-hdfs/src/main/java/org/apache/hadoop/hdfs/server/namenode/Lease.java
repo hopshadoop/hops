@@ -24,7 +24,6 @@ import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 import java.util.Collection;
-import java.util.TreeSet;
 
 /**
  * **********************************************************
@@ -75,23 +74,20 @@ public class Lease implements Comparable<Lease> {
 
   private final String holder;
   private long lastUpdate;
-  private Collection<LeasePath> paths = null;
   private int holderID;
+  private int count;
 
-  public Lease(String holder, int holderID, long lastUpd) {
+  public Lease(String holder, int holderID, long lastUpd, int count) {
     this.holder = holder;
     this.holderID = holderID;
     this.lastUpdate = lastUpd;
+    this.count = count;
   }
 
   public void setLastUpdate(long lastUpd) {
     this.lastUpdate = lastUpd;
   }
 
-  public void setPaths(TreeSet<LeasePath> paths) {
-    this.paths = paths;
-  }
-  
   public long getLastUpdate() {
     return this.lastUpdate;
   }
@@ -104,26 +100,39 @@ public class Lease implements Comparable<Lease> {
     return this.holderID;
   }
 
+  public int getCount() {
+    return count;
+  }
+
+  public void setCount(int count) {
+    this.count = count;
+  }
+
   public boolean removePath(LeasePath lPath)
       throws StorageException, TransactionContextException {
-    return getPaths().remove(lPath);
+    if( getPaths().remove(lPath) ){
+      assert count > 0;
+      count--;
+      savePersistent();
+      return  true;
+    } else {
+      return false;
+    }
   }
 
   public void addPath(LeasePath lPath)
       throws StorageException, TransactionContextException {
-    getPaths().add(lPath);
-  }
-
-  public void addFirstPath(LeasePath lPath) {
-    this.paths = new TreeSet<>();
-    this.paths.add(lPath);
+    EntityManager.update(lPath);
+    lPath.savePersistent();
+    count++;
+    savePersistent();
   }
 
   /**
    * Does this lease contain any path?
    */
   boolean hasPath() throws StorageException, TransactionContextException {
-    return !this.getPaths().isEmpty();
+    return !(this.getPaths().isEmpty() && count == 0);
   }
 
   /**
@@ -131,11 +140,7 @@ public class Lease implements Comparable<Lease> {
    */
   @Override
   public String toString() {
-    int size = 0;
-    if (paths != null) {
-      size = paths.size();
-    }
-    return "[Lease.  Holder: " + holder + ", pendingcreates: " + size + "]";
+    return "[Lease.  Holder: " + holder + ", pendingcreates: " + count + "]";
   }
 
   /**
@@ -181,10 +186,7 @@ public class Lease implements Comparable<Lease> {
 
   public Collection<LeasePath> getPaths()
       throws StorageException, TransactionContextException {
-    if (paths == null) {
-      paths = EntityManager.findList(LeasePath.Finder.ByHolderId, holderID);
-    }
-    return paths;
+    return EntityManager.findList(LeasePath.Finder.ByHolderId, holderID);
   }
 
   public String getHolder() {
@@ -217,7 +219,7 @@ public class Lease implements Comparable<Lease> {
       if(lp.getPath().equals(path)){
         lp.setLastBlockId(lastBlockId);
         lp.setPenultimateBlockId(penultimateBlockId);
-        EntityManager.update(lp);
+        lp.savePersistent();
         break;
       }
     }
@@ -234,5 +236,11 @@ public class Lease implements Comparable<Lease> {
     return null;
   }
 
+  public void deletePersistent() throws TransactionContextException, StorageException {
+    EntityManager.remove(this);
+  }
 
+  public void savePersistent() throws TransactionContextException, StorageException {
+    EntityManager.update(this);
+  }
 }

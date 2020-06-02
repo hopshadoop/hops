@@ -28,6 +28,7 @@ import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import static org.junit.Assert.assertEquals;
 
@@ -52,6 +53,8 @@ public class TestBlockInfoUnderConstruction {
 
     final Configuration conf = new HdfsConfiguration();
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    int leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     try {
       cluster.waitActive();
       final FSNamesystem namesystem = cluster.getNamesystem();
@@ -75,12 +78,13 @@ public class TestBlockInfoUnderConstruction {
           DatanodeStorageInfo s3 = dd3.getStorageInfos()[0];
 
           dd1.isAlive = dd2.isAlive = dd3.isAlive = true;
-          BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(new DatanodeStorageInfo[]{s1, s2, s3});
+          BlockInfoContiguousUnderConstruction blockInfo =
+                  createBlockInfoUnderConstruction(new DatanodeStorageInfo[]{s1, s2, s3}, leaseCreationLockRows);
           // Recovery attempt #1.
           DFSTestUtil.resetLastUpdatesWithOffset(dd1, -3 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd2, -1 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd3, -2 * 1000);
-          initializeBlockRecovery(blockInfo, 1, dn);
+          initializeBlockRecovery(blockInfo, 1, dn, leaseCreationLockRows);
           BlockInfoContiguousUnderConstruction[] blockInfoRecovery = dd2.getLeaseRecoveryCommand(1);
           assertEquals(blockInfoRecovery[0], blockInfo);
 
@@ -88,7 +92,7 @@ public class TestBlockInfoUnderConstruction {
           DFSTestUtil.resetLastUpdatesWithOffset(dd1, -2 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd2, -1 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd3, -3 * 1000);
-          initializeBlockRecovery(blockInfo, 2, dn);
+          initializeBlockRecovery(blockInfo, 2, dn, leaseCreationLockRows);
           blockInfoRecovery = dd1.getLeaseRecoveryCommand(1);
           assertEquals(blockInfoRecovery[0], blockInfo);
 
@@ -96,7 +100,7 @@ public class TestBlockInfoUnderConstruction {
           DFSTestUtil.resetLastUpdatesWithOffset(dd1, -2 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd2, -1 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd3, -3 * 1000);
-          initializeBlockRecovery(blockInfo, 3, dn);
+          initializeBlockRecovery(blockInfo, 3, dn, leaseCreationLockRows);
           blockInfoRecovery = dd3.getLeaseRecoveryCommand(1);
           assertEquals(blockInfoRecovery[0], blockInfo);
 
@@ -105,7 +109,7 @@ public class TestBlockInfoUnderConstruction {
           DFSTestUtil.resetLastUpdatesWithOffset(dd1, -2 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd2, -1 * 1000);
           DFSTestUtil.resetLastUpdatesWithOffset(dd3, 0);
-          initializeBlockRecovery(blockInfo, 3, dn);
+          initializeBlockRecovery(blockInfo, 3, dn, leaseCreationLockRows);
           blockInfoRecovery = dd3.getLeaseRecoveryCommand(1);
           assertEquals(blockInfoRecovery[0], blockInfo);
         }
@@ -116,7 +120,8 @@ public class TestBlockInfoUnderConstruction {
     }
   }
 
-  private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages) throws
+  private BlockInfoContiguousUnderConstruction createBlockInfoUnderConstruction(final DatanodeStorageInfo[] storages,
+                                                                                int leaseCreationLockRows) throws
       IOException {
     return (BlockInfoContiguousUnderConstruction) new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
@@ -132,7 +137,7 @@ public class TestBlockInfoUnderConstruction {
         locks.add(
             lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(
-                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
@@ -154,7 +159,7 @@ public class TestBlockInfoUnderConstruction {
   }
 
   private void initializeBlockRecovery(final BlockInfoContiguousUnderConstruction blockInfo, final long recoveryId,
-      final DatanodeManager dn) throws
+      final DatanodeManager dn, int leaseCreationLockRows) throws
       IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
@@ -170,7 +175,7 @@ public class TestBlockInfoUnderConstruction {
         locks.add(
             lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(
-                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+                lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,

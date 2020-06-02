@@ -1597,6 +1597,8 @@ public class TestFileCreation {
   private void acquireLock(final TransactionLockTypes.LockType lockType,
       final String holder) throws IOException {
     Configuration conf = new HdfsConfiguration();
+    int leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     HdfsStorageFactory.setConfiguration(conf);
     HopsTransactionalRequestHandler testHandler =
         new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
@@ -1611,7 +1613,7 @@ public class TestFileCreation {
           @Override
           public void acquireLock(TransactionLocks locks) throws IOException {
             LockFactory lf = LockFactory.getInstance();
-            locks.add(lf.getLeaseLockAllPaths(lockType, holder));
+            locks.add(lf.getLeaseLockAllPaths(lockType, holder, leaseCreationLockRows));
           }
 
           @Override

@@ -177,7 +177,8 @@ public class LeaseManager {
               leasePaths.toArray(new String[leasePaths.size()]))
               .setNameNodeID(fsnamesystem.getNameNode().getId())
               .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
-          locks.add(il).add(lf.getLeaseLockAllPaths(LockType.READ, holder))
+          locks.add(il).add(lf.getLeaseLockAllPaths(LockType.READ, holder,
+                  fsnamesystem.getLeaseCreationLockRows()))
               .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
               .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
         }
@@ -267,16 +268,16 @@ public class LeaseManager {
     if (lease == null) {
       lease = new Lease(holder, 
               org.apache.hadoop.hdfs.server.namenode.Lease.getHolderId(holder)
-              , now());
-      EntityManager.add(lease);
+              , now(), 0);
+      lease.savePersistent();
     } else {
       renewLease(lease);
     }
 
     if(src != null) {
       LeasePath lPath = new LeasePath(src, lease.getHolderID());
-      lease.addFirstPath(lPath);
-      EntityManager.add(lPath);
+      lease.addPath(lPath);
+      lPath.savePersistent();
     }
 
     return lease;
@@ -289,18 +290,17 @@ public class LeaseManager {
       throws StorageException, TransactionContextException {
     if(lease == null){
       LOG.warn("Lease not found. Removing lease path");
-      EntityManager.remove(src);
+      src.deletePersistent();
       return;
     }
 
-    if (lease.removePath(src)) {
-      EntityManager.remove(src);
-    } else {
+    if (!lease.removePath(src)) {
       LOG.error(src + " not found in lease.paths (=" + lease.getPaths() + ")");
     }
+    src.deletePersistent();
 
     if (!lease.hasPath()) {
-      EntityManager.remove(lease);
+      lease.deletePersistent();
     }
   }
 
@@ -345,11 +345,10 @@ public class LeaseManager {
         LOG.error(
             src + " not found in lease.paths (=" + lease.getPaths() + ")");
       }
-      EntityManager.remove(lp);
-      
-      if (!lease.hasPath() && !lease.getHolder().equals(newHolder)) {
-        EntityManager.remove(lease);
+      lp.deletePersistent();
 
+      if (!lease.hasPath() && !lease.getHolder().equals(newHolder)) {
+        lease.deletePersistent();
       }
     }
     
@@ -358,18 +357,17 @@ public class LeaseManager {
     if (newLease == null) {
       newLease = new Lease(newHolder, 
               org.apache.hadoop.hdfs.server.namenode.Lease.getHolderId(newHolder)
-              , now());
-      EntityManager.add(newLease);
+              , now(), 0);
+      newLease.savePersistent();
       lPath = new LeasePath(src, newLease.getHolderID());
-      newLease.addFirstPath(
-          lPath); // [lock] First time, so no need to look for lease-paths
+      newLease.addPath(lPath);
     } else {
       renewLease(newLease);
       lPath = new LeasePath(src, newLease.getHolderID());
       newLease.addPath(lPath);
     }
     // update lease-paths' holder
-    EntityManager.update(lPath);
+    lPath.savePersistent();
     
     return newLease;
   }
@@ -386,36 +384,10 @@ public class LeaseManager {
       throws StorageException, TransactionContextException {
     if (lease != null) {
       lease.setLastUpdate(now());
-      EntityManager.update(lease);
+      lease.savePersistent();
     }
   }
 
-  //HOP: method arguments changed for bug fix HDFS-4248
-//  void changeLease(String src, String dst)
-//      throws StorageException, TransactionContextException {
-//    if (LOG.isDebugEnabled()) {
-//      LOG.debug(getClass().getSimpleName() + ".changelease: " +
-//          " src=" + src + ", dest=" + dst);
-//    }
-//
-//    final int len = src.length();
-//    for (Map.Entry<LeasePath, Lease> entry : findLeaseWithPrefixPath(src)
-//        .entrySet()) {
-//      final LeasePath oldpath = entry.getKey();
-//      final Lease lease = entry.getValue();
-//      // replace stem of src with new destination
-//      final LeasePath newpath =
-//          new LeasePath(dst + oldpath.getPath().substring(len),
-//              lease.getHolderID());
-//      if (LOG.isDebugEnabled()) {
-//        LOG.debug("changeLease: replacing " + oldpath + " with " + newpath);
-//      }
-//      lease.replacePath(oldpath, newpath);
-//      EntityManager.remove(oldpath);
-//      EntityManager.add(newpath);
-//    }
-//  }
-  
   void changeLease(String src, String dst)
       throws StorageException, TransactionContextException {
     if (LOG.isDebugEnabled()) {
@@ -440,10 +412,10 @@ public class LeaseManager {
     }
     
     for(LeasePath newPath: newLPs){
-      EntityManager.add(newPath);
+      newPath.savePersistent();
     }
     for(LeasePath deletedLP: deletedLPs){
-      EntityManager.remove(deletedLP);
+      deletedLP.deletePersistent();
     }
   }
   
@@ -594,7 +566,8 @@ public class LeaseManager {
                 .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
 
             locks.add(il).add(lf.getNameNodeLeaseLock(LockType.WRITE))
-                .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder))
+                .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder,
+                        fsnamesystem.getLeaseCreationLockRows()))
                 .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
                 .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
           }
@@ -615,7 +588,7 @@ public class LeaseManager {
               LOG.info("Lease " + leaseToCheck + " has expired hard limit");
 
               if(!leaseToCheck.hasPath()){
-                EntityManager.remove(leaseToCheck);
+                leaseToCheck.deletePersistent();
                 return true;
               }
 

@@ -74,5 +74,53 @@ public class TestLeaseRecovery3 {
     } finally {
       cluster.shutdown();
     }
+
+  }
+
+  @Test
+  public void testFileOverwriteSimple() throws Exception {
+
+    Logger.getRootLogger().setLevel(Level.INFO);
+
+    Configuration conf = new HdfsConfiguration();
+    conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 3);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+    DistributedFileSystem newdfs = cluster.getFileSystem();
+
+    try {
+
+      // a client creats multiple files but fails and leaves the
+      // files in under construction state
+      newdfs.mkdirs(new Path("/dir"));
+      for (int i = 0; i < 3; i++) {
+        Path file = new Path("/dir/file" + i);
+        FSDataOutputStream out = newdfs.create(file, (short) 1);
+//        out.close();
+      }
+      //kill file client
+      newdfs.getClient().getLeaseRenewer().interruptAndJoin();
+      newdfs.getClient().abort();
+      newdfs.close();
+      //three open leases
+
+      newdfs = (DistributedFileSystem) FileSystem
+              .newInstance(cluster.getURI(), conf);
+      for (int i = 0; i < 3; i++) {
+        Path file = new Path("/dir/file" + i);
+        FSDataOutputStream out = newdfs.create(file, (short) 1);
+        out.close();
+      }
+      newdfs.getClient().getLeaseRenewer().interruptAndJoin();
+      newdfs.getClient().abort();
+      newdfs.close();
+
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail();
+    } finally {
+      cluster.shutdown();
+    }
+
   }
 }
