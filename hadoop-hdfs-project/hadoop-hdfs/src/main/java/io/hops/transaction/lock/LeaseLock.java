@@ -15,6 +15,7 @@
  */
 package io.hops.transaction.lock;
 
+import io.hops.metadata.hdfs.entity.LeaseCreationLock;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.Lease;
@@ -35,14 +36,16 @@ public final class LeaseLock extends Lock {
   private final List<Lease> leases;
   private final String singleFileLock;
   private final LeaseHolderResolveType resolveType;
+  private final int LEASE_CREATION_LOCK_ROWS;
 
   LeaseLock(TransactionLockTypes.LockType lockType, LeaseHolderResolveType resolveType,
-            String leaseHolder, String singleFileLock ) {
+            String leaseHolder, String singleFileLock, int leaseCreationLockRows ) {
     this.lockType = lockType;
     this.leaseHolder = leaseHolder;
     this.leases = new ArrayList<>();
     this.resolveType = resolveType;
     this.singleFileLock = singleFileLock;
+    this.LEASE_CREATION_LOCK_ROWS = leaseCreationLockRows;
 
     if(resolveType == LeaseHolderResolveType.SINGLE_PATH &&
             (singleFileLock == null || singleFileLock.isEmpty())) {
@@ -50,8 +53,8 @@ public final class LeaseLock extends Lock {
     }
   }
 
-  LeaseLock(TransactionLockTypes.LockType lockType) {
-    this(lockType, LeaseHolderResolveType.ALL_PATHS, null, null);
+  LeaseLock(TransactionLockTypes.LockType lockType, int leaseCreationLockRows) {
+    this(lockType, LeaseHolderResolveType.ALL_PATHS, null, null, leaseCreationLockRows);
   }
 
   @Override
@@ -81,7 +84,10 @@ public final class LeaseLock extends Lock {
         leases.addAll(allLeases);
       }
     }
+
     for (String h : holders) {
+      acquireLock(lockType, LeaseCreationLock.Finder.ByRowID,
+              Math.abs(Lease.getHolderId(h)) % LEASE_CREATION_LOCK_ROWS);
       Lease lease = acquireLock(lockType, Lease.Finder.ByHolder, h, Lease.getHolderId(h));
       if (lease != null) {
         leases.add(lease);

@@ -291,10 +291,12 @@ class FSDirRenameOp {
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.UC, BLK.IV, BLK.CR, BLK.ER, BLK.PE, BLK.UR));
         if (!isUsingSubTreeLocks) {
-          locks.add(lf.getLeaseLockAllPaths(LockType.WRITE))
+          locks.add(lf.getLeaseLockAllPaths(LockType.WRITE,
+                  fsd.getFSNamesystem().getLeaseCreationLockRows()))
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
         } else {
-          locks.add(lf.getLeaseLockAllPaths(LockType.READ_COMMITTED))
+          locks.add(lf.getLeaseLockAllPaths(LockType.READ_COMMITTED,
+                  fsd.getFSNamesystem().getLeaseCreationLockRows()))
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src)).
               add(lf.getSubTreeOpsLock(LockType.WRITE, fsd.getFSNamesystem().getSubTreeLockPathPrefix(src), false));
         }
@@ -579,10 +581,12 @@ class FSDirRenameOp {
           locks.add(lf.getQuotaUpdateLock(true, src, dst));
         }
         if (!isUsingSubTreeLocks) {
-          locks.add(lf.getLeaseLockAllPaths(LockType.WRITE))
+          locks.add(lf.getLeaseLockAllPaths(LockType.WRITE,
+                  fsd.getFSNamesystem().getLeaseCreationLockRows()))
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
         } else {
-          locks.add(lf.getLeaseLockAllPaths(LockType.WRITE))
+          locks.add(lf.getLeaseLockAllPaths(LockType.WRITE,
+                  fsd.getFSNamesystem().getLeaseCreationLockRows()))
               .add(lf.getLeasePathLock(LockType.WRITE, src)).
               add(lf.getSubTreeOpsLock(LockType.WRITE, fsd.
                     getFSNamesystem().getSubTreeLockPathPrefix(src), false));

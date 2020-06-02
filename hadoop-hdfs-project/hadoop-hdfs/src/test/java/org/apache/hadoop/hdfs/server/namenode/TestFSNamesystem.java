@@ -27,6 +27,7 @@ import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
 import java.io.File;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
@@ -62,7 +63,9 @@ public class TestFSNamesystem {
     DFSTestUtil.formatNameNode(conf);
     FSNamesystem fsn = FSNamesystem.loadFromDisk(conf, null);
     LeaseManager leaseMan = fsn.getLeaseManager();
-    addLease(leaseMan, "client1", "importantFile");
+    int leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
+    addLease(leaseMan, "client1", "importantFile", leaseCreationLockRows);
     assertEquals(1, leaseMan.countLease());
     fsn.clear();
     leaseMan = fsn.getLeaseManager();
@@ -70,12 +73,12 @@ public class TestFSNamesystem {
   }
   
   private void addLease(final LeaseManager leaseMan, final String holder,
-      final String src) throws IOException {
+      final String src, int leaseCreationLockRows) throws IOException {
     new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getLeaseLockAllPaths(LockType.WRITE, holder));
+        locks.add(lf.getLeaseLockAllPaths(LockType.WRITE, holder, leaseCreationLockRows ));
       }
       
       @Override

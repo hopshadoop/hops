@@ -38,6 +38,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -58,9 +59,12 @@ public class TestBlockInfo {
   private static final Log LOG = LogFactory
       .getLog("org.apache.hadoop.hdfs.TestBlockInfo");
 
+  private int leaseCreationLockRows;
   @Before
   public void setup() throws IOException {
     HdfsConfiguration conf = new HdfsConfiguration();
+    leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     HdfsStorageFactory.setConfiguration(conf);
     HdfsStorageFactory.formatStorage();
     HashBuckets.initialize(1);
@@ -71,10 +75,10 @@ public class TestBlockInfo {
     Block block = new Block(0);
     BlockInfoContiguous blockInfo = new BlockInfoContiguous(block, (short) 3);
     BlockCollection bc = Mockito.mock(BlockCollection.class);
-    setBlockCollection(blockInfo, bc);
+    setBlockCollection(blockInfo, bc, leaseCreationLockRows);
     Assert.assertFalse(blockInfo.isDeleted());
     blockInfo.setBlockCollection(null);
-    Assert.assertTrue(isDeleted(blockInfo));
+    Assert.assertTrue(isDeleted(blockInfo, leaseCreationLockRows));
   }
 
   @Test
@@ -181,7 +185,7 @@ public class TestBlockInfo {
   }
   
   private void setBlockCollection(final BlockInfoContiguous blockInfo, 
-      final BlockCollection bc ) throws IOException {
+      final BlockCollection bc, int leaseCreationLockRows) throws IOException {
     new HopsTransactionalRequestHandler(
         HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(0L);
@@ -194,7 +198,7 @@ public class TestBlockInfo {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+            .add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
@@ -210,7 +214,7 @@ public class TestBlockInfo {
     }.handle();
   }
   
-  private boolean isDeleted(final BlockInfoContiguous blockInfo) throws IOException {
+  private boolean isDeleted(final BlockInfoContiguous blockInfo, int leaseCreationLockRows) throws IOException {
     return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.COMMIT_BLOCK_SYNCHRONIZATION) {
       INodeIdentifier inodeIdentifier = new INodeIdentifier(0L);
 
@@ -222,7 +226,7 @@ public class TestBlockInfo {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
-            .add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE))
+            .add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,

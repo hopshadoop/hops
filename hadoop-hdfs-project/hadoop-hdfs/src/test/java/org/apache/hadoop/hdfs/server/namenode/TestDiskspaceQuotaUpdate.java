@@ -56,16 +56,17 @@ public class TestDiskspaceQuotaUpdate {
   private static final short REPLICATION = 4;
   static final long seed = 0L;
   private static final Path dir = new Path("/TestQuotaUpdate");
-
   private Configuration conf;
   private MiniDFSCluster cluster;
   private FSDirectory fsdir;
   private DistributedFileSystem dfs;
-
+  private int leaseCreationLockRows;
   @Before
   public void setUp() throws Exception {
     conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCKSIZE);
+    leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION)
         .build();
     cluster.waitActive();
@@ -217,7 +218,7 @@ public class TestDiskspaceQuotaUpdate {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -241,7 +242,7 @@ public class TestDiskspaceQuotaUpdate {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));

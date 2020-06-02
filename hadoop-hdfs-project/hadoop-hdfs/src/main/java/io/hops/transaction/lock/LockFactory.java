@@ -213,19 +213,19 @@ public class LockFactory {
   }
 
   public Lock getLeaseLockAllPaths(TransactionLockTypes.LockType lockType,
-                                   String leaseHolder) {
+                                   String leaseHolder, int leaseCreationLockRows) {
     return new LeaseLock(lockType, TransactionLockTypes.LeaseHolderResolveType.ALL_PATHS,
-            leaseHolder, null);
+            leaseHolder, null, leaseCreationLockRows);
   }
 
   public Lock getLeaseLockSinglePath(TransactionLockTypes.LockType lockType,
-                                     String leaseHolder, String path) {
+                                     String leaseHolder, String path, int leaseCreationLockRows) {
     return new LeaseLock(lockType, TransactionLockTypes.LeaseHolderResolveType.SINGLE_PATH,
-            leaseHolder, path);
+            leaseHolder, path, leaseCreationLockRows);
   }
 
-  public Lock getLeaseLockAllPaths(TransactionLockTypes.LockType lockType) {
-    return new LeaseLock(lockType);
+  public Lock getLeaseLockAllPaths(TransactionLockTypes.LockType lockType, int leaseCreationLockRows) {
+    return new LeaseLock(lockType, leaseCreationLockRows);
   }
 
   public Lock getLeasePathLock(TransactionLockTypes.LockType lockType,

@@ -58,6 +58,7 @@ public class TestQuotaByStorageType {
   private FSDirectory fsdir;
   private DistributedFileSystem dfs;
   private FSNamesystem fsn;
+  private int leaseCreationLockRows;
 
   protected static final Log LOG = LogFactory.getLog(TestQuotaByStorageType.class);
 
@@ -65,7 +66,8 @@ public class TestQuotaByStorageType {
   public void setUp() throws Exception {
     conf = new Configuration();
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCKSIZE);
-
+    leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
+            DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
     // Setup a 3-node cluster and configure
     // each node with 1 SSD and 1 DISK without capacity limitation
     cluster = new MiniDFSCluster
@@ -599,7 +601,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = LockFactory.getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -624,7 +626,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH, foo.toString());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -648,7 +650,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, foo.toString());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
@@ -675,7 +677,7 @@ public class TestQuotaByStorageType {
         LockFactory lf = getInstance();
         INodeLock il = lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE_ON_TARGET_AND_PARENT,
             TransactionLockTypes.INodeResolveType.PATH_AND_ALL_CHILDREN_RECURSIVELY, foo.toString());
-        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ))
+        locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, leaseCreationLockRows))
             .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, foo.toString()))
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR));
