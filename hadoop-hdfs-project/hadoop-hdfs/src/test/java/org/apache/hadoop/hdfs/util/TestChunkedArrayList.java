@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import org.junit.Test;
 
 import com.google.common.base.Stopwatch;
+import java.util.concurrent.TimeUnit;
 
 public class TestChunkedArrayList {
 
@@ -69,24 +70,24 @@ public class TestChunkedArrayList {
       System.gc();
       {
         ArrayList<String> arrayList = new ArrayList<String>();
-        Stopwatch sw = new Stopwatch();
+        Stopwatch sw = Stopwatch.createUnstarted();
         sw.start();
         for (int i = 0; i < numElems; i++) {
           arrayList.add(obj);
         }
-        System.out.println("       ArrayList " + sw.elapsedMillis());
+        System.out.println("       ArrayList " + sw.elapsed(TimeUnit.MILLISECONDS));
       }
       
       // test ChunkedArrayList
       System.gc();
       {
         ChunkedArrayList<String> chunkedList = new ChunkedArrayList<String>();
-        Stopwatch sw = new Stopwatch();
+        Stopwatch sw = Stopwatch.createUnstarted();
         sw.start();
         for (int i = 0; i < numElems; i++) {
           chunkedList.add(obj);
         }
-        System.out.println("ChunkedArrayList " + sw.elapsedMillis());
+        System.out.println("ChunkedArrayList " + sw.elapsed(TimeUnit.MILLISECONDS));
       }
     }
   }

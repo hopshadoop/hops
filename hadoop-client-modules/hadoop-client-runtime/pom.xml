@@ -342,6 +342,14 @@
                         <exclude>net/topology/**/*</exclude>
                       </excludes>
                     </relocation>
+		    <relocation>
+                      <pattern>afu/</pattern>
+                      <shadedPattern>${shaded.dependency.prefix}.afu.</shadedPattern>
+                      <excludes>
+                        <exclude>**/pom.xml</exclude>
+                        <!-- Exclude config keys for Hadoop that look like package names -->
+                      </excludes>
+                    </relocation>
                     <!-- okio declares a top level package instead of nested -->
                     <relocation>
                       <pattern>okio/</pattern>
