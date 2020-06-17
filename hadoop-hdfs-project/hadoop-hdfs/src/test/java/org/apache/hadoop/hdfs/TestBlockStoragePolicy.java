@@ -17,7 +17,16 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
+import static org.apache.hadoop.fs.permission.AclEntryScope.DEFAULT;
+import static org.apache.hadoop.fs.permission.AclEntryType.GROUP;
+import static org.apache.hadoop.fs.permission.AclEntryType.OTHER;
+import static org.apache.hadoop.fs.permission.AclEntryType.USER;
+import static org.apache.hadoop.fs.permission.FsAction.ALL;
+import static org.apache.hadoop.fs.permission.FsAction.NONE;
+import static org.apache.hadoop.fs.permission.FsAction.READ_EXECUTE;
 import static org.apache.hadoop.hdfs.protocol.HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
+import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -30,6 +39,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import org.apache.hadoop.hdfs.server.blockmanagement.*;
@@ -1096,6 +1106,36 @@ public class TestBlockStoragePolicy {
               policies[5].toString());
     } finally {
       IOUtils.cleanup(null, fs);
+      cluster.shutdown();
+    }
+  }
+  
+  @Test
+  public void testSetStoragePolicyOnDirWithACLs() throws Exception{
+    Configuration conf = new HdfsConfiguration();
+    conf.setBoolean(DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY, true);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(1).build();
+    cluster.waitActive();
+    final DistributedFileSystem fs = cluster.getFileSystem();
+    
+    try{
+      Path dir = new Path("/dir");
+      fs.mkdirs(dir);
+  
+      List<AclEntry> aclSpec = Lists.newArrayList(
+          aclEntry(ACCESS, USER, ALL),
+          aclEntry(ACCESS, USER, "foo", ALL),
+          aclEntry(ACCESS, GROUP, READ_EXECUTE),
+          aclEntry(ACCESS, OTHER, NONE));
+      
+      fs.setAcl(dir, aclSpec);
+      fs.setStoragePolicy(dir, HdfsConstants.WARM_STORAGE_POLICY_NAME);
+      BlockStoragePolicy policy = fs.getStoragePolicy(dir);
+      Assert.assertEquals(HdfsConstants.WARM_STORAGE_POLICY_NAME, policy.getName());
+      
+    }finally {
       cluster.shutdown();
     }
   }
