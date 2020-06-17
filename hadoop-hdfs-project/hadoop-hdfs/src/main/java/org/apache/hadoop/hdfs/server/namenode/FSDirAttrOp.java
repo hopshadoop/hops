@@ -309,6 +309,7 @@ public class FSDirAttrOp {
         locks.add(il);
         locks.add(lf.getEZLock());
         locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
+        locks.add(lf.getAcesLock());
       }
 
       @Override
