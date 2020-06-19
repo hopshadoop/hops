@@ -33,16 +33,10 @@ RUN echo APT::Install-Suggests "0"\; >>  /etc/apt/apt.conf.d/10disableextras
 ENV DEBIAN_FRONTEND noninteractive
 ENV DEBCONF_TERSE true
 
-######
-# Install common dependencies from packages. Versions here are either
-# sufficient or irrelevant.
-#
-# WARNING: DO NOT PUT JAVA APPS HERE! Otherwise they will install default
-# Ubuntu Java.  See Java section below!
-######
 # hadolint ignore=DL3008
 RUN apt-get -q update \
     && apt-get -q install -y --no-install-recommends \
+        ant \
         apt-utils \
         bats \
         build-essential \
@@ -51,11 +45,13 @@ RUN apt-get -q update \
         cmake \
         curl \
         doxygen \
+        findbugs \
         fuse \
         g++ \
         gcc \
         git \
         gnupg-agent \
+        libbcprov-java \
         libbz2-dev \
         libcurl4-openssl-dev \
         libfuse-dev \
@@ -64,11 +60,13 @@ RUN apt-get -q update \
         libsasl2-dev \
         libsnappy-dev \
         libssl-dev \
-        libsnappy-dev \
         libtool \
         libzstd1-dev \
         locales \
         make \
+        maven \
+        openjdk-11-jdk \
+        openjdk-8-jdk \
         pinentry-curses \
         pkg-config \
         python3 \
@@ -89,12 +87,6 @@ RUN locale-gen en_US.UTF-8
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 ENV PYTHONIOENCODING=utf-8
 
-######
-# Set env vars required to build Hadoop
-######
-ENV MAVEN_HOME /usr
-# JAVA_HOME must be set in Maven >= 3.5.0 (MNG-6003)
-ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 
 #######
 # Install SpotBugs 4.2.2
@@ -106,14 +98,13 @@ RUN mkdir -p /opt/spotbugs \
     && chmod +x /opt/spotbugs/bin/*
 ENV SPOTBUGS_HOME /opt/spotbugs
 
-#######
-# OpenJDK 8
-#######
-# hadolint ignore=DL3008
-RUN apt-get -q update \
-    && apt-get -q install -y --no-install-recommends openjdk-8-jdk libbcprov-java \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+######
+# Set env vars required to build Hadoop
+######
+ENV MAVEN_HOME /usr
+# JAVA_HOME must be set in Maven >= 3.5.0 (MNG-6003)
+ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
+ENV FINDBUGS_HOME /usr
 
 ######
 # Install Google Protobuf 2.5.0 (3.0.0 ships with Bionic)
@@ -131,18 +122,6 @@ RUN mkdir -p /opt/protobuf-src \
     && rm -rf /opt/protobuf-src
 ENV PROTOBUF_HOME /opt/protobuf
 ENV PATH "${PATH}:/opt/protobuf/bin"
-
-######
-# Install Apache Maven 3.6.0 (3.6.0 ships with Bionic)
-######
-# hadolint ignore=DL3008
-RUN apt-get -q update \
-    && apt-get -q install -y --no-install-recommends maven \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-ENV MAVEN_HOME /usr
-# JAVA_HOME must be set in Maven >= 3.5.0 (MNG-6003)
-ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 
 # Install pylint and python-dateutil
 RUN pip3 install pylint==2.6.0 python-dateutil==2.8.1
