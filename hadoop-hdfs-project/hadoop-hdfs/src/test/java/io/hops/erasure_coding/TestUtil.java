@@ -19,7 +19,6 @@ import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.tukaani.xz.UnsupportedOptionsException;
 
 import java.io.IOException;
 import java.util.Random;
