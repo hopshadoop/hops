@@ -682,6 +682,14 @@ message ActiveNamenodeListResponseProto {
   repeated hadoop.common.ActiveNodeProto namenodes = 1;
 }
 
+message GetEpochMSRequestProto {
+}
+
+message GetEpochMSResponseProto {
+  required int64 epoch = 1;
+}
+
+
 message EncodingStatusProto {
   optional uint64 inodeId = 1;
   optional uint64 parityInodeId = 2;
@@ -918,5 +926,7 @@ service ClientNamenodeProtocol {
       returns(ListEncryptionZonesResponseProto);
   rpc getEZForPath(GetEZForPathRequestProto)
       returns(GetEZForPathResponseProto);
+  rpc getNNEpochMS(GetEpochMSRequestProto)
+      returns (GetEpochMSResponseProto);
 }
 

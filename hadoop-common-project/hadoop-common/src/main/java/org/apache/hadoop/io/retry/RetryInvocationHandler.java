@@ -50,6 +50,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     private final Object[] args;
     private final boolean isRpc;
     private final int callId;
+    private final long epoch;
     private final Counters counters = new Counters();
 
     private final RetryPolicy retryPolicy;
@@ -57,12 +58,13 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
 
     private RetryInfo retryInfo;
 
-    Call(Method method, Object[] args, boolean isRpc, int callId,
+    Call(long epoch, Method method, Object[] args, boolean isRpc, int callId,
          RetryInvocationHandler<?> retryInvocationHandler) {
       this.method = method;
       this.args = args;
       this.isRpc = isRpc;
       this.callId = callId;
+      this.epoch = epoch;
 
       this.retryPolicy = retryInvocationHandler.getRetryPolicy(method);
       this.retryInvocationHandler = retryInvocationHandler;
@@ -70,6 +72,10 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
 
     int getCallId() {
       return callId;
+    }
+
+    long getEpoch() {
+      return epoch;
     }
 
     Counters getCounters() {
@@ -160,7 +166,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     Object invokeMethod() throws Throwable {
       if (isRpc) {
         Client.setCallIdAndRetryCount(callId, counters.retries,
-            retryInvocationHandler.asyncCallHandler);
+            retryInvocationHandler.asyncCallHandler, epoch);
       }
       return retryInvocationHandler.invokeMethod(method, args);
     }
@@ -339,12 +345,12 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     return proxyDescriptor.getFailoverCount();
   }
 
-  private Call newCall(Method method, Object[] args, boolean isRpc,
+  private Call newCall(long epoch, Method method, Object[] args, boolean isRpc,
                        int callId) {
     if (Client.isAsynchronousMode()) {
-      return asyncCallHandler.newAsyncCall(method, args, isRpc, callId, this);
+      return asyncCallHandler.newAsyncCall(epoch, method, args, isRpc, callId, this);
     } else {
-      return new Call(method, args, isRpc, callId, this);
+      return new Call(epoch, method, args, isRpc, callId, this);
     }
   }
 
@@ -353,8 +359,10 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
       throws Throwable {
     final boolean isRpc = isRpcInvocation(proxyDescriptor.getProxy());
     final int callId = isRpc? Client.nextCallId(): RpcConstants.INVALID_CALL_ID;
+    final long epoch = isRpc? Client.getRpcEpochSec():
+            RpcConstants.INVALID_EPOCH;
 
-    final Call call = newCall(method, args, isRpc, callId);
+    final Call call = newCall(epoch, method, args, isRpc, callId);
     while (true) {
       final CallReturn c = call.invokeOnce();
       final CallReturn.State state = c.getState();

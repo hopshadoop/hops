@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.CacheDirectiveDataAccess;
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
@@ -41,8 +42,6 @@ import java.util.EnumSet;
 import java.util.List;
 import org.apache.hadoop.hdfs.protocol.CacheDirective;
 import org.apache.hadoop.hdfs.protocolPB.PBHelper;
-import org.apache.hadoop.ipc.RetryCache.CacheEntry;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.Server;
 
 class FSNDNCacheOp {
@@ -61,7 +60,8 @@ class FSNDNCacheOp {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         if (fsn.isRetryCacheEnabled()) {
-          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId()));
+          locks.add(lf.getRetryCacheEntryLock(Server.getClientId(), Server.getCallId(),
+                  Server.getRpcEpoch()));
         }
         locks.add(lf.getCachePoolLock(directive.getPool()));
         INodeLock il = lf.getINodeLock(INodeLockType.READ, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, path)
@@ -76,9 +76,7 @@ class FSNDNCacheOp {
 
       @Override
       public Object performTask() throws IOException {
-        final RetryCacheDistributed.CacheEntryWithPayload cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.
-            getRetryCache(), null);
-
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return PBHelper.bytesToLong(cacheEntry.getPayload());
         }
@@ -95,7 +93,7 @@ class FSNDNCacheOp {
           success = true;
           return effectiveDirective;
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success, PBHelper.longToBytes(result));
+          LightWeightCacheDistributed.put(PBHelper.longToBytes(result), success);
         }
       }
     };
@@ -134,7 +132,7 @@ class FSNDNCacheOp {
         LockFactory lf = LockFactory.getInstance();
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getCacheDirectiveLock(directive.getId())).
             add(lf.getCachePoolsLock(pools));
@@ -150,7 +148,7 @@ class FSNDNCacheOp {
       @Override
       public Object performTask() throws IOException {
         boolean success = false;
-        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null;
         }
@@ -160,7 +158,7 @@ class FSNDNCacheOp {
           cacheManager.modifyDirective(directive, pc, flags);
           success = true;
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
         return null;
       }
@@ -176,7 +174,7 @@ class FSNDNCacheOp {
         LockFactory lf = LockFactory.getInstance();
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getCacheDirectiveLock(id)).
             add(lf.getCachePoolLock(LockType.WRITE));
@@ -184,7 +182,7 @@ class FSNDNCacheOp {
 
       @Override
       public Object performTask() throws IOException {
-        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null;
         }
@@ -196,7 +194,7 @@ class FSNDNCacheOp {
           cacheManager.removeDirective(id, pc);
           success = true;
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
         return null;
       }
@@ -222,14 +220,14 @@ class FSNDNCacheOp {
         LockFactory lf = LockFactory.getInstance();
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getCachePoolLock(poolName));
       }
 
       @Override
       public Object performTask() throws IOException {
-        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null; // Return previous response
         }
@@ -241,9 +239,10 @@ class FSNDNCacheOp {
             pc.checkSuperuserPrivilege();
           }
           CachePoolInfo info = cacheManager.addCachePool(req);
+          success = true;
           return info;
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
       }
     }.handle();
@@ -259,14 +258,14 @@ class FSNDNCacheOp {
         LockFactory lf = LockFactory.getInstance();
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getCachePoolLock(poolName));
       }
 
       @Override
       public Object performTask() throws IOException {
-        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null; // Return previous response
         }
@@ -279,7 +278,7 @@ class FSNDNCacheOp {
           cacheManager.modifyCachePool(req);
           success = true;
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
         return null;
       }
@@ -296,7 +295,7 @@ class FSNDNCacheOp {
         LockFactory lf = LockFactory.getInstance();
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getCachePoolLock(cachePoolName)).
             add(lf.getCacheDirectiveLock(cachePoolName));
@@ -304,7 +303,7 @@ class FSNDNCacheOp {
 
       @Override
       public Object performTask() throws IOException {
-        CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null; // Return previous response
         }
@@ -315,8 +314,9 @@ class FSNDNCacheOp {
             pc.checkSuperuserPrivilege();
           }
           cacheManager.removeCachePool(cachePoolName);
+          success = true;
         } finally {
-           RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
         return null;
       }

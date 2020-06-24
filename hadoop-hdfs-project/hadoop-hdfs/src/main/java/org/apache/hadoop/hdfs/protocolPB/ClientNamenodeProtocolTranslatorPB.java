@@ -1578,6 +1578,19 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public long getEpochMS() throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.GetEpochMSRequestProto req =
+              ClientNamenodeProtocolProtos.GetEpochMSRequestProto.newBuilder().build();
+      ClientNamenodeProtocolProtos.GetEpochMSResponseProto response = rpcProxy.getNNEpochMS(null,
+              req);
+      return response.getEpoch();
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
   public void createEncryptionZone(String src, String keyName)
     throws IOException {
     final CreateEncryptionZoneRequestProto.Builder builder =

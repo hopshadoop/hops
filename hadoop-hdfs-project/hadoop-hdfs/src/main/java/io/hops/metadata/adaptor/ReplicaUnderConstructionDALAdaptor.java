@@ -71,12 +71,6 @@ public class ReplicaUnderConstructionDALAdaptor extends
   }
 
   @Override
-  public void removeByBlockIdAndInodeId(long blockId, long inodeId)
-      throws StorageException {
-    dataAccces.removeByBlockIdAndInodeId(blockId, inodeId);
-  }
-
-  @Override
   public int countAll() throws StorageException {
     return dataAccces.countAll();
   }

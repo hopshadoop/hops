@@ -354,7 +354,9 @@ public enum HDFSOperationType implements OperationType {
   SET_ACL,
   
   //retry cache
+  RETRY_CACHE_WAIT_COMPLETION,
   RETRY_CACHE,
+  RETRY_CACHE_GET_ALL,
   CLEAN_RETRY_CACHE,
 
   //Metadata GC
@@ -385,7 +387,9 @@ public enum HDFSOperationType implements OperationType {
   GET_BLOCK_THRESHOLD,
   GET_BLOCK_REPLICATION_QUEUE_THRESHOLD,
   CHECK_BLOCK,
-  
+  GET_RETRY_CACHE_CLEANER_EPOCH,
+  SET_RETRY_CACHE_CLEANER_EPOCH,
+
   //XAttr
   SET_XATTR,
   GET_XATTRS,

@@ -28,16 +28,20 @@ public class RetryCacheEntryLock extends Lock {
 
   private final List<byte[]> clientId  = new ArrayList<>();
   private final List<Integer> callId = new ArrayList<>();
+  private final List<Long> epochs = new ArrayList<>();
 
-  RetryCacheEntryLock(byte[] clientId, int callId) {
+  RetryCacheEntryLock(byte[] clientId, int callId, long epoch) {
     this.clientId.add(clientId);
     this.callId.add(callId);
+    this.epochs.add(epoch);
   }
+
 
   RetryCacheEntryLock(List<RetryCache.CacheEntry> entries) {
     for(RetryCache.CacheEntry entry : entries){
       this.clientId.add(entry.getClientId());
       this.callId.add(entry.getCallId());
+      this.epochs.add(entry.getEpoch());
     }
   }
   
@@ -47,7 +51,9 @@ public class RetryCacheEntryLock extends Lock {
     for (int i = 0; i < clientId.size(); i++) {
       byte[] cid = clientId.get(i);
       int clid = callId.get(i);
-      EntityManager.find(RetryCacheEntry.Finder.ByClientIdAndCallId, cid, clid);
+      long epoch = epochs.get(i);
+      EntityManager.find(RetryCacheEntry.Finder.ByPK, cid,
+              clid, epoch);
     }
   }
 

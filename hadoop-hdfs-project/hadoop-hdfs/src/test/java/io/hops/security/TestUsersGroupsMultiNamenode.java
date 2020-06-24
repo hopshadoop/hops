@@ -650,6 +650,11 @@ public class TestUsersGroupsMultiNamenode {
       usersGroupsMapping.invCacheUserAddedToGroup(userName, groupName);
     }
 
+    @Override
+    public long getEpochMS() throws IOException {
+        return System.currentTimeMillis();
+    }
+
     void clearCache(){
       usersGroupsMapping.clear();
     }

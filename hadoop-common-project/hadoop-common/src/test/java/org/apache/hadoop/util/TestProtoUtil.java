@@ -82,7 +82,7 @@ public class TestProtoUtil {
     byte[] uuid = ClientId.getClientId();
     RpcRequestHeaderProto header = ProtoUtil.makeRpcRequestHeader(
         RpcKind.RPC_PROTOCOL_BUFFER, OperationProto.RPC_FINAL_PACKET, 0,
-        RpcConstants.INVALID_RETRY_COUNT, uuid);
+        RpcConstants.INVALID_RETRY_COUNT, uuid, RpcConstants.INVALID_EPOCH);
     assertTrue(Arrays.equals(uuid, header.getClientId().toByteArray()));
   }
 }

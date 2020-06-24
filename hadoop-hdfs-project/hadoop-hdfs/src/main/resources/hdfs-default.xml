@@ -1525,21 +1525,6 @@
   </property>
 
   <property>
-    <name>dfs.namenode.retrycache.heap.percent</name>
-    <value>0.03f</value>
-    <description>
-      This parameter configures the heap size allocated for retry cache
-      (excluding the response cached). This corresponds to approximately
-      4096 entries for every 64MB of namenode process java heap size.
-      Assuming retry cache entry expiration time (configured using
-      dfs.namenode.retrycache.expirytime.millis) of 10 minutes, this
-      enables retry cache to support 7 operations per second sustained
-      for 10 minutes. As the heap size is increased, the operation rate
-      linearly increases.
-    </description>
-  </property>
-  
-  <property>
     <name>dfs.client.mmap.enabled</name>
     <value>true</value>
     <description>

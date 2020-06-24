@@ -30,6 +30,7 @@ public class RpcConstants {
   
   public static final int AUTHORIZATION_FAILED_CALL_ID = -1;
   public static final int INVALID_CALL_ID = -2;
+  public static final int INVALID_EPOCH = 0;
   public static final int CONNECTION_CONTEXT_CALL_ID = -3;
   public static final int PING_CALL_ID = -4;
   

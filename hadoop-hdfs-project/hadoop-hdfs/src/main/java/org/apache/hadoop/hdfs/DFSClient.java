@@ -373,6 +373,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       }
     }
 
+    // set epoch
+    setClientEpoch();
+
     String localInterfaces[] =
       conf.getTrimmedStrings(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES);
     localInterfaceAddrs = getLocalInterfaceAddrs(localInterfaces);
@@ -3152,4 +3155,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }
   
   }
+
+  private void setClientEpoch() throws IOException {
+    if(leaderNN != null) {
+      long startTime = System.currentTimeMillis();
+      long epoch = leaderNN.getEpochMS();
+      long endTime = System.currentTimeMillis();
+      long diff = (endTime - startTime) / 2;
+      Client.setEpoch(endTime, epoch + diff);
+    }
+  }
+
 }
