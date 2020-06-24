@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
@@ -27,15 +28,12 @@ import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.ipc.RetryCache;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.AccessControlException;
 
@@ -88,14 +86,13 @@ class FSDirXAttrOp {
         
         if(fsd.getFSNamesystem().isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
       }
       
       @Override
       public Object performTask() throws IOException {
-        RetryCache.CacheEntry cacheEntry =
-            RetryCacheDistributed.waitForCompletion(fsd.getFSNamesystem().getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null;
         }
@@ -105,7 +102,7 @@ class FSDirXAttrOp {
           stat = setXAttrInt(fsd, srcArg, src, xAttr, flag, cacheEntry != null);
           success = true;
         }finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
         return stat;
       }
@@ -181,15 +178,14 @@ class FSDirXAttrOp {
         locks.add(lf.getAcesLock());
         if(fsd.getFSNamesystem().isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getEZLock());
       }
       
       @Override
       public Object performTask() throws IOException {
-        RetryCache.CacheEntry cacheEntry =
-            RetryCache.waitForCompletion(fsd.getFSNamesystem().getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null; // Return previous response
         }
@@ -199,7 +195,7 @@ class FSDirXAttrOp {
           stat = removeXAttrInt(fsd, srcArg, src, xAttr, cacheEntry != null);
           success = true;
         } finally {
-          RetryCache.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
         return stat;
       }

@@ -36,8 +36,6 @@ import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.server.namenode.INode.BlocksMapUpdateInfo;
 import org.apache.hadoop.ipc.RetriableException;
-import org.apache.hadoop.ipc.RetryCache;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.util.ChunkedArrayList;
 
@@ -128,7 +126,7 @@ class FSDirDeleteOp {
       return deleteTransaction(fsn, src, false);
     }
 
-    RetryCache.CacheEntry cacheEntry = fsn.retryCacheWaitForCompletionTransactional();
+    RetryCacheEntry cacheEntry = LightWeightCacheDistributed.getTransactional();
     if (cacheEntry != null && cacheEntry.isSuccess()) {
       return true; // Return previous response
     }
@@ -184,7 +182,7 @@ class FSDirDeleteOp {
       ret = true;
       return ret;
     } finally {
-      fsn.retryCacheSetStateTransactional(cacheEntry, ret);
+      LightWeightCacheDistributed.putTransactional(ret);
     }
   }
   
@@ -326,7 +324,7 @@ class FSDirDeleteOp {
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,BLK.PE, BLK.IV,BLK.ER));
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
 
         locks.add(lf.getAllUsedHashBucketsLock());
@@ -342,7 +340,7 @@ class FSDirDeleteOp {
 
       @Override
       public Object performTask() throws IOException {
-        RetryCache.CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return true; // Return previous response
         }
@@ -360,7 +358,7 @@ class FSDirDeleteOp {
           ret = deleteInternal(fsn, src, iip);
           return ret; 
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, ret);
+          LightWeightCacheDistributed.put(null, ret);
         }
       }
     };

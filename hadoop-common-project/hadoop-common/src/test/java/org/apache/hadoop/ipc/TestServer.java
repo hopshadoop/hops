@@ -135,7 +135,7 @@ public class TestServer {
   @Test (timeout=300000)
   public void testLogExceptions() throws Exception {
     final Configuration conf = new Configuration();
-    final Call dummyCall = new Call(0, 0, null, null);
+    final Call dummyCall = new Call(0, 0, null, null, RpcConstants.INVALID_EPOCH);
     Logger logger = mock(Logger.class);
     Server server = new Server("0.0.0.0", 0, LongWritable.class, 1, conf) {
       @Override

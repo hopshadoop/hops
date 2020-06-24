@@ -1807,4 +1807,10 @@ throws IOException;
    */
   @Idempotent
   public void invCachesUserAddedToGroup(String userName, String groupName) throws IOException;
+
+  /**
+   * Get the Epoch from the NN
+   */
+  @Idempotent
+  public long getEpochMS() throws IOException;
 }

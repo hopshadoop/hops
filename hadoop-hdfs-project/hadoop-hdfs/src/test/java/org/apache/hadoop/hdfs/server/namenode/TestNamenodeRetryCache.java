@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -26,10 +27,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
@@ -52,6 +50,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.io.EnumSetWritable;
+import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC.RpcKind;
 import org.apache.hadoop.ipc.RetryCache.CacheEntry;
@@ -96,7 +95,7 @@ public class TestNamenodeRetryCache {
     conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BlockSize);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
-    conf.setLong(DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY, 30000);
+    conf.setLong(DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY, 60000);
     cluster = new MiniDFSCluster.Builder(conf).build();
     cluster.waitActive();
     nnRpc = cluster.getNameNode().getRpcServer();
@@ -120,13 +119,14 @@ public class TestNamenodeRetryCache {
   /** Set the current Server RPC call */
   public static void newCall() {
     Server.Call call = new Server.Call(++callId, 1, null, null,
-        RpcKind.RPC_PROTOCOL_BUFFER, CLIENT_ID);
+        RpcKind.RPC_PROTOCOL_BUFFER, CLIENT_ID, Client.getRpcEpochSec());
     Server.getCurCall().set(call);
   }
   
   public static void resetCall() {
     Server.Call call = new Server.Call(RpcConstants.INVALID_CALL_ID, 1, null,
-        null, RpcKind.RPC_PROTOCOL_BUFFER, RpcConstants.DUMMY_CLIENT_ID);
+        null, RpcKind.RPC_PROTOCOL_BUFFER, RpcConstants.DUMMY_CLIENT_ID,
+            RpcConstants.INVALID_EPOCH);
     Server.getCurCall().set(call);
   }
   
@@ -351,17 +351,6 @@ public class TestNamenodeRetryCache {
     }
   }
   
-  @Test
-  public void testRetryCacheConfig() {
-    // By default retry configuration should be enabled
-    Configuration conf = new HdfsConfiguration();
-    Assert.assertNotNull(FSNamesystem.initRetryCache(conf)); 
-    
-    // If retry cache is disabled, it should not be created
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY, false);
-    Assert.assertNull(FSNamesystem.initRetryCache(conf));
-  }
-  
   /**
    * After run a set of operations, restart NN and check if the retry cache has
    * been rebuilt based on the editlog.
@@ -371,15 +360,14 @@ public class TestNamenodeRetryCache {
     DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
     
     FSNamesystem namesystem = cluster.getNamesystem();
-    LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
-        (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
+    List<RetryCacheEntry> cacheSet = namesystem.getCacheSet();
     assertEquals(22, cacheSet.size());
     
-    Map<CacheEntry, CacheEntry> oldEntries = 
-        new HashMap<CacheEntry, CacheEntry>();
-    Iterator<CacheEntry> iter = cacheSet.iterator();
+    Map<RetryCacheEntry, RetryCacheEntry> oldEntries =
+        new HashMap<>();
+    Iterator<RetryCacheEntry> iter = cacheSet.iterator();
     while (iter.hasNext()) {
-      CacheEntry entry = iter.next();
+      RetryCacheEntry entry = iter.next();
       oldEntries.put(entry, entry);
     }
     
@@ -390,34 +378,14 @@ public class TestNamenodeRetryCache {
     
     // check retry cache
     assertTrue(namesystem.hasRetryCache());
-    fillCacheFromDB(oldEntries, namesystem);
-    cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
-        .getRetryCache().getCacheSet();
+    cacheSet = namesystem.getCacheSet();
     assertEquals(22, cacheSet.size());
     iter = cacheSet.iterator();
+    FSNamesystem.LOG.info("Checking: "+ Arrays.toString(oldEntries.keySet().toArray()));
     while (iter.hasNext()) {
-      CacheEntry entry = iter.next();
+      RetryCacheEntry entry = iter.next();
+      FSNamesystem.LOG.info("Checking "+entry);
       assertTrue(oldEntries.containsKey(entry));
-    }
-  }
-  
-  private void fillCacheFromDB(Map<CacheEntry, CacheEntry> oldEntries, final FSNamesystem namesystem) throws IOException {
-    for (final CacheEntry entry : oldEntries.keySet()) {
-      HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
-        @Override
-        public void acquireLock(TransactionLocks locks) throws IOException {
-          LockFactory lf = getInstance();
-          locks.add(lf.getRetryCacheEntryLock(entry.getClientId(), entry.getCallId()));
-        }
-
-        @Override
-        public Object performTask() throws IOException {
-          namesystem.getRetryCache().getCacheSet().get(entry);
-          return null;
-        }
-      };
-      rh.handle();
-
     }
   }
   
@@ -426,15 +394,14 @@ public class TestNamenodeRetryCache {
     DFSTestUtil.runOperations(cluster, filesystem, conf, BlockSize, 0);
     
     FSNamesystem namesystem = cluster.getNamesystem();
-    LightWeightCache<CacheEntry, CacheEntry> cacheSet = 
-        (LightWeightCache<CacheEntry, CacheEntry>) namesystem.getRetryCache().getCacheSet();
+    List<RetryCacheEntry> cacheSet = namesystem.getCacheSet();
     assertEquals(22, cacheSet.size());
     
-    Map<CacheEntry, CacheEntry> oldEntries = 
-        new HashMap<CacheEntry, CacheEntry>();
-    Iterator<CacheEntry> iter = cacheSet.iterator();
+    Map<RetryCacheEntry, RetryCacheEntry> oldEntries =
+        new HashMap<>();
+    Iterator<RetryCacheEntry> iter = cacheSet.iterator();
     while (iter.hasNext()) {
-      CacheEntry entry = iter.next();
+      RetryCacheEntry entry = iter.next();
       oldEntries.put(entry, entry);
     }
     
@@ -447,9 +414,7 @@ public class TestNamenodeRetryCache {
     
     // check retry cache
     assertTrue(namesystem.hasRetryCache());
-    fillCacheFromDB(oldEntries, namesystem);
-    cacheSet = (LightWeightCache<CacheEntry, CacheEntry>) namesystem
-        .getRetryCache().getCacheSet();
+    cacheSet = namesystem.getCacheSet();
     assertEquals(0, cacheSet.size());
   }
   

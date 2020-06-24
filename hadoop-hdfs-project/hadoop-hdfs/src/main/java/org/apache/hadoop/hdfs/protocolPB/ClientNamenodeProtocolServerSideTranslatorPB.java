@@ -1379,6 +1379,18 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   }
 
   @Override
+  public ClientNamenodeProtocolProtos.GetEpochMSResponseProto getNNEpochMS(RpcController controller,
+      ClientNamenodeProtocolProtos.GetEpochMSRequestProto request)
+      throws ServiceException {
+    try {
+      return ClientNamenodeProtocolProtos.GetEpochMSResponseProto.newBuilder().
+              setEpoch(server.getEpochMS()).build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
   public ListEncryptionZonesResponseProto listEncryptionZones(
     RpcController controller, ListEncryptionZonesRequestProto req)
     throws ServiceException {

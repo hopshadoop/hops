@@ -323,8 +323,8 @@ public class LockFactory {
     return new HashBucketsLocksAllFileBlocks();
   }
 
-  public Lock getRetryCacheEntryLock(byte[] clientId, int callId){
-    return new RetryCacheEntryLock(clientId, callId);
+  public Lock getRetryCacheEntryLock(byte[] clientId, int callId, long epoch){
+    return new RetryCacheEntryLock(clientId, callId, epoch);
   }
   
   public Lock getRetryCacheEntryLock(List<RetryCache.CacheEntry> entries){

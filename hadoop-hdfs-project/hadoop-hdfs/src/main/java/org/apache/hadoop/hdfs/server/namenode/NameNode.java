@@ -625,6 +625,13 @@ public class NameNode implements NameNodeStatusMXBean {
       HdfsVariables.setMaxConcurrentBrs(maxConcurrentBRs, null);
       createLeaseLocks(conf);
     }
+
+    // in case of cluster upgrade the retry cache epoch is set to 0
+    // update the epoch to correct value
+    if (HdfsVariables.getRetryCacheCleanerEpoch() == 0){
+      // -1 to ensure the entries in the current epoch are delete by the cleaner
+      HdfsVariables.setRetryCacheCleanerEpoch(System.currentTimeMillis()/1000 - 1);
+    }
   }
 
   /**

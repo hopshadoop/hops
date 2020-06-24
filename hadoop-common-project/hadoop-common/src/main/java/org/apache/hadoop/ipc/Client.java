@@ -92,6 +92,7 @@ public class Client implements AutoCloseable {
   private static final AtomicInteger callIdCounter = new AtomicInteger();
 
   private static final ThreadLocal<Integer> callId = new ThreadLocal<Integer>();
+  private static final ThreadLocal<Long> epochTL = new ThreadLocal<Long>();
   private static final ThreadLocal<Integer> retryCount = new ThreadLocal<Integer>();
   private static final ThreadLocal<Object> EXTERNAL_CALL_HANDLER
       = new ThreadLocal<>();
@@ -114,12 +115,14 @@ public class Client implements AutoCloseable {
 
   /** Set call id and retry count for the next call. */
   public static void setCallIdAndRetryCount(int cid, int rc,
-                                            Object externalHandler) {
+                                            Object externalHandler, long epoch) {
     Preconditions.checkArgument(cid != RpcConstants.INVALID_CALL_ID);
     Preconditions.checkState(callId.get() == null);
+    Preconditions.checkState(epochTL.get() == null);
     Preconditions.checkArgument(rc != RpcConstants.INVALID_RETRY_COUNT);
 
     callId.set(cid);
+    epochTL.set(epoch);
     retryCount.set(rc);
     EXTERNAL_CALL_HANDLER.set(externalHandler);
   }
@@ -332,7 +335,8 @@ public class Client implements AutoCloseable {
    * Class that represents an RPC call
    */
   static class Call {
-    final int id;               // call id
+    final int id;              // call id
+    final long epoch;
     final int retry;           // retry count
     final Writable rpcRequest;  // the serialized rpc request
     Writable rpcResponse;       // null if rpc has error
@@ -346,11 +350,15 @@ public class Client implements AutoCloseable {
       this.rpcRequest = param;
 
       final Integer id = callId.get();
-      if (id == null) {
+      final Long ct = epochTL.get();
+      if (id == null && ct == null) {
         this.id = nextCallId();
+        this.epoch = getRpcEpochSec();
       } else {
         callId.set(null);
+        epochTL.set(null);
         this.id = id;
+        this.epoch = ct;
       }
       
       final Integer rc = retryCount.get();
@@ -470,7 +478,8 @@ public class Client implements AutoCloseable {
         RpcRequestHeaderProto pingHeader = ProtoUtil
             .makeRpcRequestHeader(RpcKind.RPC_PROTOCOL_BUFFER,
                 OperationProto.RPC_FINAL_PACKET, PING_CALL_ID,
-                RpcConstants.INVALID_RETRY_COUNT, clientId);
+                RpcConstants.INVALID_RETRY_COUNT, clientId,
+                RpcConstants.INVALID_EPOCH);
         pingHeader.writeDelimitedTo(buf);
         pingRequest = buf.toByteArray();
       }
@@ -998,7 +1007,8 @@ public class Client implements AutoCloseable {
       RpcRequestHeaderProto connectionContextHeader = ProtoUtil
           .makeRpcRequestHeader(RpcKind.RPC_PROTOCOL_BUFFER,
               OperationProto.RPC_FINAL_PACKET, CONNECTION_CONTEXT_CALL_ID,
-              RpcConstants.INVALID_RETRY_COUNT, clientId);
+              RpcConstants.INVALID_RETRY_COUNT, clientId,
+              RpcConstants.INVALID_EPOCH);
       // do not flush.  the context and first ipc call request must be sent
       // together to avoid possibility of broken pipes upon authz failure.
       // see writeConnectionHeader
@@ -1109,7 +1119,7 @@ public class Client implements AutoCloseable {
       // Items '1' and '2' are prepared here. 
       RpcRequestHeaderProto header = ProtoUtil.makeRpcRequestHeader(
           call.rpcKind, OperationProto.RPC_FINAL_PACKET, call.id, call.retry,
-          clientId);
+          clientId, call.epoch);
 
       final ResponseBuffer buf = new ResponseBuffer();
       header.writeDelimitedTo(buf);
@@ -1771,6 +1781,20 @@ public class Client implements AutoCloseable {
    */
   public static int nextCallId() {
     return callIdCounter.getAndIncrement() & 0x7FFFFFFF;
+  }
+
+  static long serverReportedEpoch = System.currentTimeMillis(); // this is the ephoc reported by server
+  static long epochReportTime = serverReportedEpoch;     // time when the epoch was reported
+  public static void setEpoch(long reportTime, long epoch){
+    serverReportedEpoch = epoch;
+    epochReportTime = reportTime;
+  }
+
+
+  public static long getRpcEpochSec() {
+    long timePassed = (System.currentTimeMillis() - epochReportTime);
+    long currentTime = serverReportedEpoch + timePassed;
+    return  currentTime / 1000;
   }
 
   @Override

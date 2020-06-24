@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.INodeCandidatePrimaryKey;
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.transaction.EntityManager;
 import io.hops.transaction.context.HdfsTransactionContextMaintenanceCmds;
 import io.hops.transaction.handler.HDFSOperationType;
@@ -47,9 +48,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import org.apache.hadoop.ipc.RetryCache.CacheEntry;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
+
 import org.apache.hadoop.ipc.Server;
+
 import java.util.List;
 
 import static org.apache.hadoop.util.Time.now;
@@ -91,7 +92,7 @@ class FSDirConcatOp {
             lf.getBlockRelated(BLK.RE.RE, BLK.CR, BLK.ER, BLK.PE, BLK.UC, BLK.IV));
         if (fsd.getFSNamesystem().isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         if (fsd.getFSNamesystem().isErasureCodingEnabled()) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE.WRITE, srcs));
@@ -103,7 +104,7 @@ class FSDirConcatOp {
 
       @Override
       public Object performTask() throws IOException {
-        final CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsd.getFSNamesystem().getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null; // Return previous response
         }
@@ -132,7 +133,7 @@ class FSDirConcatOp {
           return fsd.getAuditFileInfo(targetIIP);
           
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
       }
     }.handle();

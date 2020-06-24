@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -41,7 +42,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -416,28 +416,24 @@ public class TestRetryCacheWithHA {
     DFSTestUtil.runOperations(cluster, dfs, conf, BlockSize, 0);
     
     List<FSNamesystem> fsns = new ArrayList<>();
-    List<LightWeightCache<CacheEntry, CacheEntry>> cacheSets = new ArrayList<>();
+    List<List<RetryCacheEntry>> cacheSets = new ArrayList<>();
     // check retry cache in NN1
     fsns.add(cluster.getNamesystem(0));
     fsns.add(cluster.getNamesystem(1));
-    cacheSets.add((LightWeightCache<CacheEntry, CacheEntry>) fsns.get(0).getRetryCache().getCacheSet());
-    cacheSets.add((LightWeightCache<CacheEntry, CacheEntry>) fsns.get(1).getRetryCache().getCacheSet());
+    cacheSets.add(fsns.get(0).getCacheSet());
+    cacheSets.add(fsns.get(1).getCacheSet());
     int usedNN = 0;
-    if (cacheSets.get(0).size() < cacheSets.get(1).size()) {
-      usedNN = 1;
-    }
-    assertEquals(22,
-        cacheSets.get(usedNN).size() + cacheSets.get(1-  usedNN).size());
-    
-    Map<CacheEntry, CacheEntry> oldEntries = new HashMap<CacheEntry, CacheEntry>();
-    Iterator<CacheEntry> iter = cacheSets.get(usedNN).iterator();
+    assertEquals(cacheSets.get(0).size() , cacheSets.get(1).size());
+
+    Map<RetryCacheEntry, RetryCacheEntry> oldEntries = new HashMap<>();
+    Iterator<RetryCacheEntry> iter = cacheSets.get(usedNN).iterator();
     while (iter.hasNext()) {
-      CacheEntry entry = iter.next();
+      RetryCacheEntry entry = iter.next();
       oldEntries.put(entry, entry);
     }
     iter = cacheSets.get(1 - usedNN).iterator();
     while (iter.hasNext()) {
-      CacheEntry entry = iter.next();
+      RetryCacheEntry entry = iter.next();
       oldEntries.put(entry, entry);
     }
     
@@ -445,33 +441,12 @@ public class TestRetryCacheWithHA {
     cluster.waitActive(1 - usedNN);
 
     // 3. check the retry cache on the new active NN
-    fillCacheFromDB(oldEntries, fsns.get(1 - usedNN));
     assertEquals(22, cacheSets.get(1 - usedNN).size());
     iter = cacheSets.get(1 - usedNN).iterator();
     
     while (iter.hasNext()) {
-      CacheEntry entry = iter.next();
+      RetryCacheEntry entry = iter.next();
       assertTrue(oldEntries.containsKey(entry));
-    }
-  }
-  
-  private void fillCacheFromDB(Map<CacheEntry, CacheEntry> oldEntries, final FSNamesystem namesystem) throws IOException {
-    for (final CacheEntry entry : oldEntries.keySet()) {
-      HopsTransactionalRequestHandler rh = new HopsTransactionalRequestHandler(HDFSOperationType.CONCAT) {
-        @Override
-        public void acquireLock(TransactionLocks locks) throws IOException {
-          LockFactory lf = getInstance();
-          locks.add(lf.getRetryCacheEntryLock(entry.getClientId(), entry.getCallId()));
-        }
-        
-        @Override
-        public Object performTask() throws IOException {
-          namesystem.getRetryCache().getCacheSet().get(entry);
-          return null;
-        }
-      };
-      rh.handle();
-      
     }
   }
   

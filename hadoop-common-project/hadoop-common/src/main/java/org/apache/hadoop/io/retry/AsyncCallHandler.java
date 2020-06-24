@@ -228,10 +228,10 @@ public class AsyncCallHandler {
     private final AsyncValue<CallReturn> asyncCallReturn = new AsyncValue<>();
     private AsyncGet<?, Exception> lowerLayerAsyncGet;
 
-    AsyncCall(Method method, Object[] args, boolean isRpc, int callId,
+    AsyncCall(long epoch, Method method, Object[] args, boolean isRpc, int callId,
               RetryInvocationHandler<?> retryInvocationHandler,
               AsyncCallHandler asyncCallHandler) {
-      super(method, args, isRpc, callId, retryInvocationHandler);
+      super(epoch, method, args, isRpc, callId, retryInvocationHandler);
 
       this.asyncCallHandler = asyncCallHandler;
     }
@@ -313,10 +313,10 @@ public class AsyncCallHandler {
   private final AsyncCallQueue asyncCalls = new AsyncCallQueue();
   private volatile boolean hasSuccessfulCall = false;
 
-  AsyncCall newAsyncCall(Method method, Object[] args, boolean isRpc,
+  AsyncCall newAsyncCall(long epoch, Method method, Object[] args, boolean isRpc,
                          int callId,
                          RetryInvocationHandler<?> retryInvocationHandler) {
-    return new AsyncCall(method, args, isRpc, callId,
+    return new AsyncCall(epoch, method, args, isRpc, callId,
         retryInvocationHandler, this);
   }
 

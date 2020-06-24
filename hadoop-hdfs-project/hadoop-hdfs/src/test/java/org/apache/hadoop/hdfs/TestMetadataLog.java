@@ -146,7 +146,7 @@ public class TestMetadataLog extends TestCase {
   public void testNonLoggingFolder() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -176,7 +176,7 @@ public class TestMetadataLog extends TestCase {
   public void testCreate() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -211,7 +211,7 @@ public class TestMetadataLog extends TestCase {
   public void testAppend() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -263,7 +263,7 @@ public class TestMetadataLog extends TestCase {
   public void testNoLogEntryBeforeClosing() throws Exception {
     Configuration conf = new HdfsConfiguration();
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -296,7 +296,7 @@ public class TestMetadataLog extends TestCase {
   public void testDelete() throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -344,7 +344,7 @@ public class TestMetadataLog extends TestCase {
   public void testRename(boolean oldRename) throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -410,7 +410,7 @@ public class TestMetadataLog extends TestCase {
   private void testDeepRename(boolean oldRename) throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -477,7 +477,7 @@ public class TestMetadataLog extends TestCase {
   public void testEnableLogForExistingDirectory() throws Exception {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -522,7 +522,7 @@ public class TestMetadataLog extends TestCase {
     conf.setInt(DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY, PACKET_SIZE);
 
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(1)
+        .numDataNodes(1).format(true)
         .build();
     try {
       FileSystem fs = cluster.getFileSystem();
@@ -606,7 +606,7 @@ public class TestMetadataLog extends TestCase {
       IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -676,8 +676,8 @@ public class TestMetadataLog extends TestCase {
   private void testDeepRenameToNonMetaEnabledDir(boolean oldRename) throws
       IOException {
     Configuration conf = new HdfsConfiguration();
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).format(true)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -770,7 +770,7 @@ public class TestMetadataLog extends TestCase {
       IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -888,7 +888,7 @@ public class TestMetadataLog extends TestCase {
   public void testSettingAndUnsettingMetaEnabled() throws Exception{
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -1017,7 +1017,7 @@ public class TestMetadataLog extends TestCase {
     Configuration conf = new HdfsConfiguration();
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     
     final String name1 = "user.metadata";
@@ -1068,7 +1068,7 @@ public class TestMetadataLog extends TestCase {
     Configuration conf = new HdfsConfiguration();
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     
     final String name1 = "user.metadata";
@@ -1267,7 +1267,7 @@ public class TestMetadataLog extends TestCase {
       IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -1342,7 +1342,7 @@ public class TestMetadataLog extends TestCase {
       IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -1377,7 +1377,7 @@ public class TestMetadataLog extends TestCase {
       IOException {
     Configuration conf = new HdfsConfiguration();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -1432,7 +1432,7 @@ public class TestMetadataLog extends TestCase {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_KEY, numXAttrs);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY, MAX_SIZE);
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(1)
+        .numDataNodes(1).format(true)
         .build();
     try{
       DistributedFileSystem dfs = cluster.getFileSystem();
@@ -1591,7 +1591,7 @@ public class TestMetadataLog extends TestCase {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_XATTRS_PER_INODE_KEY, 2);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_MAX_XATTR_SIZE_KEY, 100);
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(2)
+        .numDataNodes(2).format(true)
         .build();
     try {
       DistributedFileSystem dfs = cluster.getFileSystem();

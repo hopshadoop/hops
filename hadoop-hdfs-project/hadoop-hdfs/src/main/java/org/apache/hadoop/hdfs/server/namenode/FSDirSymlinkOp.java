@@ -18,11 +18,11 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.common.IDsGeneratorFactory;
+import io.hops.metadata.hdfs.entity.RetryCacheEntry;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.INodeLock;
 import io.hops.transaction.lock.LockFactory;
-import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -40,8 +40,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.fs.XAttr;
-import org.apache.hadoop.ipc.RetryCache;
-import org.apache.hadoop.ipc.RetryCacheDistributed;
 import org.apache.hadoop.ipc.Server;
 
 import static org.apache.hadoop.util.Time.now;
@@ -78,7 +76,7 @@ class FSDirSymlinkOp {
         locks.add(il).add(lf.getAcesLock());
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),
-              Server.getCallId()));
+              Server.getCallId(), Server.getRpcEpoch()));
         }
         locks.add(lf.getEZLock());
         List<XAttr> xAttrsToLock = new ArrayList<>();
@@ -89,7 +87,7 @@ class FSDirSymlinkOp {
 
       @Override
       public Object performTask() throws IOException {
-        final RetryCache.CacheEntry cacheEntry = RetryCacheDistributed.waitForCompletion(fsn.getRetryCache());
+        RetryCacheEntry cacheEntry = LightWeightCacheDistributed.get();
         if (cacheEntry != null && cacheEntry.isSuccess()) {
           return null; // Return previous response
         }
@@ -117,7 +115,7 @@ class FSDirSymlinkOp {
           success = true;
           return fsd.getAuditFileInfo(iip);
         } finally {
-          RetryCacheDistributed.setState(cacheEntry, success);
+          LightWeightCacheDistributed.put(null, success);
         }
       }
     }.handle();

@@ -18,20 +18,19 @@
 package org.apache.hadoop.ipc;
 
 
-import java.util.Arrays;
-import java.util.UUID;
-import java.util.concurrent.locks.ReentrantLock;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.ipc.metrics.RetryCacheMetrics;
 import org.apache.hadoop.util.LightWeightCache;
 import org.apache.hadoop.util.LightWeightGSet;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Maintains a cache of non-idempotent requests that have been successfully
@@ -68,9 +67,10 @@ public class RetryCache {
     
     protected final int callId;
     private final long expirationTime;
+    private final long epoch;
     private LightWeightGSet.LinkedElement next;
 
-    CacheEntry(byte[] clientId, int callId, long expirationTime) {
+    CacheEntry(byte[] clientId, int callId, long expirationTime, long epoch) {
       // ClientId must be a UUID - that is 16 octets.
       Preconditions.checkArgument(clientId.length == ClientId.BYTE_LENGTH,
           "Invalid clientId - length is " + clientId.length
@@ -80,12 +80,13 @@ public class RetryCache {
       clientIdLsb = ClientId.getLsb(clientId);
       this.callId = callId;
       this.expirationTime = expirationTime;
+      this.epoch = epoch;
       this.clientIdByte = clientId;
     }
 
-    CacheEntry(byte[] clientId, int callId, long expirationTime,
+    CacheEntry(byte[] clientId, int callId, long expirationTime, long epoch,
         boolean success) {
-      this(clientId, callId, expirationTime);
+      this(clientId, callId, expirationTime, epoch);
       this.state = success ? SUCCESS : FAILED;
     }
 
@@ -157,6 +158,10 @@ public class RetryCache {
       return (new UUID(this.clientIdMsb, this.clientIdLsb)).toString() + ":"
           + this.callId + ":" + this.state;
     }
+
+    public long getEpoch() {
+      return epoch;
+    }
   }
 
   /**
@@ -167,14 +172,14 @@ public class RetryCache {
     private Object payload;
 
     CacheEntryWithPayload(byte[] clientId, int callId, Object payload,
-        long expirationTime) {
-      super(clientId, callId, expirationTime);
+        long expirationTime, long epoch) {
+      super(clientId, callId, expirationTime, epoch);
       this.payload = payload;
     }
 
     CacheEntryWithPayload(byte[] clientId, int callId, Object payload,
-        long expirationTime, boolean success) {
-     super(clientId, callId, expirationTime, success);
+        long expirationTime, long epoch, boolean success) {
+     super(clientId, callId, expirationTime, epoch, success);
      this.payload = payload;
    }
 
@@ -205,7 +210,7 @@ public class RetryCache {
    * Constructor
    * @param cacheName name to identify the cache by
    * @param percentage percentage of total java heap space used by this cache
-   * @param expirationTime time for an entry to expire in nanoseconds
+   * @param expirationTime time for an entry to expire in milli seconds
    */
   public RetryCache(String cacheName, double percentage, long expirationTime) {
     int capacity = LightWeightGSet.computeCapacity(percentage, cacheName);
@@ -317,9 +322,9 @@ public class RetryCache {
    * Add a new cache entry into the retry cache. The cache entry consists of 
    * clientId and callId extracted from editlog.
    */
-  public void addCacheEntry(byte[] clientId, int callId) {
+  public void addCacheEntry(byte[] clientId, int callId, long epoch) {
     CacheEntry newEntry = new CacheEntry(clientId, callId, System.currentTimeMillis()
-        + expirationTime, true);
+        + expirationTime, epoch, true);
     lock.lock();
     try {
       set.put(newEntry);
@@ -329,11 +334,11 @@ public class RetryCache {
     retryCacheMetrics.incrCacheUpdated();
   }
   
-  public void addCacheEntryWithPayload(byte[] clientId, int callId,
+  public void addCacheEntryWithPayload(byte[] clientId, int callId, long epoch,
       Object payload) {
     // since the entry is loaded from editlog, we can assume it succeeded.    
     CacheEntry newEntry = new CacheEntryWithPayload(clientId, callId, payload,
-        System.currentTimeMillis()+ expirationTime, true);
+        System.currentTimeMillis()+ expirationTime, epoch, true);
     lock.lock();
     try {
       set.put(newEntry);
@@ -345,13 +350,13 @@ public class RetryCache {
 
   private static CacheEntry newEntry(long expirationTime) {
     return new CacheEntry(Server.getClientId(), Server.getCallId(),
-        System.currentTimeMillis()+ expirationTime);
+        System.currentTimeMillis()+ expirationTime, Server.getRpcEpoch());
   }
 
   private static CacheEntryWithPayload newEntry(Object payload,
       long expirationTime) {
     return new CacheEntryWithPayload(Server.getClientId(), Server.getCallId(),
-        payload, System.currentTimeMillis()+ expirationTime);
+        payload, System.currentTimeMillis()+ expirationTime, Server.getRpcEpoch());
   }
 
   /** Static method that provides null check for retryCache */

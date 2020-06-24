@@ -18,58 +18,11 @@
 
 package org.apache.hadoop.ipc;
 
-import static org.apache.hadoop.ipc.RpcConstants.AUTHORIZATION_FAILED_CALL_ID;
-import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
-import static org.apache.hadoop.ipc.RpcConstants.CURRENT_VERSION;
-import static org.apache.hadoop.ipc.RpcConstants.HEADER_LEN_AFTER_HRPC_PART;
-import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.lang.reflect.UndeclaredThrowableException;
-import java.net.BindException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.channels.CancelledKeyException;
-import java.nio.channels.Channels;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.WritableByteChannel;
-import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import javax.security.sasl.Sasl;
-import javax.security.sasl.SaslException;
-import javax.security.sasl.SaslServer;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.Message;
 import io.hops.security.HopsFileBasedKeyStoresFactory;
 import io.hops.security.HopsX509AuthenticationException;
 import io.hops.security.HopsX509Authenticator;
@@ -100,17 +53,16 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.SaslPropertiesResolver;
-import org.apache.hadoop.security.SaslRpcServer;
+import org.apache.hadoop.security.*;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
-import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
+import org.apache.hadoop.security.ssl.CRLValidator;
+import org.apache.hadoop.security.ssl.CRLValidatorFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -121,23 +73,36 @@ import org.apache.hadoop.util.Time;
 import org.apache.htrace.core.SpanId;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.Message;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.*;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.PrivilegedExceptionAction;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import org.apache.hadoop.security.ssl.CRLValidator;
-import org.apache.hadoop.security.ssl.CRLValidatorFactory;
-import org.apache.hadoop.security.ssl.SSLFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.hadoop.ipc.RpcConstants.*;
 
 /** An abstract IPC service.  IPC calls take a single {@link Writable} as a
  * parameter, and return a {@link Writable} as their value.  A service runs on
@@ -361,7 +326,13 @@ public abstract class Server {
     Call call = CurCall.get();
     return call != null ? call.callId : RpcConstants.INVALID_CALL_ID;
   }
-  
+
+
+  public static long getRpcEpoch() {
+    Call call = CurCall.get();
+    return call != null ? call.epoch : 0;
+  }
+
   /**
    * @return The current active RPC call's retry count. -1 indicates the retry
    *         cache is not supported in the client side.
@@ -704,6 +675,7 @@ public abstract class Server {
     final int retryCount;        // the retry count of the call
     long timestamp;              // time received when response is null
                                  // time served when response is not null
+    final long epoch;
     private AtomicInteger responseWaitCount = new AtomicInteger(1);
     final RPC.RpcKind rpcKind;
     final byte[] clientId;
@@ -715,26 +687,27 @@ public abstract class Server {
 
     Call() {
       this(RpcConstants.INVALID_CALL_ID, RpcConstants.INVALID_RETRY_COUNT,
-        RPC.RpcKind.RPC_BUILTIN, RpcConstants.DUMMY_CLIENT_ID);
+        RPC.RpcKind.RPC_BUILTIN, RpcConstants.DUMMY_CLIENT_ID,
+              INVALID_EPOCH);
     }
 
     Call(Call call) {
       this(call.callId, call.retryCount, call.rpcKind, call.clientId,
-          call.traceScope, call.callerContext);
+          call.traceScope, call.callerContext, call.epoch);
     }
 
-    Call(int id, int retryCount, RPC.RpcKind kind, byte[] clientId) {
-      this(id, retryCount, kind, clientId, null, null);
+    Call(int id, int retryCount, RPC.RpcKind kind, byte[] clientId, long epoch) {
+      this(id, retryCount, kind, clientId, null, null, epoch);
     }
 
     @VisibleForTesting // primarily TestNamenodeRetryCache
     public Call(int id, int retryCount, Void ignore1, Void ignore2,
-        RPC.RpcKind kind, byte[] clientId) {
-      this(id, retryCount, kind, clientId, null, null);
+        RPC.RpcKind kind, byte[] clientId, long epoch) {
+      this(id, retryCount, kind, clientId, null, null, epoch);
     }
 
     Call(int id, int retryCount, RPC.RpcKind kind, byte[] clientId,
-        TraceScope traceScope, CallerContext callerContext) {
+        TraceScope traceScope, CallerContext callerContext, long epoch) {
       this.callId = id;
       this.retryCount = retryCount;
       this.timestamp = Time.now();
@@ -742,6 +715,7 @@ public abstract class Server {
       this.clientId = clientId;
       this.traceScope = traceScope;
       this.callerContext = callerContext;
+      this.epoch = epoch;
     }
 
     @Override
@@ -848,20 +822,20 @@ public abstract class Server {
       this.rpcRequest = call.rpcRequest;
     }
 
-    RpcCall(Connection connection, int id) {
-      this(connection, id, RpcConstants.INVALID_RETRY_COUNT);
+    RpcCall(long epoch, Connection connection, int id) {
+      this(epoch, connection, id, RpcConstants.INVALID_RETRY_COUNT);
     }
 
-    RpcCall(Connection connection, int id, int retryCount) {
-      this(connection, id, retryCount, null,
+    RpcCall(long epoch, Connection connection, int id, int retryCount) {
+      this(epoch, connection, id, retryCount, null,
           RPC.RpcKind.RPC_BUILTIN, RpcConstants.DUMMY_CLIENT_ID,
           null, null);
     }
 
-    RpcCall(Connection connection, int id, int retryCount,
+    RpcCall(long epoch, Connection connection, int id, int retryCount,
         Writable param, RPC.RpcKind kind, byte[] clientId,
         TraceScope traceScope, CallerContext context) {
-      super(id, retryCount, kind, clientId, traceScope, context);
+      super(id, retryCount, kind, clientId, traceScope, context, epoch);
       this.connection = connection;
       this.rpcRequest = param;
     }
@@ -1307,7 +1281,7 @@ public abstract class Server {
         LOG.warn("CRL validation for " + connection + " did NOT pass", ex);
         // use the wrapped exception if there is one.
         Throwable t = (ex.getCause() != null) ? ex.getCause() : ex;
-        final RpcCall call = new RpcCall(connection, -1, 0);
+        final RpcCall call = new RpcCall(INVALID_EPOCH, connection, -1, 0);
         setupResponse(call,
             ex.getRpcStatusProto(), ex.getRpcErrorCodeProto(), null,
             t.getClass().getName(), t.getMessage());
@@ -1752,7 +1726,7 @@ public abstract class Server {
 
     // Fake 'call' for failed authorization response
     private final RpcCall authFailedCall =
-        new RpcCall(this, AUTHORIZATION_FAILED_CALL_ID);
+        new RpcCall(INVALID_EPOCH, this, AUTHORIZATION_FAILED_CALL_ID);
 
     private boolean sentNegotiate = false;
     private boolean useWrap = false;
@@ -2142,7 +2116,8 @@ public abstract class Server {
     }
 
     private void doSaslReply(Message message) throws IOException {
-      final RpcCall saslCall = new RpcCall(this, AuthProtocol.SASL.callId);
+      final RpcCall saslCall = new RpcCall(INVALID_EPOCH, this,
+              AuthProtocol.SASL.callId);
       setupResponse(saslCall,
           RpcStatusProto.SUCCESS, null,
           RpcWritable.wrap(message), null, null);
@@ -2383,20 +2358,20 @@ public abstract class Server {
       
       if (clientVersion >= 9) {
         // Versions >>9  understand the normal response
-        RpcCall fakeCall = new RpcCall(this, -1);
+        RpcCall fakeCall = new RpcCall(INVALID_EPOCH, this, -1);
         setupResponse(fakeCall,
             RpcStatusProto.FATAL, RpcErrorCodeProto.FATAL_VERSION_MISMATCH,
             null, VersionMismatch.class.getName(), errMsg);
         sendResponse(fakeCall);
       } else if (clientVersion >= 3) {
-        RpcCall fakeCall = new RpcCall(this, -1);
+        RpcCall fakeCall = new RpcCall(INVALID_EPOCH, this, -1);
         // Versions 3 to 8 use older response
         setupResponseOldVersionFatal(buffer, fakeCall,
             null, VersionMismatch.class.getName(), errMsg);
 
         sendResponse(fakeCall);
       } else if (clientVersion == 2) { // Hadoop 0.18.3
-        RpcCall fakeCall = new RpcCall(this, 0);
+        RpcCall fakeCall = new RpcCall(INVALID_EPOCH, this, 0);
         DataOutputStream out = new DataOutputStream(buffer);
         out.writeInt(0); // call ID
         out.writeBoolean(true); // error
@@ -2408,7 +2383,7 @@ public abstract class Server {
     }
     
     private void setupHttpRequestOnIpcPortResponse() throws IOException {
-      RpcCall fakeCall = new RpcCall(this, 0);
+      RpcCall fakeCall = new RpcCall(INVALID_EPOCH, this, 0);
       fakeCall.setResponse(ByteBuffer.wrap(
           RECEIVED_HTTP_REQ_RESPONSE.getBytes(StandardCharsets.UTF_8)));
       sendResponse(fakeCall);
@@ -2575,6 +2550,7 @@ public abstract class Server {
       // setupResponse will use the rpc status to determine if the connection
       // should be closed.
       int callId = -1;
+      long epoch = INVALID_EPOCH;
       int retry = RpcConstants.INVALID_RETRY_COUNT;
       try {
         final RpcWritable.Buffer buffer = RpcWritable.Buffer.wrap(bb);
@@ -2582,6 +2558,7 @@ public abstract class Server {
             getMessage(RpcRequestHeaderProto.getDefaultInstance(), buffer);
         callId = header.getCallId();
         retry = header.getRetryCount();
+        epoch = header.getEpoch();
         if (LOG.isDebugEnabled()) {
           LOG.debug(" got #" + callId);
         }
@@ -2606,7 +2583,7 @@ public abstract class Server {
         }
         // use the wrapped exception if there is one.
         Throwable t = (rse.getCause() != null) ? rse.getCause() : rse;
-        final RpcCall call = new RpcCall(this, callId, retry);
+        final RpcCall call = new RpcCall(epoch, this, callId, retry);
         setupResponse(call,
             rse.getRpcStatusProto(), rse.getRpcErrorCodeProto(), null,
             t.getClass().getName(), t.getMessage());
@@ -2709,7 +2686,7 @@ public abstract class Server {
                 .build();
       }
 
-      RpcCall call = new RpcCall(this, header.getCallId(),
+      RpcCall call = new RpcCall(header.getEpoch(), this, header.getCallId(),
           header.getRetryCount(), rpcRequest,
           ProtoUtil.convert(header.getRpcKind()),
           header.getClientId().toByteArray(), traceScope, callerContext);
@@ -3183,6 +3160,7 @@ public abstract class Server {
         RpcResponseHeaderProto.newBuilder();
     headerBuilder.setClientId(ByteString.copyFrom(call.clientId));
     headerBuilder.setCallId(call.callId);
+    headerBuilder.setEpoch(call.epoch);
     headerBuilder.setRetryCount(call.retryCount);
     headerBuilder.setStatus(status);
     headerBuilder.setServerIpcVersionNum(CURRENT_VERSION);

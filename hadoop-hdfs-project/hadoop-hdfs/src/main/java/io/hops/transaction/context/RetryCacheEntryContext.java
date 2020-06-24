@@ -38,7 +38,7 @@ public class RetryCacheEntryContext extends BaseEntityContext<PrimaryKey, RetryC
       throws TransactionContextException, StorageException {
     RetryCacheEntry.Finder hbFinder = (RetryCacheEntry.Finder) finder;
     switch (hbFinder){
-      case ByClientIdAndCallId:
+      case ByPK:
         return findByPrimaryKey(hbFinder, params);
       default:
         throw new RuntimeException(UNSUPPORTED_FINDER);
@@ -49,16 +49,17 @@ public class RetryCacheEntryContext extends BaseEntityContext<PrimaryKey, RetryC
       throws StorageException, StorageCallPreventedException {
     byte[] clientId = (byte[]) params[0];
     int callId = (Integer) params[1];
-    RetryCacheEntry.PrimaryKey pk = new RetryCacheEntry.PrimaryKey(clientId, callId);
+    long epoch = (Long) params[2];
+    RetryCacheEntry.PrimaryKey pk = new RetryCacheEntry.PrimaryKey(clientId, callId, epoch);
     RetryCacheEntry result;
     if (contains(pk)){
       result = get(pk);
-      hit(hbFinder, result, "clientId", clientId, "callId", callId);
+      hit(hbFinder, result, "clientId", clientId, "callId", callId, "epoch", epoch);
     } else {
       aboutToAccessStorage(hbFinder, params);
       result = dataAccess.find(pk);
       gotFromDB(pk, result);
-      miss(hbFinder, result, "clientId", clientId, "callId", callId);
+      miss(hbFinder, result, "clientId", clientId, "callId", callId, "epoch", epoch);
     }
     
     return result;
@@ -72,6 +73,7 @@ public class RetryCacheEntryContext extends BaseEntityContext<PrimaryKey, RetryC
   
   @Override
   RetryCacheEntry.PrimaryKey getKey(RetryCacheEntry retryCacheEntry) {
-    return new RetryCacheEntry.PrimaryKey(retryCacheEntry.getClientId(), retryCacheEntry.getCallId());
+    return new RetryCacheEntry.PrimaryKey(retryCacheEntry.getClientId(),
+            retryCacheEntry.getCallId(), retryCacheEntry.getEpoch());
   }
 }
