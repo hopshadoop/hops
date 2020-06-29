@@ -24,6 +24,7 @@ import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.util.envVars.EnvironmentVariables;
 import org.apache.hadoop.util.envVars.EnvironmentVariablesFactory;
 import org.junit.After;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -34,8 +35,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TestSuperuserKeystoresLoader {
-  private static final String USER = "alice";
-  
+  private static String USER;
+  private final String IMPERSONATE_USER = "alice";
+
+  @BeforeClass
+  public static void beforeClass() throws Exception {
+    USER = UserGroupInformation.getLoginUser().getUserName();
+  }
+
   @After
   public void afterEach() {
     EnvironmentVariablesFactory.setInstance(null);
@@ -50,7 +57,7 @@ public class TestSuperuserKeystoresLoader {
   
     Configuration conf = new Configuration(false);
     final SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(USER);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(IMPERSONATE_USER);
     ugi.doAs(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws Exception {
@@ -67,7 +74,7 @@ public class TestSuperuserKeystoresLoader {
     Configuration conf = new Configuration(false);
     conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, materialDirectory);
     final SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(USER);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(IMPERSONATE_USER);
     ugi.doAs(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws Exception {
@@ -84,7 +91,7 @@ public class TestSuperuserKeystoresLoader {
         SuperuserKeystoresLoader.SUPER_MATERIAL_HOME_SUBDIRECTORY).toString();
     Configuration conf = new Configuration(false);
     final SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(USER);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(IMPERSONATE_USER);
     ugi.doAs(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws Exception {
@@ -102,7 +109,7 @@ public class TestSuperuserKeystoresLoader {
     Configuration conf = new Configuration(false);
     conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, materialDirectory);
     final SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(USER);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(IMPERSONATE_USER);
     ugi.doAs(new PrivilegedExceptionAction<Object>() {
       @Override
       public Object run() throws Exception {
@@ -116,11 +123,11 @@ public class TestSuperuserKeystoresLoader {
   @Test
   public void testLoadFromDirectoryWithUserVariable() throws Exception {
     final String materialDirectory = "/some/directory/${USER}";
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(USER);
-    final String expectedDirectory = Paths.get("/some/directory", ugi.getUserName()).toString();
+    final String expectedDirectory = Paths.get("/some/directory", USER).toString();
     Configuration conf = new Configuration(false);
     conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, materialDirectory);
     final SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(IMPERSONATE_USER);
     ugi.doAs(new PrivilegedExceptionAction<Object>() {
       @Override
       public Object run() throws Exception {
