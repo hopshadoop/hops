@@ -385,7 +385,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
     @Test
     public void testNoConfigHostCertificates() throws Exception {
         String TMP = System.getProperty("java.io.tmpdir");
-        UserGroupInformation ugi = UserGroupInformation.createRemoteUser("glassfish");
+        UserGroupInformation ugi = UserGroupInformation.getLoginUser();
         SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
         Path kstore = Paths.get(TMP, loader.getSuperKeystoreFilename(ugi.getUserName()));
         Path tstore = Paths.get(TMP, loader.getSuperTruststoreFilename(ugi.getUserName()));
@@ -398,7 +398,7 @@ public class TestHopsSSLConfiguration extends HopsSSLTestUtils {
         
         conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, TMP);
         final Set<String> superusers = new HashSet<>(1);
-        superusers.add("glassfish");
+        superusers.add(ugi.getUserName());
         ugi.doAs(new PrivilegedExceptionAction<Object>() {
             @Override
             public Object run() throws SSLCertificateException {
