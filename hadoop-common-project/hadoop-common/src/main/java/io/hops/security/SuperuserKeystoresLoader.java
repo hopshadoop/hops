@@ -58,7 +58,7 @@ public class SuperuserKeystoresLoader {
   
   public X509SecurityMaterial loadSuperUserMaterial() throws IOException {
     Path superMaterialDirectory = getMaterialDirectory();
-    String username = UserGroupInformation.getCurrentUser().getUserName();
+    String username = UserGroupInformation.getLoginUser().getUserName();
     Path keystore = superMaterialDirectory.resolve(getSuperKeystoreFilename(username));
     Path truststore = superMaterialDirectory.resolve(getSuperTruststoreFilename(username));
     Path password = superMaterialDirectory.resolve(getSuperMaterialPasswdFilename(username));
@@ -89,7 +89,7 @@ public class SuperuserKeystoresLoader {
       matcher = USER_PATTERN.matcher(superuserMaterialDirectory);
       if (matcher.matches()) {
         matcher = USER_REPLACEMENT_PATTERN.matcher(superuserMaterialDirectory);
-        String templatedDirectory = matcher.replaceAll(UserGroupInformation.getCurrentUser().getUserName());
+        String templatedDirectory = matcher.replaceAll(UserGroupInformation.getLoginUser().getUserName());
         LOG.debug("Replacing ${USER} - Super user material directory: " + templatedDirectory);
         return Paths.get(templatedDirectory);
       }
