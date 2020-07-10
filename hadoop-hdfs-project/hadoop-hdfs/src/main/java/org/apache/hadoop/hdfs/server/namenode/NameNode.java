@@ -1404,12 +1404,29 @@ public class NameNode implements NameNodeStatusMXBean {
     }
 
     String httpAddress;
+    /*
+     * httpServer.getHttpAddress() return the bind address. If we use 0.0.0.0 to listen to all interfaces the leader
+     * election system will return 0.0.0.0 as the http address and the client will not be able to connect to the UI
+     * to mitigate this we retunr the address used by the RPC. This address will work because the http server is 
+     * listening on very interfaces
+     * */
+    
     if (DFSUtil.getHttpPolicy(conf).isHttpEnabled()) {
-      httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress()
-          .getPort() ;
+      if (httpServer.getHttpAddress().getAddress().getHostAddress().equals("0.0.0.0")) {
+        httpAddress = rpcServer.getRpcAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress()
+            .getPort();
+      } else {
+        httpAddress = httpServer.getHttpAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpAddress()
+            .getPort();
+      }
     } else {
-      httpAddress = httpServer.getHttpsAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpsAddress()
-          .getPort() ;
+      if (httpServer.getHttpsAddress().getAddress().getHostAddress().equals("0.0.0.0")) {
+        httpAddress = rpcServer.getRpcAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpsAddress()
+            .getPort();
+      } else {
+        httpAddress = httpServer.getHttpsAddress().getAddress().getHostAddress() + ":" + httpServer.getHttpsAddress()
+            .getPort();
+      }
     }
     
     leaderElection =
