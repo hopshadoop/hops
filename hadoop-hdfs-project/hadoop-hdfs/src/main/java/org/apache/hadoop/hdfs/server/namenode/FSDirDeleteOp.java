@@ -336,6 +336,7 @@ class FSDirDeleteOp {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
         }
         locks.add(lf.getEZLock());
+        locks.add(lf.getAcesLock());
       }
 
       @Override
