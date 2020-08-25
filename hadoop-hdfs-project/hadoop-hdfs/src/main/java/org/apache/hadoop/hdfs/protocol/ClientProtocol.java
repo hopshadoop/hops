@@ -1813,4 +1813,10 @@ throws IOException;
    */
   @Idempotent
   public long getEpochMS() throws IOException;
+
+  /**
+   * Get the total number of Inodes in the system
+   */
+  @Idempotent
+  public long getINodesCount() throws IOException;
 }

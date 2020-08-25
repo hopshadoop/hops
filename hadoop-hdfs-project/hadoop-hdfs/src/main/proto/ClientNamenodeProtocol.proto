@@ -689,6 +689,13 @@ message GetEpochMSResponseProto {
   required int64 epoch = 1;
 }
 
+message GetINodesCountRequestProto {
+}
+
+message GetINodesCountResponseProto {
+  required int64 inodesCount = 1;
+}
+
 
 message EncodingStatusProto {
   optional uint64 inodeId = 1;
@@ -928,5 +935,7 @@ service ClientNamenodeProtocol {
       returns(GetEZForPathResponseProto);
   rpc getNNEpochMS(GetEpochMSRequestProto)
       returns (GetEpochMSResponseProto);
+  rpc getINodesCount(GetINodesCountRequestProto)
+      returns (GetINodesCountResponseProto);
 }
 

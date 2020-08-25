@@ -1379,6 +1379,17 @@ public class ClientNamenodeProtocolServerSideTranslatorPB
   }
 
   @Override
+  public ClientNamenodeProtocolProtos.GetINodesCountResponseProto getINodesCount(RpcController controller,
+      ClientNamenodeProtocolProtos.GetINodesCountRequestProto request) throws ServiceException {
+    try {
+      return ClientNamenodeProtocolProtos.GetINodesCountResponseProto.newBuilder()
+              .setInodesCount(server.getINodesCount()).build();
+    } catch (IOException ex) {
+      throw new ServiceException(ex);
+    }
+  }
+
+  @Override
   public ClientNamenodeProtocolProtos.GetEpochMSResponseProto getNNEpochMS(RpcController controller,
       ClientNamenodeProtocolProtos.GetEpochMSRequestProto request)
       throws ServiceException {

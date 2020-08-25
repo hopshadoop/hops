@@ -1550,6 +1550,11 @@ class NameNodeRpcServer implements NamenodeProtocols {
     return System.currentTimeMillis();
   }
 
+  @Override
+  public long getINodesCount() throws IOException {
+    return namesystem.getINodesCount();
+  }
+
   @Override // TraceAdminProtocol
   public SpanReceiverInfo[] listSpanReceivers() throws IOException {
     checkNNStartup();

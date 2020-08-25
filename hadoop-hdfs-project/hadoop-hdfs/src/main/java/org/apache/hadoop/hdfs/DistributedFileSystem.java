@@ -2035,6 +2035,13 @@ public class DistributedFileSystem extends FileSystem {
   public void removeUserFromGroup(String userName, String groupName) throws IOException{
     dfs.removeUserFromGroup(userName, groupName);
   }
+
+  /**
+   * Get total number of inodes in the system
+   */
+  public long getINodesCount() throws IOException {
+    return dfs.getINodesCount();
+  }
   
   /* HDFS only */
   public void createEncryptionZone(final Path path, final String keyName)

@@ -1591,6 +1591,19 @@ public class ClientNamenodeProtocolTranslatorPB
   }
 
   @Override
+  public long getINodesCount() throws IOException {
+    try {
+      ClientNamenodeProtocolProtos.GetINodesCountRequestProto req =
+              ClientNamenodeProtocolProtos.GetINodesCountRequestProto.newBuilder().build();
+      ClientNamenodeProtocolProtos.GetINodesCountResponseProto response = rpcProxy.getINodesCount(null,
+              req);
+      return response.getInodesCount();
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
+  @Override
   public void createEncryptionZone(String src, String keyName)
     throws IOException {
     final CreateEncryptionZoneRequestProto.Builder builder =

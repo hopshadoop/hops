@@ -655,6 +655,11 @@ public class TestUsersGroupsMultiNamenode {
         return System.currentTimeMillis();
     }
 
+    @Override
+    public long getINodesCount() throws IOException {
+      return 0;
+    }
+
     void clearCache(){
       usersGroupsMapping.clear();
     }

@@ -3097,6 +3097,14 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }
   }
 
+  public long getINodesCount() throws IOException {
+    try{
+      return namenode.getINodesCount();
+    }catch (RemoteException re){
+      throw re.unwrapRemoteException();
+    }
+  }
+
   @VisibleForTesting
   @InterfaceAudience.Private
   public void setNamenodes(Collection<ClientProtocol> namenodes){

@@ -8921,6 +8921,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       }
     }.handle());
   }
+
+  public long getINodesCount() {
+    return getFilesTotal();
+  }
 }
 
 
