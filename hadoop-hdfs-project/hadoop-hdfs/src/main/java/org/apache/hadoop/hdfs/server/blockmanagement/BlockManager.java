@@ -5461,7 +5461,13 @@ public class BlockManager {
 
       @Override
       public Object performTask() throws IOException {
-        block.addReplicaIfNotPresent(storage, reportedState, block.getGenerationStamp());
+
+        BlockInfoContiguous storedBlock = blocksMap.getStoredBlock(block);
+        BlockUCState ucState = storedBlock.getBlockUCState();
+        if (isBlockUnderConstruction(storedBlock, ucState, reportedState)) {
+          block.addReplicaIfNotPresent(storage, reportedState, block.getGenerationStamp());
+        }
+
         //and fall through to next clause
         //add replica if appropriate
         if (reportedState == ReplicaState.FINALIZED) {
