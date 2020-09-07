@@ -73,7 +73,7 @@ message ResourceTypeInfoProto {
 message ResourceProto {
   optional int64 memory = 1;
   optional int32 virtual_cores = 2;
-  repeated ResourceInformationProto resource_value_map = 3;
+  repeated ResourceInformationProto resource_value_map = 4;
 }
 
 message ResourceUtilizationProto {
