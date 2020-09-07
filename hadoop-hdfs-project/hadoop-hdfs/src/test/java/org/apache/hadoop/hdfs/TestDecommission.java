@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs;
 
 import static org.junit.Assert.assertNotNull;
+
+import java.io.File;
 import java.util.List;
 
 import com.google.common.base.Supplier;
@@ -1077,5 +1079,32 @@ public class TestDecommission {
         decomManager.getNumTrackedNodes());
     assertEquals("Unexpected number of pending nodes", pending,
         decomManager.getNumPendingNodes());
+  }
+
+  @Test
+  public void testRefreshNodeNotLeaderError() throws Exception {
+    LOG.info("Starting test testDecommission");
+    int numNamenodes = 2;
+    int numDatanodes = 0;
+    conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 3);
+
+    File ef = new File(excludeFile.toUri());
+    if(ef.exists()){
+      ef.delete();
+    }
+    ef.getParentFile().mkdirs();
+    ef.createNewFile();
+
+    startCluster(numNamenodes, numDatanodes, conf);
+
+
+    for(int i = 0; i < 100; i++){
+      DistributedFileSystem dfs = (DistributedFileSystem)(cluster.getNewFileSystemInstance(0));
+      dfs.refreshNodes();
+      Thread.sleep(20);
+    }
+
+
+    cluster.shutdown();
   }
 }
