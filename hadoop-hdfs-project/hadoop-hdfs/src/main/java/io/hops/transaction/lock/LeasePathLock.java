@@ -71,7 +71,8 @@ public final class LeasePathLock extends Lock {
       if(resolveType == LeaseHolderResolveType.SINGLE_PATH ) {
         acquireLeasePath(lease, leaseLock.getSingleFileLock());
       } else {
-        assert resolveType == LeaseHolderResolveType.ALL_PATHS;
+        assert resolveType == LeaseHolderResolveType.ALL_PATHS ||
+               resolveType == LeaseHolderResolveType.ALL_SYSTEM_PATHS_FOR_TESTSING;
         acquireLeasePaths(lease);
       }
     }

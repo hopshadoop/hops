@@ -400,6 +400,9 @@ public class LeaseManager {
     Collection <LeasePath> newLPs = new ArrayList<>(paths.size());
     Collection <LeasePath> deletedLPs = new ArrayList<>(paths.size());
     for (final LeasePath oldPath : paths) {
+      if (oldPath.getPath().length() > len && oldPath.getPath().charAt(len) != Path.SEPARATOR_CHAR) {
+        continue;
+      }
       final int holderId = oldPath.getHolderId();
       final LeasePath newpath =
           new LeasePath(dst + oldPath.getPath().substring(len), holderId,
@@ -441,6 +444,7 @@ public class LeaseManager {
 
     Collection<LeasePath> leasePathSet =
         EntityManager.findList(LeasePath.Finder.ByPrefix, prefix);
+
     final Map<LeasePath, Lease> entries = new HashMap<>();
     int srclen = prefix.length();
     
