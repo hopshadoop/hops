@@ -76,6 +76,15 @@ public final class LeaseLock extends Lock {
       }
     }
 
+    // Required by some unit tests that directly access lease manager class
+    if (LeaseHolderResolveType.ALL_SYSTEM_PATHS_FOR_TESTSING == resolveType ) {
+      //trying to lock all leases
+      Collection<Lease> leases = acquireLockList(lockType, Lease.Finder.All);
+      for(Lease lease : leases){
+        hldrs.add(lease.getHolder());
+      }
+    }
+
     List<String> holders = new ArrayList<>(hldrs);
     Collections.sort(holders);
     if (holders.isEmpty() && !locks.containsLock(Type.INode)) {

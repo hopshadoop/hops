@@ -228,6 +228,12 @@ public class LockFactory {
     return new LeaseLock(lockType, leaseCreationLockRows);
   }
 
+  public Lock getLeaseLockAllSystemPathsTesting(TransactionLockTypes.LockType lockType,
+                                    int leaseCreationLockRows) {
+    return new LeaseLock(lockType, TransactionLockTypes.LeaseHolderResolveType.ALL_SYSTEM_PATHS_FOR_TESTSING, null,
+            null, leaseCreationLockRows);
+  }
+
   public Lock getLeasePathLock(TransactionLockTypes.LockType lockType,
       int expectedCount) {
     return new LeasePathLock(lockType, expectedCount);

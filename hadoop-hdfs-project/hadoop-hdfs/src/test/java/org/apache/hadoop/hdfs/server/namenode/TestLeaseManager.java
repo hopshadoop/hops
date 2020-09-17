@@ -114,7 +114,9 @@ public class TestLeaseManager {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
+        locks.add(lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
+                TransactionLockTypes.INodeResolveType.PATH, path));
+        locks.add(lf.getLeaseLockAllSystemPathsTesting(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
               .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE, path));
       }
 
