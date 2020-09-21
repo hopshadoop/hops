@@ -19,11 +19,11 @@
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
     <groupId>io.hops</groupId>
-    <version>3.2.0.0-RC2</version>
+    <version>3.2.0.0-RC3</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
-  <version>3.2.0.0-RC2</version>
+  <version>3.2.0.0-RC3</version>
   <name>Apache Hadoop YARN ResourceManager</name>
 
   <properties>
