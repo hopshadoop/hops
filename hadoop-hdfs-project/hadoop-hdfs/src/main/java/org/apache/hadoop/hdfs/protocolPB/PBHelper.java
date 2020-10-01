@@ -2618,10 +2618,8 @@ public class PBHelper {
 
         blocks = BlockListAsLongs.decodeBuffers(num, bucketProto.getBlocksBuffersList());
       } else {
-        int numBlocksInBucket = bucketProto.getBlocksCount();
-
-        numBlocks += numBlocksInBucket;
         blocks = BlockListAsLongs.decodeLongs(bucketProto.getBlocksList());
+        numBlocks += blocks.getNumberOfBlocks();
       }
       
       Bucket bucket = new Bucket();
