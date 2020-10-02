@@ -18,11 +18,11 @@
 <parent>
    <groupId>io.hops</groupId>
    <artifactId>hadoop-project</artifactId>
-   <version>3.2.0.0-RC3</version>
+   <version>3.2.0.0-RC4</version>
    <relativePath>../../hadoop-project</relativePath>
 </parent>
   <artifactId>hadoop-client-api</artifactId>
-  <version>3.2.0.0-RC3</version>
+  <version>3.2.0.0-RC4</version>
   <packaging>jar</packaging>
 
   <description>Apache Hadoop Client</description>
