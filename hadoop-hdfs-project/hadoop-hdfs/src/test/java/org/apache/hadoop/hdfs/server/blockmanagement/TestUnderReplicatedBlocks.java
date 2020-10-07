@@ -19,9 +19,14 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.dal.INodeDataAccess;
+import io.hops.metadata.hdfs.dal.UnderReplicatedBlockDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.LockFactory;
 import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLocks;
@@ -36,6 +41,10 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.INode;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -244,4 +253,66 @@ public class TestUnderReplicatedBlocks {
     }.handle();
   }
 
+  /*
+   For under replicated blocks the replication work is done in two
+   different TXs. In the first TX blocks are selected, and in the second TX
+   replication work is computed for the blocks. It is possible
+   that after fist TX a selected block is deleted by the user and
+   when the Second TX runs for such a block it would throw an
+   exception
+   */
+  @Test
+  public void testJira1593() throws Exception {
+//    Logger.getRootLogger().setLevel(Level.TRACE);
+    Configuration conf = new HdfsConfiguration();
+    conf.setInt(DFSConfigKeys.DFS_NAMENODE_REPLICATION_INTERVAL_KEY, 1000 /*sec*/);
+    final short REPLICATION_FACTOR = 2;
+    final String FILE_NAME = "testFile";
+    final Path FILE_PATH = new Path("/",FILE_NAME);
+    final MiniDFSCluster cluster =
+            new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION_FACTOR-1)
+                    .build();
+    try {
+      // create a file with one block with a replication factor of 2
+      final FileSystem fs = cluster.getFileSystem();
+      DFSTestUtil.createFile(fs, FILE_PATH, 1L, REPLICATION_FACTOR, 1L);
+
+      new LightWeightRequestHandler(HDFSOperationType.TEST) {
+        @Override
+        public Object performTask() throws IOException {
+          INodeDataAccess da = (INodeDataAccess) HdfsStorageFactory.getDataAccess(INodeDataAccess.class);
+          da.deleteInode(FILE_NAME);
+
+          BlockInfoDataAccess bda =
+                  (BlockInfoDataAccess) HdfsStorageFactory.getDataAccess(BlockInfoDataAccess.class);
+          bda.deleteBlocksForFile(0);
+          return null;
+        }
+      }.handle();
+
+      BlockInfoContiguous bic =  new BlockInfoContiguous();
+      bic.setBlockIdNoPersistance(0);
+      bic.setINodeIdNoPersistance(INode.ROOT_INODE_ID+1);
+      cluster.getNamesystem().getBlockManager().computeReplicationWorkForBlock
+              (bic,0);
+      new LightWeightRequestHandler(HDFSOperationType.TEST) {
+        @Override
+        public Object performTask() throws IOException {
+          UnderReplicatedBlockDataAccess da = (UnderReplicatedBlockDataAccess)
+                  HdfsStorageFactory.getDataAccess(UnderReplicatedBlockDataAccess.class);
+          assert da.countAll() == 0;
+          return null;
+        }
+      }.handle();
+
+      Block blk = new Block();
+      blk.setBlockIdNoPersistance(123);
+      cluster.getNamesystem().getBlockManager().computeReplicationWorkForBlock(blk, 0);
+      //no exception
+
+    } finally {
+      cluster.shutdown();
+    }
+
+  }
 }

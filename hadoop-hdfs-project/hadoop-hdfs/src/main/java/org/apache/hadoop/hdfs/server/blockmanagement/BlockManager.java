@@ -1660,7 +1660,20 @@ public class BlockManager {
       // abandoned block or block reopened for append
       if (bc == null || (bc.isUnderConstruction() && getBlockInfo(blk).equals(bc.getLastBlock()))) {
         // remove from neededReplications
-        neededReplications.remove(getBlockInfo(blk));
+
+        BlockInfoContiguous blkToDelete;
+        if (!(blk instanceof BlockInfoContiguous)) {
+          blkToDelete = getStoredBlock(blk);
+          if(blkToDelete == null){
+            blkToDelete = new BlockInfoContiguous();
+            blkToDelete.setBlockIdNoPersistance(blk.getBlockId());
+            blkToDelete.setINodeIdNoPersistance(-1);
+          }
+        } else {
+          blkToDelete = (BlockInfoContiguous) blk;
+        }
+
+        neededReplications.remove(blkToDelete);
         neededReplications.decrementReplicationIndex(priority1);
         return scheduledWork;
       }

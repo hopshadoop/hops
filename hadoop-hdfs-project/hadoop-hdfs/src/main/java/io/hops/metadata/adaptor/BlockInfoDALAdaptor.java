@@ -129,6 +129,11 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
+  public void deleteBlocksForFile(long inodeID) throws StorageException {
+    dataAccess.deleteBlocksForFile(inodeID);
+  }
+
+  @Override
   public BlockInfo convertHDFStoDAL(
       org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous hdfsClass)
       throws StorageException {
