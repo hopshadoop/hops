@@ -293,6 +293,7 @@ class FSDirConcatOp {
     }
 
     trgInode.setModificationTime(timestamp);
+    trgInode.setHasBlocks(true);
     trgParent.updateModificationTime(timestamp);
     // update quota on the parent directory ('count' files removed, 0 space)
     fsd.unprotectedUpdateCount(targetIIP, targetIIP.length() - 1, deltas);

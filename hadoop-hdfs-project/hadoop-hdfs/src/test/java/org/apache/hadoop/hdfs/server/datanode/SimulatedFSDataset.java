@@ -712,10 +712,10 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
 
   @Override
   @Deprecated
-  public Replica getReplica(String bpid, long blockId) {
-    final Map<Block, BInfo> map = blockMap.get(bpid);
+    public Replica getReplica(ExtendedBlock block) {
+    final Map<Block, BInfo> map = blockMap.get(block.getBlockPoolId());
     if (map != null) {
-      return map.get(new Block(blockId));
+      return map.get(new Block(block.getBlockId()));
     }
     return null;
   }

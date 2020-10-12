@@ -185,7 +185,7 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
    * @return replica from the replicas map
    */
   @Deprecated
-  public Replica getReplica(String bpid, long blockId);
+  public Replica getReplica(ExtendedBlock block);
 
   /**
    * @return replica meta information

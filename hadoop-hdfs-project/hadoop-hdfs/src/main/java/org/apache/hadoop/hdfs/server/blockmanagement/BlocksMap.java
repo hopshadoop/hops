@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -41,7 +42,8 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
  * block's metadata currently includes blockCollection it belongs to and
  * the datanodes that store the block.
  */
-class BlocksMap {
+@VisibleForTesting
+public class BlocksMap {
 
   private final DatanodeManager datanodeManager;
   private final static List<DatanodeDescriptor> empty_datanode_list =
@@ -90,17 +92,14 @@ class BlocksMap {
   /**
    * Returns the block object it it exists in the map.
    */
-  BlockInfoContiguous getStoredBlock(Block b)
+  @VisibleForTesting
+  public BlockInfoContiguous getStoredBlock(Block b)
       throws StorageException, TransactionContextException {
-    // TODO STEFFEN - This is a workaround to prevent NullPointerExceptions for me. Not sure how to actually fix the bug.
     if (b == null) {
       return null;
     }
-    if (!(b instanceof BlockInfoContiguous)) {
-      return EntityManager
-          .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
-    }
-    return (BlockInfoContiguous) b;
+    return EntityManager
+            .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
   }
 
   /**

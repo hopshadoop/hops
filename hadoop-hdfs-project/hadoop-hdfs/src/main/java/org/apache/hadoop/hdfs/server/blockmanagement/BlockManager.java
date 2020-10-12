@@ -170,7 +170,7 @@ public class BlockManager {
    * Mapping: Block -> { BlockCollection, datanodes, self ref }
    * Updated only in response to client-sent information.
    */
-  final BlocksMap blocksMap;
+  BlocksMap blocksMap;
 
   /**
    * Replication thread.
@@ -882,13 +882,11 @@ public class BlockManager {
     machines[0] = phantomDatanode;
     */
 
-    List<DatanodeInfo> machines = new ArrayList<>(file.getBlockReplication());
-    for(int i = 0; i < file.getBlockReplication(); i++){
-      DatanodeInfo randomDatanode =  datanodeManager.getRandomDN(machines, file.getBlockReplication());
-      if(randomDatanode != null){
-        machines.add(randomDatanode);
-      }
-      else{
+    List<DatanodeDescriptor> dnds = datanodeManager.getRandomDN(file.getBlockReplication());
+    List<DatanodeInfo> dnInfos = new ArrayList(dnds);
+
+    if (dnInfos.size() == 0) {
+      for (int i = 0; i < file.getBlockReplication(); i++) {
         DatanodeID phantomDatanodID = new DatanodeID(
                 namesystem.getNameNode().getServiceRpcAddress().getAddress().getHostAddress(),
                 namesystem.getNameNode().getServiceRpcAddress().getAddress().getCanonicalHostName(),
@@ -898,12 +896,12 @@ public class BlockManager {
                 DFSConfigKeys.DFS_DATANODE_HTTPS_DEFAULT_PORT,
                 DFSConfigKeys.DFS_DATANODE_IPC_DEFAULT_PORT);
         DatanodeInfo phantomDatanode = new DatanodeInfo(phantomDatanodID);
-        machines.add(phantomDatanode);
+        dnInfos.add(phantomDatanode);
       }
     }
 
     LocatedBlock locatedBlock  = new LocatedBlock(eb,
-            machines.toArray(new DatanodeInfo[file.getBlockReplication()]), 0, false);
+            dnInfos.toArray(new DatanodeInfo[dnInfos.size()]), 0, false);
     locatedBlock.setData(data);
     results.add(locatedBlock);
     return results;
@@ -1320,7 +1318,7 @@ public class BlockManager {
    * Adds block to list of blocks which will be invalidated on all its
    * datanodes.
    */
-  private void addToInvalidates(Block b)
+  public void addToInvalidates(Block b)
       throws StorageException, TransactionContextException, IOException {
     if (!namesystem.isPopulatingReplQueues()) {
       return;
@@ -1583,14 +1581,14 @@ public class BlockManager {
    * @return total number of block for deletion
    */
   int computeInvalidateWork(int nodesToProcess) throws IOException {
-    final Map<DatanodeInfo, List<Integer>> nodesToSids = invalidateBlocks.getDatanodes(datanodeManager);
-    List<Map.Entry<DatanodeInfo, List<Integer>>> nodes = new ArrayList<>(nodesToSids.entrySet());
+    final Map<DatanodeInfo, Set<Integer>> nodesToSids = invalidateBlocks.getDatanodes(datanodeManager);
+    List<Map.Entry<DatanodeInfo, Set<Integer>>> nodes = new ArrayList<>(nodesToSids.entrySet());
     Collections.shuffle(nodes);
 
     nodesToProcess = Math.min(nodes.size(), nodesToProcess);
 
     int blockCnt = 0;
-    for (Map.Entry<DatanodeInfo, List<Integer>> dnInfo : nodes) {
+    for (Map.Entry<DatanodeInfo, Set<Integer>> dnInfo : nodes) {
 
       int blocks = invalidateWorkForOneNode(dnInfo);
       if (blocks > 0) {
@@ -4289,7 +4287,7 @@ public class BlockManager {
    * This includes blocks that are starting to be received, completed being
    * received, or deleted.
    */
-  public void processIncrementalBlockReport(DatanodeRegistration nodeID,
+  public void processIncrementalBlockReport(final DatanodeRegistration nodeID,
       final StorageReceivedDeletedBlocks blockInfos)
     throws IOException {
     //hack to have the variables final to pass then to the handler.
@@ -4367,38 +4365,33 @@ public class BlockManager {
                 " dataNode=" + node.getXferAddr() + " storage=" + storage.getStorageID() +
                     " sid: " + storage.getSid() + " status=" + rdbi.getStatus());
             HashBuckets hashBuckets = HashBuckets.getInstance();
+            addSubopName(rdbi.getStatus().toString());
             switch (rdbi.getStatus()) {
               case RECEIVING_BLOCK:
-                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.RECEIVING_BLOCK.name());
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                         ReplicaState.RBW, null);
                 received[0]++;
                 break;
               case APPENDING:
-                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.APPENDING.name());
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
                 break;
               case RECOVERING_APPEND:
-                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.RECOVERING_APPEND.name());
                 processAndHandleReportedBlock(storage, rdbi.getBlock(),
                     ReplicaState.RBW, null);
                 received[0]++;
                 break;
               case RECEIVED_BLOCK:
-                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.RECEIVED_BLOCK.name());
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
                 hashBuckets.applyHash(storage.getSid(), ReplicaState.FINALIZED, rdbi.getBlock());
                 received[0]++;
                 break;
               case UPDATE_RECOVERED:
-                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.UPDATE_RECOVERED.name());
                 addBlock(storage, rdbi.getBlock(), rdbi.getDelHints());
                 received[0]++;
                 break;
               case DELETED_BLOCK:
-                addSubopName(ReceivedDeletedBlockInfo.BlockStatus.DELETED_BLOCK.name());
                 removeStoredBlock(rdbi.getBlock(), storage.getDatanodeDescriptor());
                 deleted[0]++;
                 break;
@@ -4744,7 +4737,7 @@ public class BlockManager {
    *
    * @return number of blocks scheduled for removal during this iteration.
    */
-  private int invalidateWorkForOneNode(Map.Entry<DatanodeInfo, List<Integer>> entry) throws IOException {
+  private int invalidateWorkForOneNode(Map.Entry<DatanodeInfo, Set<Integer>> entry) throws IOException {
     // blocks should not be replicated or removed if safe mode is on
     if (namesystem.isInSafeMode()) {
       LOG.debug("In safemode, not computing replication work");
@@ -4757,7 +4750,7 @@ public class BlockManager {
     if (dnDescriptor == null) {
       LOG.warn("DataNode " + entry.getKey() + " cannot be found for sids " +
             Arrays.toString(entry.getValue().toArray()) + ", removing block invalidation work.");
-      invalidateBlocks.remove(entry.getValue());
+      invalidateBlocks.remove(new ArrayList<>(entry.getValue()));
       return 0;
     }
     
@@ -5221,41 +5214,6 @@ public class BlockManager {
     }.handle(namesystem);
   }
 
-  public BlockInfoContiguous tryToCompleteBlock(final BlockCollection bc,
-      final int blkIndex) throws IOException {
-
-    if (blkIndex < 0) {
-      return null;
-    }
-    BlockInfoContiguous curBlock = bc.getBlock(blkIndex);
-    LOG.debug("tryToCompleteBlock. blkId = " + curBlock.getBlockId());
-    if (curBlock.isComplete()) {
-      return curBlock;
-    }
-    BlockInfoContiguousUnderConstruction ucBlock = (BlockInfoContiguousUnderConstruction) curBlock;
-    int numNodes = ucBlock.numNodes(datanodeManager);
-    if (numNodes < minReplication) {
-      return null;
-    }
-    if (ucBlock.getBlockUCState() != BlockUCState.COMMITTED) {
-      return null;
-    }
-    BlockInfoContiguous completeBlock = ucBlock.convertToCompleteBlock();
-    // replace penultimate block in file
-    bc.setBlock(blkIndex, completeBlock);
-
-    // Since safe-mode only counts complete blocks, and we now have
-    // one more complete block, we need to adjust the total up, and
-    // also count it as safe, if we have at least the minimum replica
-    // count. (We may not have the minimum replica count yet if this is
-    // a "forced" completion when a file is getting closed by an
-    // OP_CLOSE edit on the standby).
-    namesystem.adjustSafeModeBlockTotals(null, 1);
-    namesystem.incrementSafeBlockCount(Math.min(numNodes, minReplication),curBlock);
-
-    return completeBlock;
-  }
-
   @VisibleForTesting
   public void processTimedOutPendingBlock(final long timedOutItemId)
       throws IOException {
@@ -5302,7 +5260,7 @@ public class BlockManager {
   }
 
   private BlockInfoContiguous getBlockInfo(Block b)
-      throws StorageException, TransactionContextException {
+      throws StorageException, TransactionContextException {    
     BlockInfoContiguous binfo = blocksMap.getStoredBlock(b);
     if (binfo == null) {
       LOG.error("ERROR: Dangling Block. bid=" + b.getBlockId() +
@@ -5561,5 +5519,21 @@ public class BlockManager {
         }
       }
     }
+  }
+  
+  /*
+   * only for testing
+   */
+  @VisibleForTesting
+  public BlocksMap getBlocksMap() {
+    return blocksMap;
+  }
+
+  /*
+   * only for testing
+   */
+  @VisibleForTesting
+  public void setBlocksMapSpy(BlocksMap bm) {
+    blocksMap = bm;
   }
 }

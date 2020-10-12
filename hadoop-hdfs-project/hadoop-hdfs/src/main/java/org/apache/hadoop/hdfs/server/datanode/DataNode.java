@@ -221,6 +221,10 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.protobuf.BlockingService;
+import org.apache.hadoop.hdfs.protocol.DSQuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.NSQuotaExceededException;
+import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
+import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 
 /**
  * *******************************************************
@@ -2992,7 +2996,7 @@ public class DataNode extends ReconfigurableBase
     // or their replicas have 0 length.
     // The block can be deleted.
     if (syncList.isEmpty()) {
-      nn.commitBlockSynchronization(block, recoveryId, 0, true, true,
+      commitBlockSyncWithRetry(nn, block, recoveryId, 0, true, true,
           DatanodeID.EMPTY_ARRAY, null);
       return;
     }
@@ -3086,8 +3090,64 @@ public class DataNode extends ReconfigurableBase
       datanodes[i] = r.id;
       storages[i] = r.storageID;
     }
-    nn.commitBlockSynchronization(block, newBlock.getGenerationStamp(),
+    commitBlockSyncWithRetry(nn, block, newBlock.getGenerationStamp(),
         newBlock.getNumBytes(), true, false, datanodes, storages);
+  }
+  
+    protected void commitBlockSyncWithRetry(DatanodeProtocolClientSideTranslatorPB nn,
+          ExtendedBlock block, long newgenerationstamp, long newlength, boolean closeFile,
+      boolean deleteblock, DatanodeID[] newtargets, String[] newtargetstorages)
+          throws IOException {
+
+    int retries = conf.getInt(
+            DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_KEY,
+            DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_RETRIES_DEFAULT);
+
+    long sleeptime = conf.getInt(
+            DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_KEY,
+            DFSConfigKeys.DFS_CLIENT_BLOCK_WRITE_LOCATEFOLLOWINGBLOCK_INITIAL_DELAY_DEFAULT);
+
+      long localstart = Time.monotonicNow();
+      while (true) {
+        try {
+          nn.commitBlockSynchronization(block, newgenerationstamp,
+                  newlength, closeFile, deleteblock, newtargets, newtargetstorages);
+          return;
+        } catch (RemoteException e) {
+          IOException ue =
+                  e.unwrapRemoteException(FileNotFoundException.class,
+                          AccessControlException.class,
+                          NSQuotaExceededException.class,
+                          DSQuotaExceededException.class,
+                          UnresolvedPathException.class);
+          if (ue != e) {
+            throw ue; // no need to retry these exceptions
+          }
+
+          if (NotReplicatedYetException.class.getName().
+                  equals(e.getClassName())) {
+            if (retries == 0) {
+              throw e;
+            } else {
+              --retries;
+              LOG.info("Exception while syncing a block", e);
+              long elapsed = Time.monotonicNow() - localstart;
+              if (elapsed > 5000) {
+                LOG.info("Waiting for block sycn for " + (elapsed / 1000) + " seconds");
+              }
+              try {
+                LOG.warn("NotReplicatedYetException sleeping " + block + " retries left " + retries);
+                Thread.sleep(sleeptime);
+                sleeptime *= 2;
+              } catch (InterruptedException ie) {
+                LOG.warn("Caught exception ", ie);
+              }
+            }
+          } else {
+            throw e;
+          }
+        }
+      }
   }
   
   private static void logRecoverBlock(String who, RecoveringBlock rb) {

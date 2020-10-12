@@ -1697,69 +1697,80 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    * could lazily garbage-collect the block, but why bother?
    * just get rid of it.
    */
-  @Override // FsDatasetSpi
+   @Override // FsDatasetSpi
   public void invalidate(String bpid, Block invalidBlks[]) throws IOException {
     final List<String> errors = new ArrayList<String>();
+
     for (Block invalidBlk : invalidBlks) {
-      final File f;
-      final FsVolumeImpl v;
-      synchronized (this) {
-        final ReplicaInfo info = volumeMap.get(bpid, invalidBlk);
-        if (info == null) {
-          // It is okay if the block is not found -- it may be deleted earlier.
-          LOG.info("Failed to delete replica " + invalidBlk +
-              ": ReplicaInfo not found.");
-          continue;
-        }
-        if (info.getGenerationStamp() != invalidBlk.getGenerationStamp()) {
-          errors.add("Failed to delete replica " + invalidBlk +
-              ": GenerationStamp not matched, info=" + info);
-          continue;
-        }
-        f = info.getBlockFile();
-        v = (FsVolumeImpl) info.getVolume();
-        if (v == null) {
-          errors.add("Failed to delete replica " + invalidBlk +
-              ". No volume for this replica, file=" + f);
-          continue;
-        }
-        File parent = f.getParentFile();
-        if (parent == null) {
-          errors.add("Failed to delete replica " + invalidBlk +
-              ". Parent not found for file " + f);
-          continue;
-        }
-        ReplicaInfo removing = volumeMap.remove(bpid, invalidBlk);
-        addDeletingBlock(bpid, removing.getBlockId());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Block file " + removing.getBlockFile().getName()
-              + " is to be deleted");
-        }
+      invalidateBlock(bpid, invalidBlk,errors);
+    }
+
+    printInvalidationErrors(errors, invalidBlks.length);
+  }
+
+  public void invalidateBlock(String bpid, Block invalidBlk, List<String> errors)
+          throws IOException {
+    final File f;
+    final FsVolumeImpl v;
+    synchronized (this) {
+      final ReplicaInfo info = volumeMap.get(bpid, invalidBlk);
+      if (info == null) {
+        // It is okay if the block is not found -- it may be deleted earlier.
+        LOG.info("Failed to delete replica " + invalidBlk +
+                ": ReplicaInfo not found.");
+        return;
       }
-    
-      // If a DFSClient has the replica in its cache of short-circuit file
-      // descriptors (and the client is using ShortCircuitShm), invalidate it.
-      datanode.getShortCircuitRegistry().processBlockInvalidation(
-                new ExtendedBlockId(invalidBlk.getBlockId(), bpid));
-      
-      // If the block is cached, start uncaching it.
-      cacheManager.uncacheBlock(bpid, invalidBlk.getBlockId());
-      
-      // Delete the block asynchronously to make sure we can do it fast enough.
-      // It's ok to unlink the block file before the uncache operation
-      // finishes.
-      try {
-        asyncDiskService.deleteAsync(v.obtainReference(), f,
-            FsDatasetUtil.getMetaFile(f, invalidBlk.getGenerationStamp()),
-            new ExtendedBlock(bpid, invalidBlk), dataStorage.getTrashDirectoryForBlockFile(bpid, f));
-      } catch (ClosedChannelException e) {
-        LOG.warn("Volume " + v + " is closed, ignore the deletion task for " + "block " + invalidBlks);
+      if (info.getGenerationStamp() != invalidBlk.getGenerationStamp()) {
+        errors.add("Failed to delete replica " + invalidBlk +
+                ": GenerationStamp not matched, info=" + info);
+        return;
+      }
+      f = info.getBlockFile();
+      v = (FsVolumeImpl) info.getVolume();
+      if (v == null) {
+        errors.add("Failed to delete replica " + invalidBlk +
+                ". No volume for this replica, file=" + f);
+        return;
+      }
+      File parent = f.getParentFile();
+      if (parent == null) {
+        errors.add("Failed to delete replica " + invalidBlk +
+                ". Parent not found for file " + f);
+        return;
+      }
+      ReplicaInfo removing = volumeMap.remove(bpid, invalidBlk);
+      addDeletingBlock(bpid, removing.getBlockId());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Block file " + removing.getBlockFile().getName()
+                + " is to be deleted");
       }
     }
+
+    // If a DFSClient has the replica in its cache of short-circuit file
+    // descriptors (and the client is using ShortCircuitShm), invalidate it.
+    datanode.getShortCircuitRegistry().processBlockInvalidation(
+            new ExtendedBlockId(invalidBlk.getBlockId(), bpid));
+
+    // If the block is cached, start uncaching it.
+    cacheManager.uncacheBlock(bpid, invalidBlk.getBlockId());
+
+    // Delete the block asynchronously to make sure we can do it fast enough.
+    // It's ok to unlink the block file before the uncache operation
+    // finishes.
+    try {
+      asyncDiskService.deleteAsync(v.obtainReference(), f,
+              FsDatasetUtil.getMetaFile(f, invalidBlk.getGenerationStamp()),
+              new ExtendedBlock(bpid, invalidBlk), dataStorage.getTrashDirectoryForBlockFile(bpid, f));
+    } catch (ClosedChannelException e) {
+      LOG.warn("Volume " + v + " is closed, ignore the deletion task for " + "block " + invalidBlk);
+    }
+  }
+
+  void printInvalidationErrors(List<String> errors, int total) throws IOException {
     if (!errors.isEmpty()) {
       StringBuilder b = new StringBuilder("Failed to delete ")
-        .append(errors.size()).append(" (out of ").append(invalidBlks.length)
-        .append(") replica(s):");
+              .append(errors.size()).append(" (out of ").append(total)
+              .append(") replica(s):");
       for(int i = 0; i < errors.size(); i++) {
         b.append("\n").append(i).append(") ").append(errors.get(i));
       }
@@ -2106,8 +2117,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
    */
   @Override // FsDatasetSpi
   @Deprecated
-  public ReplicaInfo getReplica(String bpid, long blockId) {
-    return volumeMap.get(bpid, blockId);
+  public ReplicaInfo getReplica(ExtendedBlock b) {
+    return volumeMap.get(b.getBlockPoolId(), b.getBlockId());
   }
 
   @Override
@@ -2126,7 +2137,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   /**
    * static version of {@link #initReplicaRecovery(RecoveringBlock)}.
    */
-  static ReplicaRecoveryInfo initReplicaRecovery(String bpid, ReplicaMap map,
+  public ReplicaRecoveryInfo initReplicaRecovery(String bpid, ReplicaMap map,
       Block block, long recoveryId, long xceiverStopTimeout) throws IOException {
     final ReplicaInfo replica = map.get(bpid, block.getBlockId());
     LOG.info("initReplicaRecovery: " + block + ", recoveryId=" + recoveryId +
@@ -2618,5 +2629,10 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       }
       s.add(blockId);
     }
+  }
+  
+  //only for testing
+  public ReplicaMap getVolumeMap() {
+    return volumeMap;
   }
 }
