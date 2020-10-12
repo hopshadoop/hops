@@ -726,7 +726,7 @@ public class DecommissionManager {
         final BlockInfoContiguous block = it.next();
         // Remove the block from the list if it's no longer in the block map,
         // e.g. the containing file has been deleted
-        if (blockManager.blocksMap.getStoredBlock(block) == null || !existingInodes.contains(block.getInodeId())) {
+        if (!existingInodes.contains(block.getInodeId()) || blockManager.blocksMap.getStoredBlock(block) == null) {
           LOG.trace("Removing unknown block {}", block);
           toRemove.add(block);
           continue;

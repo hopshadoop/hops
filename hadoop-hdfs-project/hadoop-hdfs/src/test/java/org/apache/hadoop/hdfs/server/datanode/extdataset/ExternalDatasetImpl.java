@@ -110,7 +110,7 @@ public class ExternalDatasetImpl implements FsDatasetSpi<ExternalVolumeImpl> {
 
   @Override
   @Deprecated
-  public Replica getReplica(String bpid, long blockId) {
+  public Replica getReplica(ExtendedBlock block) {
     return new ExternalReplica();
   }
 

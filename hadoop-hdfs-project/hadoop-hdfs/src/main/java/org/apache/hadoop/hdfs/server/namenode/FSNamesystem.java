@@ -1983,12 +1983,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final HdfsFileStatus stat = FSDirStatAndListingOp.
         getFileInfo(dir, src, false, FSDirectory.isReservedRawName(srcArg), true);
 
-    //Set HdfsFileStatus if the file shoudl be stored in DB
-    final INode inode = dir.getINodesInPath4Write(src).getLastINode();
-    final INodeFile myFile = INodeFile.valueOf(inode, src, true);
-    final BlockStoragePolicy storagePolicy =
-            getBlockManager().getStoragePolicySuite().getPolicy(myFile.getStoragePolicyID());
-
     logAuditEvent(true, "create", src, null,
         (isAuditEnabled() && isExternalInvocation()) ? stat : null);
     return stat;
@@ -2726,13 +2720,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     replication = pendingFile.getBlockReplication();
 
     // Get the storagePolicyID of this file
-    byte storagePolicyID = pendingFile.getStoragePolicyID();
-
-    if(getBlockManager().getStoragePolicySuite().getPolicy(storagePolicyID).getName()
-            .equals(HdfsConstants.DB_STORAGE_POLICY_NAME)){
+    if(pendingFile.getStoragePolicyID()== HdfsConstants.DB_STORAGE_POLICY_ID){
       //Policy is DB but the file is moved to DNs so change the policy for this file
-      pendingFile.setStoragePolicyID(getBlockManager().getStoragePolicySuite()
-              .getDefaultPolicy().getId());
+      if( pendingFile.getParent().getStoragePolicyID() == HdfsConstants.DB_STORAGE_POLICY_ID ){
+        pendingFile.setStoragePolicyID(getBlockManager().getStoragePolicySuite()
+                .getDefaultPolicy().getId());
+      } else {
+        pendingFile.setStoragePolicyID(pendingFile.getParent().getStoragePolicyID());
+      }
     }
 
     if (clientNode == null) {
@@ -2741,7 +2736,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     // choose targets for the new block to be allocated.
     return getBlockManager().chooseTarget4NewBlock(
         src, replication, clientNode, excludedNodes, blockSize,
-        favoredNodes, storagePolicyID);
+        favoredNodes, pendingFile.getStoragePolicyID());
   }
       
               /**
@@ -3068,7 +3063,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             locks.add(lf.getLeaseLockAllPaths(LockType.READ, leaseCreationLockRows))
                     .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
                     .add(lf.getBlockLock())
-                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.ER));
+                    .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.ER, BLK.IV));
             locks.add(lf.getAllUsedHashBucketsLock());
           }
 
@@ -3869,6 +3864,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       return;
     }
 
+    updateQuotaUponBlockCompletion(fileINode, iip, commitBlock);
+  }
+  
+  public void updateQuotaUponBlockCompletion(final INodeFile fileINode, final INodesInPath iip,
+                                             final Block commitBlock) throws IOException {
     fileINode.recomputeFileSize();
 
     if (dir.isQuotaEnabled()) {
@@ -3936,7 +3936,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
-        if (isErasureCodingEnabled()) {
+        if (isErasureCodingEnabled() && inodeIdentifier != null) {
           locks.add(lf.getIndivdualEncodingStatusLock(LockType.WRITE, inodeIdentifier.getInodeId()));
         }
       }
@@ -3946,12 +3946,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         // If a DN tries to commit to the standby, the recovery will
         // fail, and the next retry will succeed on the new NN.
 
-        checkNameNodeSafeMode(
-          "Cannot commitBlockSynchronization while in safe mode");
-        LOG.info("commitBlockSynchronization(oldBlock=" + oldBlock +
-            ", newGenerationStamp=" + newGenerationStamp + ", newLength=" +
-            newLength + ", newTargets=" + Arrays.asList(newTargets) +
-            ", closeFile=" + closeFile + ", deleteBlock=" + deleteBlock + ")");
+        if (inodeIdentifier == null) {
+          throw new FileNotFoundException("File not found for block: " + oldBlock
+              + ", likely due to delayed block"
+              + " removal");
+        }
         final BlockInfoContiguous storedBlock =
             getStoredBlock(ExtendedBlock.getLocalBlock(oldBlock));
         if (storedBlock == null) {
@@ -3966,6 +3965,54 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             throw new IOException("Block (=" + oldBlock + ") not found");
           }
         }
+        
+                BlockCollection blockCollection = storedBlock.getBlockCollection();
+        if (blockCollection == null) {
+          throw new IOException("The blockCollection of " + storedBlock
+                  + " is null, likely because the file owning this block was"
+                  + " deleted and the block removal is delayed");
+        }
+
+        checkNameNodeSafeMode(
+                "Cannot commitBlockSynchronization while in safe mode");
+        LOG.info("commitBlockSynchronization Provided Block (oldBlock=" + oldBlock +
+                ", newGenerationStamp=" + newGenerationStamp + ", newLength=" +
+                newLength + ", newTargets=" + Arrays.asList(newTargets) +
+                ", closeFile=" + closeFile + ", deleteBlock=" + deleteBlock + ")");
+
+        commitBlockSynchronizationInternal(oldBlock, newGenerationStamp, newLength,
+                  closeFile, deleteBlock, newTargets, newTargetStorages,
+                  src, copyTruncate, truncatedBlock);
+        
+        return null;
+      }
+    }.handle(this);
+    if (closeFile) {
+      LOG.info(
+          "commitBlockSynchronization(oldBlock=" + oldBlock
+          + ", file=" + src[0]
+          + (copyTruncate[0] ? ", newBlock=" + truncatedBlock
+              : ", newgenerationstamp=" + newGenerationStamp)
+          + ", newLength=" + newLength + ", newTargets=" + Arrays.asList(newTargets)
+          + ") successful"
+      );
+    } else {
+      LOG.info("commitBlockSynchronization(" + oldBlock + ") successful");
+    }
+  }
+
+  void commitBlockSynchronizationInternal(final ExtendedBlock oldBlock,
+                                  final long newGenerationStamp, final long newLength,
+                                  final boolean closeFile, final boolean deleteBlock,
+                                  final DatanodeID[] newTargets, final String[] newTargetStorages,
+                                          final String[] src, final boolean[] copyTruncate,
+                                          final BlockInfoContiguousUnderConstruction[] truncatedBlock )
+          throws IOException {
+        // If a DN tries to commit to the standby, the recovery will
+        // fail, and the next retry will succeed on the new NN.
+
+        final BlockInfoContiguous storedBlock =
+            getStoredBlock(ExtendedBlock.getLocalBlock(oldBlock));
         final long oldGenerationStamp = storedBlock.getGenerationStamp();
         final long oldNumBytes = storedBlock.getNumBytes();
         //
@@ -3987,11 +4034,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               + " deleted and the block removal is delayed");
         }
         INodeFile iFile = ((INode)storedBlock.getBlockCollection()).asFile();
-        if (inodeIdentifier==null) {
-          throw new FileNotFoundException("File not found: "
-              + iFile.getFullPathName() + ", likely due to delayed block"
-              + " removal");
-        }
+        
         if ((!iFile.isUnderConstruction() || storedBlock.isComplete()) &&
           iFile.getLastBlock().isComplete()) {
           if (LOG.isDebugEnabled()) {
@@ -3999,7 +4042,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 + ") since the file (=" + iFile.getLocalName()
                 + ") is not under construction");
           }
-          return null;
+          return;
         }
           
         truncatedBlock[0] = (BlockInfoContiguousUnderConstruction) iFile
@@ -4081,25 +4124,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           src[0] = iFile.getFullPathName();
           persistBlocks(src[0], iFile);
         }
-        return null;
-      }
-
-    }.handle(this);
-    if (closeFile) {
-      LOG.info(
-          "commitBlockSynchronization(oldBlock=" + oldBlock
-          + ", file=" + src[0]
-          + (copyTruncate[0] ? ", newBlock=" + truncatedBlock
-              : ", newgenerationstamp=" + newGenerationStamp)
-          + ", newLength=" + newLength + ", newTargets=" + Arrays.asList(newTargets)
-          + ") successful"
-      
-      );
-        } else {
-          LOG.info("commitBlockSynchronization(" + oldBlock + ") successful");
-    }
   }
-
+  
   /**
    *
    * @param pendingFile

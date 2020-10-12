@@ -48,6 +48,8 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 
 /**
@@ -254,17 +256,22 @@ class InvalidateBlocks {
   
   void add(final Collection<Block> blocks, final DatanodeStorageInfo storage)
       throws IOException {
+    List<InvalidatedBlock> invblks = new ArrayList<>();
+    for (Block blk : blocks) {
+      invblks.add(new InvalidatedBlock(storage.getSid(), blk.getBlockId(),
+          blk.getGenerationStamp(), blk.getNumBytes(),
+          BlockInfoContiguous.NON_EXISTING_ID));
+    }
+    addAll(invblks);
+  }
+
+  public void addAll(final List<InvalidatedBlock> invblks)
+      throws IOException {
     new LightWeightRequestHandler(HDFSOperationType.ADD_INV_BLOCKS) {
       @Override
       public Object performTask() throws StorageException, IOException {
-        InvalidateBlockDataAccess da =
-            (InvalidateBlockDataAccess) HdfsStorageFactory
-                .getDataAccess(InvalidateBlockDataAccess.class);
-        List<InvalidatedBlock> invblks = new ArrayList<>();
-        for (Block blk : blocks) {
-          invblks.add(new InvalidatedBlock(storage.getSid(), blk.getBlockId(),
-              blk.getGenerationStamp(), blk.getNumBytes(), BlockInfoContiguous.NON_EXISTING_ID));
-        }
+        InvalidateBlockDataAccess da = (InvalidateBlockDataAccess) HdfsStorageFactory
+            .getDataAccess(InvalidateBlockDataAccess.class);
         da.prepare(Collections.EMPTY_LIST, invblks, Collections.EMPTY_LIST);
         return null;
       }
@@ -360,15 +367,15 @@ class InvalidateBlocks {
         .findList(InvalidatedBlock.Finder.All);
   }
 
-  public Map<DatanodeInfo, List<Integer>> getDatanodes(DatanodeManager manager)
+  public Map<DatanodeInfo, Set<Integer>> getDatanodes(DatanodeManager manager)
       throws IOException {
-    Map<DatanodeInfo, List<Integer>> nodes = new HashMap<DatanodeInfo, List<Integer>>();
+    Map<DatanodeInfo, Set<Integer>> nodes = new HashMap<>();
     for(int sid : getSids()) {
       DatanodeInfo node = manager.getDatanodeBySid(sid);
       
-      List<Integer> sids = nodes.get(node);
+      Set<Integer> sids = nodes.get(node);
       if(sids==null){
-        sids = new ArrayList<>();
+        sids = new HashSet<>();
         nodes.put(node, sids);
       }
       sids.add(sid);

@@ -421,6 +421,7 @@ public class FSDirectory implements Closeable {
     if (!removed) {
       return false;
     }
+    getBlockManager().addToInvalidates(block);
     getBlockManager().removeBlockFromMap(block);
 
     if (NameNode.stateChangeLog.isDebugEnabled()) {

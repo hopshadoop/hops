@@ -17,10 +17,17 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.common.INodeUtil;
+import io.hops.exception.StorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.BlockInfoDataAccess;
+import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.LockFactory;
+import io.hops.transaction.lock.TransactionLockTypes;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -167,9 +174,9 @@ public class TestDFSRename {
           cluster.getNameNode(), dst, 0, fileLen);
       BlockManager bm = NameNodeAdapter.getNamesystem(cluster.getNameNode()).
           getBlockManager();
-      assertTrue(bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
+      assertTrue(getStoredBlockTX(bm, lbs.getLocatedBlocks().get(0).getBlock().
           getLocalBlock()) != null);
-      BlockInfoContiguous block = bm.getStoredBlock(lbs.getLocatedBlocks().get(0).getBlock().
+      BlockInfoContiguous block = getStoredBlockTX(bm, lbs.getLocatedBlocks().get(0).getBlock().
           getLocalBlock());
       dfs.rename(srcPath, dstPath, Rename.OVERWRITE);
       BlockInfoContiguous b = getBlock(block.getBlockId(), block.getInodeId());
@@ -182,6 +189,31 @@ public class TestDFSRename {
         cluster.shutdown();
       }
     }
+  }
+  
+  BlockInfoContiguous getStoredBlockTX(BlockManager bm, Block block) throws IOException {
+    HopsTransactionalRequestHandler handler = new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
+      INodeIdentifier inodeIdentifier = null;
+
+      @Override
+      public void setUp() throws StorageException {
+        inodeIdentifier = INodeUtil.resolveINodeFromBlock(block);
+      }
+
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        LockFactory lf = LockFactory.getInstance();
+        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
+            .add(lf.getIndividualBlockLock(block.getBlockId(), inodeIdentifier));
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+
+        return bm.getStoredBlock(block);
+      }
+    };
+    return (BlockInfoContiguous) handler.handle();
   }
   
   private BlockInfoContiguous getBlock(final long blockId, final long inodeId) throws IOException{

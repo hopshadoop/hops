@@ -582,7 +582,9 @@ public class LeaseManager {
             boolean needSync = false;
             if (holder != null) {
               Lease leaseToCheck = EntityManager.find(Lease.Finder.ByHolder, holder, Lease.getHolderId(holder));
-
+              if (leaseToCheck == null) {
+                return needSync;
+              }
               if (!expiredHardLimit(leaseToCheck)) {
                 LOG.warn("Unable to release hard-limit expired lease: "
                     + leaseToCheck);

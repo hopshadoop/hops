@@ -27,6 +27,7 @@ import org.apache.zookeeper.KeeperException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
 
 public class BlockInfoDALAdaptor extends
@@ -79,6 +80,12 @@ public class BlockInfoDALAdaptor extends
   }
 
   @Override
+  public List<BlockInfoContiguous> findAllBlocks(long startID, long endID) throws StorageException {
+    return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
+            dataAccess.findAllBlocks(startID, endID));
+  }
+
+  @Override
   public List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous> findBlockInfosByStorageId(
       int storageId) throws StorageException {
     return (List<org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous>) convertDALtoHDFS(
@@ -126,6 +133,12 @@ public class BlockInfoDALAdaptor extends
       throws StorageException {
     dataAccess.prepare(convertHDFStoDAL(removed), convertHDFStoDAL(newed),
         convertHDFStoDAL(modified));
+  }
+  
+  //only for testing
+  @Override
+  public void deleteBlocksForFile(long inodeID) throws StorageException {
+    dataAccess.deleteBlocksForFile(inodeID);
   }
 
   @Override

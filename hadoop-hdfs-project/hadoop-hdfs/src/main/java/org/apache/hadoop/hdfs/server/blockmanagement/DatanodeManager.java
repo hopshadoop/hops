@@ -98,6 +98,7 @@ public class DatanodeManager {
   private final DecommissionManager decomManager;
   private final HeartbeatManager heartbeatManager;
   private final FSClusterStats fsClusterStats;
+  private Random rand = new Random(System.currentTimeMillis());
 
   /**
    * Maps datanode uuid's to the DatanodeDescriptor
@@ -965,6 +966,21 @@ public class DatanodeManager {
   }
 
   /**
+   * @return live datanodes
+   */
+  private List<DatanodeDescriptor> getLiveDataNodes() {
+    List<DatanodeDescriptor> list = new ArrayList<>();
+    synchronized (datanodeMap) {
+      for (DatanodeDescriptor dn : datanodeMap.values()) {
+        if (!isDatanodeDead(dn)) {
+          list.add(dn);
+        }
+      }
+    }
+    return list;
+  }
+  
+  /**
    * @return the number of dead datanodes.
    */
   public int getNumDeadDataNodes() {
@@ -1740,19 +1756,15 @@ public class DatanodeManager {
     }
   }
 
-  Random rand = new Random(System.currentTimeMillis());
-  public DatanodeDescriptor getRandomDN(List<DatanodeInfo> existing, int tries){
-    if(datanodeMap.isEmpty()){
-        return null;
-    }else{
-      for(int i = 0; i < tries; i++){
-        DatanodeDescriptor dd = (DatanodeDescriptor) datanodeMap.values()
-                .toArray()[rand.nextInt(datanodeMap.size())];
-        if(!existing.contains(dd)){
-          return dd;
-        }
-      }
-      return null;
+  public List<DatanodeDescriptor> getRandomDN(int count) {
+    List<DatanodeDescriptor> liveNodes = getLiveDataNodes();
+
+    if (liveNodes.isEmpty()) {
+      return Collections.EMPTY_LIST;
+    } else {
+      int retCount = Math.min(count, liveNodes.size());
+      Collections.shuffle(liveNodes);
+      return liveNodes.subList(0, retCount);
     }
   }
 

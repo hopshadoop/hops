@@ -39,13 +39,10 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.*;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguousUnderConstruction;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.log4j.Level;
@@ -92,6 +89,8 @@ public class TestCommitBlockSynchronization {
       file.setParent(parent);
     }
 
+    BlocksMap bmSpy = spy(namesystem.getBlockManager().getBlocksMap());
+    namesystem.getBlockManager().setBlocksMapSpy(bmSpy);
     FSNamesystem namesystemSpy = spy(namesystem);
     doReturn(1L).when(file).getId();
     BlockInfoContiguousUnderConstruction blockInfo = createBlockInfoUnderConstruction(targets, block, file);
@@ -106,7 +105,8 @@ public class TestCommitBlockSynchronization {
     doReturn(true).when(file).removeLastBlock(any(Block.class));
     doReturn(true).when(file).isUnderConstruction();
     
-    doReturn(mockBlockInfo).when(namesystemSpy).getStoredBlock(any(Block.class));  
+    doReturn(mockBlockInfo).when(namesystemSpy).getStoredBlock(any(Block.class));
+    doReturn(mockBlockInfo).when(bmSpy).getStoredBlock(any(Block.class));
     doReturn(mockBlockInfo).when(file).getLastBlock();
     doReturn("").when(namesystemSpy).closeFileCommitBlocks(
         any(INodeFile.class),

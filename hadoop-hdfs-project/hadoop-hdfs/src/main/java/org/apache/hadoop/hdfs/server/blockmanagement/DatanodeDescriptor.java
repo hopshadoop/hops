@@ -750,10 +750,17 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   void addBlocksToBeInvalidated(List<Block> blocklist) {
     assert (blocklist != null && blocklist.size() > 0);
+    for (Block blk : blocklist) {
+      addBlockToBeInvalidated(blk);
+    }
+  }
+
+  /**
+   * Store block invalidation work.
+   */
+  void addBlockToBeInvalidated(Block block) {
     synchronized (invalidateBlocks) {
-      for (Block blk : blocklist) {
-        invalidateBlocks.add(blk);
-      }
+        invalidateBlocks.add(block);
     }
   }
 
