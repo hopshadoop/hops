@@ -3987,7 +3987,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               + " deleted and the block removal is delayed");
         }
         INodeFile iFile = ((INode)storedBlock.getBlockCollection()).asFile();
-        if (inodeIdentifier==null) {
+        INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
+        if (inode==null) {
           throw new FileNotFoundException("File not found: "
               + iFile.getFullPathName() + ", likely due to delayed block"
               + " removal");
@@ -6071,6 +6072,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           @Override
           public Object performTask() throws IOException {
             Block blk = (Block) getParams()[0];
+            //if the block or the file matching blk does not exist anymore the following will return null
+            //as they don't exist they can't be corrupted and we ignore them.
             INode inode = (INodeFile) blockManager.getBlockCollection(blk);
             skip[0]++;
             if (inode != null &&
