@@ -3946,7 +3946,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         // If a DN tries to commit to the standby, the recovery will
         // fail, and the next retry will succeed on the new NN.
 
-        if (inodeIdentifier == null) {
+        if (inodeIdentifier == null || EntityManager.find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId())
+            == null) {
           throw new FileNotFoundException("File not found for block: " + oldBlock
               + ", likely due to delayed block"
               + " removal");
@@ -6097,6 +6098,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           @Override
           public Object performTask() throws IOException {
             Block blk = (Block) getParams()[0];
+            //if the block or the file matching blk does not exist anymore the following will return null
+            //as they don't exist they can't be corrupted and we ignore them.
             INode inode = (INodeFile) blockManager.getBlockCollection(blk);
             skip[0]++;
             if (inode != null &&
