@@ -67,6 +67,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.INode;
 
 /**
  * Manages datanode decommissioning. A background monitor thread 
@@ -570,12 +571,19 @@ public class DecommissionManager {
               @Override
               public Object performTask() throws IOException {
                 List<BlockInfoContiguous> blocksToProcess = new ArrayList<>();
+                //it is ok to work with ids and blocksPerInodes here, even if they come from another transaction
+                //because in processBlocksForDecomInternal we check that these blocks actually still exist.
                 for(Long inodeIds: ids){
                   blocksToProcess.addAll(blocksPerInodes.get(inodeIds));
                 }
                 Set<Long> existingInodes = new HashSet<>();
-                for(INodeIdentifier inode : inodeIdentifiers){
-                  existingInodes.add(inode.getInodeId());
+                for(INodeIdentifier identifier : inodeIdentifiers){
+                  INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, identifier.getInodeId());
+                  if(inode==null){
+                    //The inode does not exist anymore.
+                    continue;
+                  }
+                  existingInodes.add(inode.getId());
                 }
                 processBlocksForDecomInternal(datanode, blocksToProcess.iterator(), null, true, existingInodes, toRemove,
                     underReplicatedBlocks, underReplicatedInOpenFiles, decommissionOnlyReplicas);
@@ -666,8 +674,15 @@ public class DecommissionManager {
                 List<BlockInfoContiguous> toCheck = new ArrayList<>();
                 Set<Long> existingInodes = new HashSet<>();
                 for (INodeIdentifier identifier : inodeIdentifiers) {
-                  existingInodes.add(identifier.getInodeId());
-                  for (long blockId : inodeIdsToBlockMap.get(identifier.getInodeId())) {
+                  INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, identifier.getInodeId());
+                  if(inode==null){
+                    //The inode does not exist anymore.
+                    continue;
+                  }
+                  existingInodes.add(inode.getId());
+                  //it is ok if we skip blocks that do not exist anymore here because we never use the
+                  //toRemove queue.
+                  for (long blockId : inodeIdsToBlockMap.get(inode.getId())) {
                     BlockInfoContiguous block = EntityManager.
                         find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, blockId);
                     toCheck.add(block);
