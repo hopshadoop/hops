@@ -581,6 +581,7 @@ public class DecommissionManager {
                   INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, identifier.getInodeId());
                   if(inode==null){
                     //The inode does not exist anymore.
+                    LOG.debug("inode " + identifier.getInodeId() + " does not exist anymore");
                     continue;
                   }
                   existingInodes.add(inode.getId());
@@ -677,6 +678,7 @@ public class DecommissionManager {
                   INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, identifier.getInodeId());
                   if(inode==null){
                     //The inode does not exist anymore.
+                    LOG.debug("inode " + identifier.getInodeId() + " does not exist anymore");
                     continue;
                   }
                   existingInodes.add(inode.getId());
