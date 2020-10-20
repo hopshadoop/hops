@@ -3987,8 +3987,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               + " deleted and the block removal is delayed");
         }
         INodeFile iFile = ((INode)storedBlock.getBlockCollection()).asFile();
-        INode inode = EntityManager.find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId());
-        if (inode==null) {
+        if (inodeIdentifier == null || EntityManager.find(INode.Finder.ByINodeIdFTIS, inodeIdentifier.getInodeId())
+            == null) {
           throw new FileNotFoundException("File not found: "
               + iFile.getFullPathName() + ", likely due to delayed block"
               + " removal");
