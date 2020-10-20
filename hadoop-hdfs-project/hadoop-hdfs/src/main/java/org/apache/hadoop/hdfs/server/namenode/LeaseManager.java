@@ -185,7 +185,13 @@ public class LeaseManager {
 
         @Override
         public Object performTask() throws IOException {
-          for (LeasePath leasePath : lease.getPaths()) {
+          Lease transactionLease = EntityManager.find(Lease.Finder.ByHolder, lease.getHolder());
+          if(transactionLease == null){
+            //the lease does not exist anymore, no block will be under construction
+            LOG.debug("the lease for holder: " + lease.getHolder() + " does not exist anymore");
+            return null;
+          }
+          for (LeasePath leasePath : transactionLease.getPaths()) {
             final String path = leasePath.getPath();
             final INodeFile cons;
             try {
