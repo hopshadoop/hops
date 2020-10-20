@@ -129,13 +129,18 @@ class InvalidateBlocks {
    */
   void add(final BlockInfoContiguous block, final DatanodeStorageInfo storage,
       final boolean log) throws StorageException, TransactionContextException {
+      add(block, storage, log, block.getInodeId());
+  }
+  
+  void add(final Block block, final DatanodeStorageInfo storage,
+      final boolean log, long inodeId) throws StorageException, TransactionContextException {
 
     InvalidatedBlock invBlk = new InvalidatedBlock(
         storage.getSid(),
         block.getBlockId(),
         block.getGenerationStamp(),
         block.getNumBytes(),
-        block.getInodeId());
+        inodeId);
 
     if (add(invBlk)) {
       LOG.info("BLOCK* " + getClass().getSimpleName() + ": add " + block + " to " + storage);

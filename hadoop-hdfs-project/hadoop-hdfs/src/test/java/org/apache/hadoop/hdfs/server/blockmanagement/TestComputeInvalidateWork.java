@@ -211,7 +211,12 @@ public class TestComputeInvalidateWork {
         
     DatanodeDescriptor dn = bm.getDatanodeManager().getDatanode(datanode);
     DatanodeStorageInfo storage = dn.getStorageInfos()[0];
-
-    bm.addToInvalidates(block, storage);
+    BlockInfoContiguous storedBlock = bm.getStoredBlock(block);
+    if(storedBlock == null){
+      storedBlock = new BlockInfoContiguous();
+      storedBlock.setINodeIdNoPersistance(BlockInfoContiguous.NON_EXISTING_ID);
+      storedBlock.setNoPersistance(block.getBlockId(), block.getNumBytes(), block.getGenerationStamp());
+    }
+    bm.addToInvalidates(storedBlock, storage);
   }
 }

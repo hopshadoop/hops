@@ -69,18 +69,7 @@ public class TestBlockInfo {
     HdfsStorageFactory.formatStorage();
     HashBuckets.initialize(1);
   }
-
-  @Test
-  public void testIsDeleted() throws StorageException, TransactionContextException, IOException {
-    Block block = new Block(0);
-    BlockInfoContiguous blockInfo = new BlockInfoContiguous(block, (short) 3);
-    BlockCollection bc = Mockito.mock(BlockCollection.class);
-    setBlockCollection(blockInfo, bc, leaseCreationLockRows);
-    Assert.assertFalse(blockInfo.isDeleted());
-    blockInfo.setBlockCollection(null);
-    Assert.assertTrue(isDeleted(blockInfo, leaseCreationLockRows));
-  }
-
+  
   @Test
   public void testAddStorage() throws Exception {
     Block block = new Block(0);
