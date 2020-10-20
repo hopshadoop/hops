@@ -201,11 +201,7 @@ public class BlockInfoContiguous extends Block {
   }
 
   public boolean isDeleted() throws StorageException, TransactionContextException {
-    if(bc!=null){
-      return false;
-    } else {
-      getBlockCollection();
-    }
+    getBlockCollection();
     return (bc == null);
   }
 

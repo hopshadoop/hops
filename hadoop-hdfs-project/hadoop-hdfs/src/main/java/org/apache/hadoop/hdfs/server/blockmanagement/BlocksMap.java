@@ -96,11 +96,8 @@ class BlocksMap {
     if (b == null) {
       return null;
     }
-    if (!(b instanceof BlockInfoContiguous)) {
-      return EntityManager
-          .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
-    }
-    return (BlockInfoContiguous) b;
+    return EntityManager
+        .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
   }
 
   /**

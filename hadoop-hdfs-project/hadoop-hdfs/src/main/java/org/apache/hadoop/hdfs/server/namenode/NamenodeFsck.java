@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -294,7 +295,7 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
           }
           BlockCollection bc = bm.getBlockCollection(blockInfo);
           INode iNode = (INode) bc;
-          NumberReplicas numberReplicas = bm.countNodes(block);
+          NumberReplicas numberReplicas = bm.countNodes(blockInfo);
           out.println("Block Id: " + blockId);
           out.println("Block belongs to: " + iNode.getFullPathName());
           out.println("No. of Expected Replica: " + bc.getBlockReplication());
@@ -308,8 +309,8 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
           out.println("No. of corrupted Replica: " + numberReplicas.corruptReplicas());
           //record datanodes that have corrupted block replica
           Collection<DatanodeDescriptor> corruptionRecord = null;
-          if (bm.getCorruptReplicas(block) != null) {
-            corruptionRecord = bm.getCorruptReplicas(block);
+          if (bm.getCorruptReplicas(blockInfo) != null) {
+            corruptionRecord = bm.getCorruptReplicas(blockInfo);
           }
 
           DatanodeManager dnm = namenode.getNamesystem().getBlockManager().getDatanodeManager();
@@ -784,7 +785,13 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
 
       @Override
       public Object performTask() throws IOException {
-        return namenode.getNamesystem().getBlockManager().getCorruptReplicas(block.getLocalBlock());
+        BlockInfoContiguous b = EntityManager.find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        if(b == null){
+          //the block does not exist anymore
+          LOG.debug("The block " + block.getBlockId() + " does not exist anymore");
+          return new ArrayList<>();
+        }
+        return namenode.getNamesystem().getBlockManager().getCorruptReplicas(b);
 
       }
     }.handle();  

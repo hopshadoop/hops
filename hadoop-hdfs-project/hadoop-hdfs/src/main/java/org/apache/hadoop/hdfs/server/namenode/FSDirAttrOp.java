@@ -58,6 +58,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECI
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_QUOTA_BY_STORAGETYPE_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
 import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import org.apache.hadoop.ipc.NotALeaderException;
 
 public class FSDirAttrOp {
@@ -271,7 +272,7 @@ public class FSDirAttrOp {
         }
 
         final short[] blockRepls = new short[2]; // 0: old, 1: new
-        final Block[] blocks = unprotectedSetReplication(fsd, src, replication,
+        final BlockInfoContiguous[] blocks = unprotectedSetReplication(fsd, src, replication,
             blockRepls);
         final boolean isFile = blocks != null;
         INode targetNode = iip.getLastINode();
@@ -599,7 +600,7 @@ public class FSDirAttrOp {
     }
   }
 
-  static Block[] unprotectedSetReplication(
+  static BlockInfoContiguous[] unprotectedSetReplication(
       FSDirectory fsd, String src, short replication, short[] blockRepls)
       throws QuotaExceededException, UnresolvedLinkException, StorageException, TransactionContextException{
 
