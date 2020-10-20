@@ -185,7 +185,13 @@ public class LeaseManager {
 
         @Override
         public Object performTask() throws IOException {
-          for (LeasePath leasePath : lease.getPaths()) {
+          Lease transactionLease = EntityManager.find(Lease.Finder.ByHolder, lease.getHolder(), lease.getHolderID());
+          if(transactionLease == null){
+            //the lease does not exist anymore, no block will be under construction
+            LOG.debug("the lease for holder: " + lease.getHolder() + " does not exist anymore");
+            return null;
+          }
+          for (LeasePath leasePath : transactionLease.getPaths()) {
             final String path = leasePath.getPath();
             final INodeFile cons;
             try {
@@ -506,7 +512,9 @@ public class LeaseManager {
         try {
           if (fsnamesystem.isLeader()) {
             try {
-              checkLeases();
+              if (!fsnamesystem.isInSafeMode()) {
+                checkLeases();
+              }
             } catch (IOException ex) {
               LOG.error(ex);
             }
@@ -516,6 +524,8 @@ public class LeaseManager {
           if (LOG.isDebugEnabled()) {
             LOG.debug(name + " is interrupted", ie);
           }
+        } catch(Throwable e) {
+          LOG.warn("Unexpected throwable: ", e);
         }
       }
     }
