@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
+import io.hops.transaction.EntityManager;
 import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.HopsTransactionalRequestHandler;
 import io.hops.transaction.lock.LockFactory;
@@ -572,6 +573,9 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
         liveReplicas = locs.length;
       }else{
         NumberReplicas numberReplicas = getNumReplicas(block);
+        if(numberReplicas == null){
+          continue;
+        }
         liveReplicas = numberReplicas.liveReplicas();
         decommissionedReplicas = numberReplicas.decommissioned();;
         decommissioningReplicas = numberReplicas.decommissioning();
@@ -661,38 +665,40 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
         if (showLocations || showRacks || showReplicaDetails) {
           StringBuilder sb = new StringBuilder("[");
           Iterable<DatanodeStorageInfo> storages = getStorages(block);
-          for (Iterator<DatanodeStorageInfo> iterator = storages.iterator(); iterator.hasNext();) {
-            DatanodeStorageInfo storage = iterator.next();
-            DatanodeDescriptor dnDesc = storage.getDatanodeDescriptor();
-            if (showRacks) {
-              sb.append(NodeBase.getPath(dnDesc));
-            } else {
-              sb.append(new DatanodeInfoWithStorage(dnDesc, storage.getStorageID(), storage
-                  .getStorageType()));
-            }
-            if (showReplicaDetails) {
-              LightWeightLinkedSet<Block> blocksExcess = bm.excessReplicateMap.get(dnDesc.getDatanodeUuid(), bm.
-                  getDatanodeManager());
-              Collection<DatanodeDescriptor> corruptReplicas = getCorruptReplicas(block);
-              sb.append("(");
-              if (dnDesc.isDecommissioned()) {
-                sb.append("DECOMMISSIONED)");
-              } else if (dnDesc.isDecommissionInProgress()) {
-                sb.append("DECOMMISSIONING)");
-              } else if (corruptReplicas != null && corruptReplicas.contains(dnDesc)) {
-                sb.append("CORRUPT)");
-              } else if (blocksExcess != null && blocksExcess.contains(block.getLocalBlock())) {
-                sb.append("EXCESS)");
-              } else if (dnDesc.isStale(this.staleInterval)) {
-                sb.append("STALE_NODE)");
-              } else if (storage.areBlockContentsStale()) {
-                sb.append("STALE_BLOCK_CONTENT)");
+          if (storages != null) {
+            for (Iterator<DatanodeStorageInfo> iterator = storages.iterator(); iterator.hasNext();) {
+              DatanodeStorageInfo storage = iterator.next();
+              DatanodeDescriptor dnDesc = storage.getDatanodeDescriptor();
+              if (showRacks) {
+                sb.append(NodeBase.getPath(dnDesc));
               } else {
-                sb.append("LIVE)");
+                sb.append(new DatanodeInfoWithStorage(dnDesc, storage.getStorageID(), storage
+                    .getStorageType()));
               }
-            }
-            if (iterator.hasNext()) {
-              sb.append(", ");
+              if (showReplicaDetails) {
+                LightWeightLinkedSet<Block> blocksExcess = bm.excessReplicateMap.get(dnDesc.getDatanodeUuid(), bm.
+                    getDatanodeManager());
+                Collection<DatanodeDescriptor> corruptReplicas = getCorruptReplicas(block);
+                sb.append("(");
+                if (dnDesc.isDecommissioned()) {
+                  sb.append("DECOMMISSIONED)");
+                } else if (dnDesc.isDecommissionInProgress()) {
+                  sb.append("DECOMMISSIONING)");
+                } else if (corruptReplicas != null && corruptReplicas.contains(dnDesc)) {
+                  sb.append("CORRUPT)");
+                } else if (blocksExcess != null && blocksExcess.contains(block.getLocalBlock())) {
+                  sb.append("EXCESS)");
+                } else if (dnDesc.isStale(this.staleInterval)) {
+                  sb.append("STALE_NODE)");
+                } else if (storage.areBlockContentsStale()) {
+                  sb.append("STALE_BLOCK_CONTENT)");
+                } else {
+                  sb.append("LIVE)");
+                }
+              }
+              if (iterator.hasNext()) {
+                sb.append(", ");
+              }
             }
           }
           sb.append(']');
@@ -757,7 +763,13 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
 
       @Override
       public Object performTask() throws IOException {
-        return namenode.getNamesystem().getBlockManager().countNodes(block.getLocalBlock());
+        Block b = EntityManager.find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        if(b == null){
+          //the block does not exist anymore
+          LOG.debug("The block " + block.getBlockId() + " does not exist anymore");
+          return null;
+        }
+        return namenode.getNamesystem().getBlockManager().countNodes(b);
 
       }
     }.handle();  
@@ -784,7 +796,13 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
 
       @Override
       public Object performTask() throws IOException {
-        return namenode.getNamesystem().getBlockManager().getCorruptReplicas(block.getLocalBlock());
+        Block b = EntityManager.find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        if(b == null){
+          //the block does not exist anymore
+          LOG.debug("The block " + block.getBlockId() + " does not exist anymore");
+          return null;
+        }
+        return namenode.getNamesystem().getBlockManager().getCorruptReplicas(b);
 
       }
     }.handle();  
@@ -811,7 +829,13 @@ public class NamenodeFsck implements DataEncryptionKeyFactory {
 
       @Override
       public Object performTask() throws IOException {
-        return namenode.getNamesystem().getBlockManager().getStorages(block.getLocalBlock());
+                Block b = EntityManager.find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, block.getBlockId());
+        if(b == null){
+          //the block does not exist anymore
+          LOG.debug("The block " + block.getBlockId() + " does not exist anymore");
+          return null;
+        }
+        return namenode.getNamesystem().getBlockManager().getStorages(b);
 
       }
     }.handle();  
