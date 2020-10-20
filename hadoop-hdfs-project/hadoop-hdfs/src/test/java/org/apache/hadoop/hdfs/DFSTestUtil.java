@@ -172,7 +172,9 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
+import io.hops.transaction.EntityManager;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfoContiguous;
 import static org.junit.Assert.fail;
 
 /**
@@ -558,7 +560,9 @@ public class DFSTestUtil {
 
           @Override
           public Object performTask() throws StorageException, IOException {
-            return ns.getBlockManager().numCorruptReplicas(b.getLocalBlock());
+            BlockInfoContiguous storedBlock = EntityManager
+                .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
+            return ns.getBlockManager().numCorruptReplicas(storedBlock);
           }
         };
     int repls = (Integer) corruptReplicasHandler.handle(ns);

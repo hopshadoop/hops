@@ -3511,28 +3511,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   /**
-   * Removes the blocks from blocksmap and updates the safemode blocks total
-   * 
-   * @param blocks
-   *          An instance of {@link BlocksMapUpdateInfo} which contains a list
-   *          of blocks that need to be removed from blocksMap
-   */
-  void removeBlocksAndUpdateSafemodeTotal(BlocksMapUpdateInfo blocks) throws IOException{
-    int numRemovedComplete = 0;
-    List<Block> removedSafe = new ArrayList<>();
-    
-    for (Block b : blocks.getToDeleteList()) {
-      BlockInfoContiguous bi = getStoredBlock(b);
-      if (bi.isComplete()) {
-        numRemovedComplete++;
-        removedSafe.add(b);
-      }
-      blockManager.removeBlock(b);
-    }
-    adjustSafeModeBlockTotals(removedSafe,-numRemovedComplete);
-  }
-
-  /**
    * Get the file info for a specific file.
    *
    * @param src
@@ -4029,7 +4007,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         // file (See HDFS-6825).
         //
         
-        if (storedBlock.isDeleted()) {
+        if (storedBlock == null || storedBlock.isDeleted()) {
           throw new IOException("The blockCollection of " + storedBlock
               + " is null, likely because the file owning this block was"
               + " deleted and the block removal is delayed");

@@ -99,7 +99,7 @@ public class BlocksMap {
       return null;
     }
     return EntityManager
-            .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
+        .find(BlockInfoContiguous.Finder.ByBlockIdAndINodeId, b.getBlockId());
   }
 
   /**
