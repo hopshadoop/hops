@@ -585,6 +585,7 @@ message LastUpdatedContentSummaryProto {
   required uint64 nsQuota = 2;
   required uint64 spaceConsumed = 3;
   required uint64 dsQuota = 4;
+  optional StorageTypeQuotaInfosProto typeQuotaInfos = 5;
 }
 
 message SetQuotaRequestProto {

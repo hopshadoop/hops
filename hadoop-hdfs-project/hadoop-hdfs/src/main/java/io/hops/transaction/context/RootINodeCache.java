@@ -66,7 +66,15 @@ public class RootINodeCache {
       return null;
     }
   }
-
+  
+  public static void forceRefresh(){
+    if(rootCacheUpdater != null){
+      synchronized (rootCacheUpdater) {
+        rootINode = null;
+      }
+    }
+  }
+  
   public static boolean isRootInCache() {
     return rootINode != null;
   }

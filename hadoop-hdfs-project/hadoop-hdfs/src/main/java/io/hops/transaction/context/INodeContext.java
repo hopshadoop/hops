@@ -19,10 +19,8 @@ package io.hops.transaction.context;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Lists;
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import io.hops.exception.LockUpgradeException;
-import io.hops.exception.StorageCallPreventedException;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.common.FinderType;
@@ -33,6 +31,7 @@ import io.hops.transaction.lock.TransactionLockTypes;
 import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
 
@@ -44,7 +43,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 
 public class INodeContext extends BaseEntityContext<Long, INode> {
 
@@ -164,8 +162,16 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
         }
       }
     }
-
-
+    
+    final boolean refreshRootCache = RootINodeCache.isRootInCache() &&
+        (modified.stream().filter(inode -> inode.isRoot()).count() > 0
+        || added.stream().filter(inode -> inode.isRoot()).count() > 0);
+    if(refreshRootCache){
+      LOG.trace("Root Inode has been updated, force RootINodeCache to " +
+          "refresh");
+      RootINodeCache.forceRefresh();
+    }
+    
     dataAccess.prepare(removed, added, modified);
   }
 

@@ -1350,10 +1350,18 @@ public class DFSTestUtil {
         };
     quotaApplicationChecker.handle();
   }
-
+  
   public static ContentSummary getContentSummary(DistributedFileSystem dfs, Path
       path) throws IOException, InterruptedException {
+    return getContentSummary(dfs, path, true);
+  }
+  
+  public static ContentSummary getContentSummary(DistributedFileSystem dfs, Path
+      path, boolean checkLastUpdated) throws IOException, InterruptedException {
     ContentSummary c = dfs.getContentSummary(path);
+    if(!checkLastUpdated)
+      return c;
+    
     LastUpdatedContentSummary lc = dfs.getLastUpdatedContentSummary(path);
     if(!isContentSummaryUpToDate(c, lc)){
       waitForQuotaUpdatesToBeApplied();
@@ -1363,6 +1371,11 @@ public class DFSTestUtil {
     assertEquals(c.getSpaceConsumed(), lc.getSpaceConsumed());
     assertEquals(c.getQuota(), lc.getNsQuota());
     assertEquals(c.getSpaceQuota(), lc.getDsQuota());
+    
+    for(StorageType type : StorageType.values()){
+      assertEquals(type.toString(), c.getTypeConsumed(type), lc.getTypeConsumed(type));
+      assertEquals(type.toString(), c.getTypeQuota(type), lc.getTypeQuota(type));
+    }
     return c;
   }
 
@@ -1372,9 +1385,20 @@ public class DFSTestUtil {
         .getFileAndDirCount())
         && (c.getSpaceConsumed() == lc.getSpaceConsumed())
         && (c.getQuota() == lc.getNsQuota())
-        && (c.getSpaceQuota() == lc.getDsQuota());
+        && (c.getSpaceQuota() == lc.getDsQuota())
+        && isTypeSummaryEquals(c, lc);
   }
 
+  public static boolean isTypeSummaryEquals(ContentSummary c,
+      LastUpdatedContentSummary lc){
+    for(StorageType type : StorageType.values()){
+      if(c.getTypeConsumed(type) != lc.getTypeConsumed(type) || c.getTypeQuota(type) != lc.getTypeQuota(type)){
+        return false;
+      }
+    }
+    return true;
+  }
+  
     public static void toolRun(Tool tool, String cmd, int retcode, String contain)
       throws Exception {
     String [] cmds = StringUtils.split(cmd, ' ');

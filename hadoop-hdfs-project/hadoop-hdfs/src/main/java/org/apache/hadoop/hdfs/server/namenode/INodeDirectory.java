@@ -471,7 +471,7 @@ public class INodeDirectory extends INodeWithAdditionalFields {
       node.setGroup(getGroupName());
       node.setGroupID(getGroupID());
     }
-  
+    
     if (logMetadataEvent) {
       node.logMetadataEvent(INodeMetadataLogEntry.Operation.Add);
     }
