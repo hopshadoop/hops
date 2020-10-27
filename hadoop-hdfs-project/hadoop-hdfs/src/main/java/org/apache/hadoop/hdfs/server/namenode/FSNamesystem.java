@@ -90,6 +90,7 @@ import org.apache.hadoop.hdfs.server.namenode.top.metrics.TopMetrics;
 import org.apache.hadoop.hdfs.server.namenode.top.window.RollingWindowManager;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
 import org.apache.hadoop.hdfs.server.protocol.*;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -353,7 +354,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private TopMetrics topMetrics;
 
   private final int leaseCreationLockRows;
-
+  
+  private final short dbReplicationFactor;
+  
   /**
    * Notify that loading of this FSDirectory is complete, and
    * it is imageLoaded for use
@@ -578,6 +581,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       DatanodeStorageInfo.BLOCKITERATOR_BATCH_SIZE = slicerBatchSize;
       leaseCreationLockRows = conf.getInt(DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
               DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
+      
+      this.dbReplicationFactor = (short) conf.getInt(DFS_DB_REPLICATION_FACTOR,
+          DFS_DB_REPLICATION_FACTOR_DEFAULT);
     } catch (IOException | RuntimeException e) {
       LOG.error(getClass().getSimpleName() + " initialization failed.", e);
       close();
@@ -1593,6 +1599,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       file.deleteFileDataStoredInDB();
       file.storeFileDataInDB(newData);
       file.setSize(newData.length);
+      final long ssDelta = newLengthInt - oldData.length;
+      dir.updateSpaceConsumed(iip, 0, ssDelta, file.getBlockReplication());
       return true; //truncate is ready
     }
     if(!onBlockBoundary) {
@@ -2231,7 +2239,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       // Do not check quota if editlog is still being processed
       return null;
     }
-    if (file.getLastBlock() != null) {
+    if (file.getLastBlock() != null || file.isFileStoredInDB()) {
       final QuotaCounts delta = computeQuotaDeltaForUCBlock(file);
         FSDirectory.verifyQuota(iip, iip.length() - 1, delta, null);
         return delta;
@@ -2243,8 +2251,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private QuotaCounts computeQuotaDeltaForUCBlock(INodeFile file) throws IOException {
     final QuotaCounts delta = new QuotaCounts.Builder().build();
     final BlockInfoContiguous lastBlock = file.getLastBlock();
-    if (lastBlock != null) {
-      final long diff = file.getPreferredBlockSize() - lastBlock.getNumBytes();
+    long lastBlockNumBytes = -1;
+    if(file.isFileStoredInDB()){
+      lastBlockNumBytes = file.getSize();
+    }else if(lastBlock != null){
+      lastBlockNumBytes = lastBlock.getNumBytes();
+    }
+    if (lastBlockNumBytes >= 0) {
+      final long diff = file.getPreferredBlockSize() - lastBlockNumBytes;
       final short repl = file.getBlockReplication();
       delta.addStorageSpace(diff * repl);
       final BlockStoragePolicy policy = dir.getBlockStoragePolicySuite()
@@ -2798,6 +2812,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       //delete the file data from database and unset the flag
       pendingFile.setFileStoredInDB(false);
       pendingFile.deleteFileDataStoredInDB();
+      //reset file replication to default replication and update quota counts
+      //accordingly
+      updateReplicationFromDBToBlocks(inodesInPath);
+          
       LOG.debug("Stuffed Inode:  appending to a file stored in the database. In the current implementation there is"
           + " potential for data loss if the client fails");
       //the data has been deleted. if the client fails to write the data on the datanodes then the data will
@@ -3335,7 +3353,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     pendingFile.setSize(data.length);
 
     pendingFile.storeFileDataInDB(data);
-
+    
+    pendingFile.setFileReplication(dbReplicationFactor);
+    
     //update quota
     if (dir.isQuotaEnabled()) {
       //account for only newly added data
@@ -8648,9 +8668,19 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           final DirectoryWithQuotaFeature q = quotaDir.getDirectoryWithQuotaFeature();
           if (q != null) {
             
-            return new LastUpdatedContentSummary(q.getSpaceConsumed().getNameSpace(), 
-                q.getSpaceConsumed().getStorageSpace(), quotaDir.getQuotaCounts().getNameSpace(), 
-                quotaDir.getQuotaCounts().getStorageSpace());
+            LastUpdatedContentSummary.Builder builder =
+                new LastUpdatedContentSummary.Builder()
+                    .fileAndDirectoryCount(q.getSpaceConsumed().getNameSpace())
+                    .spaceConsumed(q.getSpaceConsumed().getStorageSpace())
+                    .quota(q.getQuota().getNameSpace())
+                    .spaceQuota(q.getQuota().getStorageSpace());
+            
+            for(StorageType type : StorageType.asList()){
+              builder.typeConsumed(type,
+                  q.getSpaceConsumed().getTypeSpace(type))
+                  .typeQuota(type, q.getQuota().getTypeSpace(type));
+            }
+            return builder.build();
           }
         }
         return null;
@@ -8660,9 +8690,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     if(luSummary == null) {
       ContentSummary summary = getContentSummary(path);
-      luSummary = new LastUpdatedContentSummary(summary.getFileCount() +
-          summary.getDirectoryCount(), summary.getSpaceConsumed(),
-          summary.getQuota(), summary.getSpaceQuota());
+      LastUpdatedContentSummary.Builder builder =
+        new LastUpdatedContentSummary.Builder().fileAndDirectoryCount(summary.getFileCount() +
+          summary.getDirectoryCount()).spaceConsumed(summary.getSpaceConsumed())
+          .quota(summary.getQuota()).spaceQuota(summary.getSpaceQuota());
+      
+      for(StorageType type : StorageType.asList()){
+        builder.typeConsumed(type, summary.getTypeConsumed(type))
+            .typeQuota(type, summary.getTypeQuota(type));
+      }
+      
+      luSummary = builder.build();
     }
 
     return luSummary;
@@ -8920,6 +8958,34 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         return da.findAll();
       }
     }.handle());
+  }
+
+  public short getDBReplicationFactor(){
+    return dbReplicationFactor;
+  }
+  
+  private void updateReplicationFromDBToBlocks(final INodesInPath iip)
+      throws TransactionContextException, StorageException,
+      QuotaExceededException {
+    INodeFile file = iip.getLastINode().asFile();
+    final short oldReplicationFactor = dbReplicationFactor;
+    final short newReplicationFactor = serverDefaults.getReplication();
+    
+    final long ssDelta = file.getSize();
+    
+    EnumCounters<StorageType> typeSpaceDeltas =
+        dir.getStorageTypeDeltas(file.getStoragePolicyID(), ssDelta,
+        oldReplicationFactor, oldReplicationFactor);
+    
+    typeSpaceDeltas.add(StorageType.DB, -(ssDelta * oldReplicationFactor));
+    
+    QuotaCounts deltas = new QuotaCounts.Builder().nameSpace(0).storageSpace(0).
+        typeSpaces(typeSpaceDeltas).build();
+  
+    dir.updateCountNoQuotaCheck(iip, iip.length() - 1, deltas);
+    
+    FSDirAttrOp.unprotectedSetReplicationWithoutGetBlocks(dir, iip,
+        newReplicationFactor, null);
   }
 }
 

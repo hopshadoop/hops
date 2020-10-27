@@ -2722,20 +2722,50 @@ public class PBHelper {
     if (cs == null) {
       return null;
     }
-    return new LastUpdatedContentSummary(cs.getFileandDirCount(), cs
-        .getSpaceConsumed(), cs.getNsQuota(), cs.getDsQuota());
+    
+    LastUpdatedContentSummary.Builder builder = new LastUpdatedContentSummary.Builder();
+    builder.fileAndDirectoryCount(cs.getFileandDirCount())
+        .spaceConsumed(cs.getSpaceConsumed())
+        .quota(cs.getNsQuota())
+        .spaceQuota(cs.getDsQuota());
+    
+    if (cs.hasTypeQuotaInfos()) {
+      for (HdfsProtos.StorageTypeQuotaInfoProto info :
+          cs.getTypeQuotaInfos().getTypeQuotaInfoList()) {
+        StorageType type = PBHelper.convertStorageType(info.getType());
+        builder.typeConsumed(type, info.getConsumed());
+        builder.typeQuota(type, info.getQuota());
+      }
+    }
+    return builder.build();
   }
 
   public static LastUpdatedContentSummaryProto convert(LastUpdatedContentSummary cs) {
     if (cs == null) {
       return null;
     }
-    return LastUpdatedContentSummaryProto.newBuilder().
-        setFileandDirCount(cs.getFileAndDirCount()).
+    LastUpdatedContentSummaryProto.Builder builder =
+        LastUpdatedContentSummaryProto.newBuilder();
+    builder.setFileandDirCount(cs.getFileAndDirCount()).
         setNsQuota(cs.getNsQuota()).
         setSpaceConsumed(cs.getSpaceConsumed()).
-        setDsQuota(cs.getDsQuota()).
-        build();
+        setDsQuota(cs.getDsQuota());
+  
+    if (cs.isTypeQuotaSet() || cs.isTypeConsumedAvailable()) {
+      HdfsProtos.StorageTypeQuotaInfosProto.Builder isb =
+          HdfsProtos.StorageTypeQuotaInfosProto.newBuilder();
+      for (StorageType t: StorageType.getTypesSupportingQuota()) {
+        HdfsProtos.StorageTypeQuotaInfoProto info =
+            HdfsProtos.StorageTypeQuotaInfoProto.newBuilder().
+                setType(convertStorageType(t)).
+                setConsumed(cs.getTypeConsumed(t)).
+                setQuota(cs.getTypeQuota(t)).
+                build();
+        isb.addTypeQuotaInfo(info);
+      }
+      builder.setTypeQuotaInfos(isb);
+    }
+    return builder.build();
   }
 
   public static BlockStoragePolicy[] convertStoragePolicies(

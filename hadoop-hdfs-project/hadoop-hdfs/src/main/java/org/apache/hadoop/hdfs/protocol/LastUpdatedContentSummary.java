@@ -15,69 +15,97 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
-public class LastUpdatedContentSummary {
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.QuotaUsage;
+import org.apache.hadoop.fs.StorageType;
 
-  private final long fileAndDirCount;
-  private final long spaceConsumed;
-  private final long nsQuota;
-  private final long dsQuota;
-
-  public LastUpdatedContentSummary(long fileAndDirCount, long spaceConsumed,
-      long nsQuota, long dsQuota) {
-    this.fileAndDirCount = fileAndDirCount;
-    this.spaceConsumed = spaceConsumed;
-    this.nsQuota = nsQuota;
-    this.dsQuota = dsQuota;
+public class LastUpdatedContentSummary extends QuotaUsage {
+  
+  public static class Builder extends QuotaUsage.Builder{
+    public Builder() {
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder fileAndDirectoryCount(long count) {
+      super.fileAndDirectoryCount(count);
+      return this;
+    }
+    
+    @Override
+    public LastUpdatedContentSummary.Builder quota(long quota){
+      super.quota(quota);
+      return this;
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder spaceConsumed(long spaceConsumed) {
+      super.spaceConsumed(spaceConsumed);
+      return this;
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder spaceQuota(long spaceQuota) {
+      super.spaceQuota(spaceQuota);
+      return this;
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder typeConsumed(long typeConsumed[]) {
+      super.typeConsumed(typeConsumed);
+      return this;
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder typeQuota(StorageType type, long quota) {
+      super.typeQuota(type, quota);
+      return this;
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder typeConsumed(StorageType type, long consumed) {
+      super.typeConsumed(type, consumed);
+      return this;
+    }
+  
+    @Override
+    public LastUpdatedContentSummary.Builder typeQuota(long typeQuota[]) {
+      super.typeQuota(typeQuota);
+      return this;
+    }
+    
+    public LastUpdatedContentSummary build(){
+      return new LastUpdatedContentSummary(this);
+    }
   }
-
+  
+  protected LastUpdatedContentSummary(Builder builder){
+    super(builder);
+  }
+  
   public long getFileAndDirCount() {
-    return fileAndDirCount;
+    return super.getFileAndDirectoryCount();
   }
 
   public long getSpaceConsumed() {
-    return spaceConsumed;
+    return super.getSpaceConsumed();
   }
 
   public long getNsQuota() {
-    return nsQuota;
+    return super.getQuota();
   }
 
   public long getDsQuota() {
-    return dsQuota;
+    return super.getSpaceQuota();
   }
-
+  
   @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof LastUpdatedContentSummary)) {
-      return false;
-    }
-
-    LastUpdatedContentSummary that = (LastUpdatedContentSummary) o;
-
-    if (fileAndDirCount != that.fileAndDirCount) {
-      return false;
-    }
-    if (spaceConsumed != that.spaceConsumed) {
-      return false;
-    }
-    if (nsQuota != that.nsQuota) {
-      return false;
-    }
-    return dsQuota == that.dsQuota;
-
+  public boolean equals(Object to) {
+    return super.equals(to);
   }
-
+  
   @Override
   public int hashCode() {
-    int result = (int) (fileAndDirCount ^ (fileAndDirCount >>> 32));
-    result = 31 * result + (int) (spaceConsumed ^ (spaceConsumed >>> 32));
-    result = 31 * result + (int) (nsQuota ^ (nsQuota >>> 32));
-    result = 31 * result + (int) (dsQuota ^ (dsQuota >>> 32));
-    return result;
+    return super.hashCode();
   }
-
 }
 

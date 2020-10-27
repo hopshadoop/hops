@@ -442,23 +442,24 @@ abstract class AbstractFileTree {
   
     public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
         throws AccessControlException {
-      super(namesystem, subtreeRootId, HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED);
+      super(namesystem, subtreeRootId, subtreeRootId.getStoragePolicy());
     }
   
     @Override
     protected void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps, byte inheritedStoragePolicy) {
-      addNode(node);
+      addNode(node, bsps, inheritedStoragePolicy);
     }
 
     @Override
     protected void addChildNode(ProjectedINode parent, int level, ProjectedINode node, BlockStoragePolicySuite bsps,
         byte inheritedStoragePolicy) {
       if (!parent.isDirWithQuota()) {
-        addNode(node);
+        addNode(node, bsps, inheritedStoragePolicy);
       }
     }
   
-    protected void addNode(final ProjectedINode node) {
+    protected void addNode(final ProjectedINode node,
+        BlockStoragePolicySuite bsps, byte inheritedStoragePolicy) {
       if (node.isDirWithQuota()) {
         LightWeightRequestHandler handler = new LightWeightRequestHandler(
             HDFSOperationType.GET_SUBTREE_ATTRIBUTES) {
@@ -480,9 +481,17 @@ abstract class AbstractFileTree {
           setExceptionIfNull(e);
         }
       } else {
-        quotaCounts.addNameSpace(1);
         if (!node.isDirectory() && !node.isSymlink()) {
-          quotaCounts.addStorageSpace(node.getFileSize() * INode.HeaderFormat.getReplication(node.getHeader()));
+          final short replication =
+              INode.HeaderFormat.getReplication(node.getHeader());
+          final long ssDeltaNoReplication = node.getFileSize();
+  
+          QuotaCounts fileCounts = new QuotaCounts.Builder().build();
+          fileCounts = INodeFile.computeQuotaUsage(bsps, inheritedStoragePolicy,
+              ssDeltaNoReplication, replication, fileCounts);
+          quotaCounts.add(fileCounts);
+        } else {
+          quotaCounts.addNameSpace(1);
         }
       }
     }

@@ -421,27 +421,10 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
   @Override
   QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps, byte blockStoragePolicyId, QuotaCounts counts)
       throws StorageException, TransactionContextException {
-    long nsDelta = 1;
-    final long ssDeltaNoReplication;
-    short replication;
-    ssDeltaNoReplication = storagespaceConsumedNoReplication();
-    replication = getBlockReplication();
-    counts.addNameSpace(nsDelta);
-    counts.addStorageSpace(ssDeltaNoReplication * replication);
-    
-    //storage policy is not set for new inodes
-    if (blockStoragePolicyId != BLOCK_STORAGE_POLICY_ID_UNSPECIFIED){
-      BlockStoragePolicy bsp = bsps.getPolicy(blockStoragePolicyId);
-      List<StorageType> storageTypes = bsp.chooseStorageTypes(replication);
-      for (StorageType t : storageTypes) {
-        if (!t.supportTypeQuota()) {
-          continue;
-        }
-        counts.addTypeSpace(t, ssDeltaNoReplication);
-      }
-    }
-
-    return counts;
+    final long ssDeltaNoReplication = storagespaceConsumedNoReplication();
+    final short replication = getBlockReplication();
+    return computeQuotaUsage(bsps, blockStoragePolicyId,ssDeltaNoReplication,
+        replication, counts);
   }
 
   /**
@@ -720,6 +703,9 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
    * @return the quota usage delta (not considering replication factor)
    */
   long computeQuotaDeltaForTruncate(final long newLength) throws StorageException, TransactionContextException {
+    if(isFileStoredInDB){
+      return size;
+    }
     final BlockInfoContiguous[] blocks = getBlocks();
     if (blocks == null || blocks.length == 0) {
       return 0;
@@ -739,5 +725,28 @@ public class INodeFile extends INodeWithAdditionalFields implements BlockCollect
 
     return onBoundary ? -truncateSize : (getPreferredBlockSize() - truncateSize);
   }
-
+  
+  
+  static QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
+      byte blockStoragePolicyId, long ssDeltaNoReplication,
+      short replication, QuotaCounts counts){
+    
+    counts.addNameSpace(1);
+    counts.addStorageSpace(ssDeltaNoReplication * replication);
+    
+    //storage policy is not set for new inodes
+    if (blockStoragePolicyId != BLOCK_STORAGE_POLICY_ID_UNSPECIFIED){
+      BlockStoragePolicy bsp = bsps.getPolicy(blockStoragePolicyId);
+      List<StorageType> storageTypes = bsp.chooseStorageTypes(replication);
+      for (StorageType t : storageTypes) {
+        if (!t.supportTypeQuota()) {
+          continue;
+        }
+        counts.addTypeSpace(t, ssDeltaNoReplication);
+      }
+    }
+    
+    return counts;
+  }
+  
 }

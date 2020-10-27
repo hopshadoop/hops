@@ -1008,4 +1008,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   
   public static final String FS_SECURITY_ACTIONS_X509_PATH_KEY = FS_SECURITY_ACTIONS_X509 + "get-path";
   public static final String DEFAULT_FS_SECURITY_ACTIONS_X509_PATH = "/hopsworks-api/api/admin/credentials/x509";
+  
+  public static final String  DFS_DB_REPLICATION_FACTOR = "dfs.db.replication";
+  public static final byte    DFS_DB_REPLICATION_FACTOR_DEFAULT = 1;
 }

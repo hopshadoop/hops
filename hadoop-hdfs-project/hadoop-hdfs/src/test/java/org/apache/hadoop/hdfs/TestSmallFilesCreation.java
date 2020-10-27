@@ -1022,6 +1022,8 @@ public class TestSmallFilesCreation {
     try {
       Configuration conf = new HdfsConfiguration();
       final int BLOCK_SIZE = 1024 * 1024;
+      final int dbReplication = 2;
+      conf.setInt(DFSConfigKeys.DFS_DB_REPLICATION_FACTOR, dbReplication);
       conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
       cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(0).format(true).build();
       cluster.waitActive();
@@ -1039,11 +1041,11 @@ public class TestSmallFilesCreation {
       verifyFile(dfs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
 
       dfs.setReplication(new Path(FILE_NAME1), (short) 10);
-
-      if (dfs.getFileStatus(new Path(FILE_NAME1)).getReplication() != 10) {
-        fail("Unable to set replication for a small file");
-      }
-
+      
+      assertTrue("Replication factor for small files should be always set to " +
+          "be db replication factor",
+          dfs.getFileStatus(new Path(FILE_NAME1)).getReplication() == dbReplication);
+      
     } catch (Exception e) {
       e.printStackTrace();
       fail(e.getMessage());

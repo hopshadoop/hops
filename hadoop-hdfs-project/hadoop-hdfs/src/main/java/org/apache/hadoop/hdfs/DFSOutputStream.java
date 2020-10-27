@@ -366,10 +366,10 @@ public class DFSOutputStream extends FSOutputSummer
       if (policySuite.getPolicy(stat.getStoragePolicy()).getStorageTypes()[0] == StorageType.DB) {
         String errorMessage = null;
         if (stat.getLen() > stat.getBlockSize()) {
-          errorMessage = "Invalid paraters for appending a file stored in the database. Block size can not be smaller "
+          errorMessage = "Invalid parameters for appending a file stored in the database. Block size can not be smaller "
               + "than the max size of a file stored in the database";
         } else if (dbFileMaxSize > stat.getBlockSize()) {
-          errorMessage = "Invalid paraters for appending a file stored in the database. Files stored in the database "
+          errorMessage = "Invalid parameters for appending a file stored in the database. Files stored in the database "
               + "can not be larger than a HDFS block";
         }
 

@@ -234,8 +234,10 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   /**
    * Check whether this is the root inode.
    */
-  final boolean isRoot() {
-    return getLocalNameBytes().length == 0;
+  public final boolean isRoot() {
+    return getLocalNameBytes() != null
+        && getLocalNameBytes().length == 0
+        && getId() == ROOT_INODE_ID;
   }
   
   /**

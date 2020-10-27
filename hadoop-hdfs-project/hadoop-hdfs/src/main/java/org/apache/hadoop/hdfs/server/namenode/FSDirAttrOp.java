@@ -269,15 +269,22 @@ public class FSDirAttrOp {
         if (fsd.isPermissionEnabled()) {
           fsd.checkPathAccess(pc, iip, FsAction.WRITE);
         }
-
+  
+        INode lastInode = iip.getLastINode();
+        if (lastInode.isFile() && lastInode.asFile().isFileStoredInDB()) {
+          INodeFile file = lastInode.asFile();
+          
+          if(file.isFileStoredInDB()){
+            file.setFileReplication(fsd.getFSNamesystem().getDBReplicationFactor());
+          }
+          return true;
+        }
+        
         final short[] blockRepls = new short[2]; // 0: old, 1: new
         final Block[] blocks = unprotectedSetReplication(fsd, src, replication,
             blockRepls);
         final boolean isFile = blocks != null;
-        INode targetNode = iip.getLastINode();
-        // [s] for the files stored in the database setting the replication level does not make
-        // any sense. For now we will just set the replication level as requested by the user
-        if (isFile && !((INodeFile) targetNode).isFileStoredInDB()) {
+        if(isFile) {
           bm.setReplication(blockRepls[0], blockRepls[1], src, blocks);
         }
         return isFile;
@@ -602,15 +609,26 @@ public class FSDirAttrOp {
   static Block[] unprotectedSetReplication(
       FSDirectory fsd, String src, short replication, short[] blockRepls)
       throws QuotaExceededException, UnresolvedLinkException, StorageException, TransactionContextException{
-
     final INodesInPath iip = fsd.getINodesInPath4Write(src, true);
+    INodeFile file = unprotectedSetReplicationWithoutGetBlocks(fsd, iip,
+        replication, blockRepls);
+    if(file == null)
+      return null;
+    
+    return file.getBlocks();
+  }
+
+  static INodeFile unprotectedSetReplicationWithoutGetBlocks(FSDirectory fsd,
+      final INodesInPath iip, short replication, short[] blockRepls) throws TransactionContextException,
+      StorageException, QuotaExceededException {
+    
     final INode inode = iip.getLastINode();
     if (inode == null || !inode.isFile()) {
       return null;
     }
     INodeFile file = inode.asFile();
     final short oldBR = file.getBlockReplication();
-    
+  
     // before setFileReplication, check for increasing block replication.
     // if replication > oldBR, then newBR == replication.
     // if replication < oldBR, we don't know newBR yet.
@@ -618,23 +636,23 @@ public class FSDirAttrOp {
       long dsDelta = file.storagespaceConsumed()/oldBR;
       fsd.updateCount(iip, 0L, dsDelta, oldBR, replication, true);
     }
-
+  
     file.setFileReplication(replication);
-
+  
     final short newBR = file.getBlockReplication();
     // check newBR < oldBR case.
     if (newBR < oldBR) {
       long dsDelta = file.storagespaceConsumed()/newBR;
       fsd.updateCount(iip, 0L, dsDelta, oldBR, newBR, true);
     }
-
+  
     if (blockRepls != null) {
       blockRepls[0] = oldBR;
       blockRepls[1] = newBR;
     }
-    return file.getBlocks();
+    return file;
   }
-
+  
   static void unprotectedSetStoragePolicy(
       FSDirectory fsd, BlockManager bm, INodesInPath iip, byte policyId)
       throws IOException {

@@ -2063,4 +2063,10 @@
       Changing this parameter require cluster restart.</description>
   </property>
 
+  <property>
+    <name>dfs.db.replication</name>
+    <value>1</value>
+    <description>Number of replicas configured in the NDB cluster.</description>
+  </property>
+
 </configuration>
