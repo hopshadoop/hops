@@ -1840,10 +1840,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       }
       remaining -= block.getNumBytes();
       final DatanodeInfo[] datanodes = lb.getLocations();
-      if (remaining < block.getNumBytes()) {
-        block.setNumBytes(remaining);
-      }
-      remaining -= block.getNumBytes();
 
       //try each datanode location of the block
       final int timeout = 3000*datanodes.length + dfsClientConf.getSocketTimeout();
