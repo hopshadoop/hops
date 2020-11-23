@@ -486,14 +486,15 @@ public class NamenodeWebHdfsMethods {
             .type(MediaType.APPLICATION_OCTET_STREAM).build();
       }
       case MKDIRS: {
-        final boolean b =
-            np.mkdirs(fullpath, permission.getFsPermission(), true);
+        final boolean b = np.mkdirs(fullpath,
+            permission.getDirFsPermission(), true);
         final String js = JsonUtil.toJsonString("boolean", b);
         return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       }
       case CREATESYMLINK: {
         np.createSymlink(destination.getValue(), fullpath,
-            PermissionParam.getDefaultFsPermission(), createParent.getValue());
+            PermissionParam.getDefaultSymLinkFsPermission(),
+            createParent.getValue());
         return Response.ok().type(MediaType.APPLICATION_OCTET_STREAM).build();
       }
       case RENAME: {
@@ -523,7 +524,7 @@ public class NamenodeWebHdfsMethods {
         return Response.ok().type(MediaType.APPLICATION_OCTET_STREAM).build();
       }
       case SETPERMISSION: {
-        np.setPermission(fullpath, permission.getFsPermission());
+        np.setPermission(fullpath, permission.getDirFsPermission());
         return Response.ok().type(MediaType.APPLICATION_OCTET_STREAM).build();
       }
       case SETTIMES: {
