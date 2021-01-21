@@ -87,7 +87,6 @@ public class X509SecurityHandler
   private final static String SECURITY_PROVIDER = "BC";
   private final static String KEY_ALGORITHM = "RSA";
   private final static String SIGNATURE_ALGORITHM = "SHA256withRSA";
-  private final static int KEY_SIZE = 1024;
   private final static int REVOCATION_QUEUE_SIZE = 100;
   
   private final String TMP = System.getProperty("java.io.tmpdir");
@@ -156,13 +155,16 @@ public class X509SecurityHandler
         YarnConfiguration.RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL);
     revocationMonitorInterval = monitorIntervalUnit.getFirst();
     revocationUnitOfInterval = monitorIntervalUnit.getSecond();
+
+    int keySize = config.getInt(YarnConfiguration.RM_APP_CERTIFICATE_KEY_SIZE,
+            YarnConfiguration.DEFAULT_RM_APP_CERTIFICATE_KEY_SIZE);
   
     if (isHopsTLSEnabled()) {
       superuserKeystoresLoader = new SuperuserKeystoresLoader(config);
       this.certificateLocalizationService = rmContext.getCertificateLocalizationService();
       rmAppSecurityActions = rmAppSecurityManager.getRmAppCertificateActions();
       keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGORITHM, SECURITY_PROVIDER);
-      keyPairGenerator.initialize(KEY_SIZE);
+      keyPairGenerator.initialize(keySize);
     }
   }
   

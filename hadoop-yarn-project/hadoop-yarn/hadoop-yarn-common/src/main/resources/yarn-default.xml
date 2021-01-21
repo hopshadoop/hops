@@ -4056,6 +4056,12 @@
   </property>
 
   <property>
+    <description>Key size for the application certificates</description>
+    <name>yarn.resourcemanager.rmappsecurity.x509.key-size</name>
+    <value>2048</value>
+  </property>
+
+  <property>
     <description>Enable JWT management for containers</description>
     <name>yarn.resourcemanager.rmappsecurity.jwt.enabled</name>
     <value>false</value>

@@ -4029,6 +4029,9 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL = RM_PREFIX + X509_PREFIX
       + "revocation-monitor-interval";
   public static final String DEFAULT_RM_APP_CERTIFICATE_REVOCATION_MONITOR_INTERVAL = "10h";
+
+  public static final String RM_APP_CERTIFICATE_KEY_SIZE = RM_PREFIX + X509_PREFIX + "key-size";
+  public static final int DEFAULT_RM_APP_CERTIFICATE_KEY_SIZE = 2048;
   
   /**
    * Application JWT configuration
