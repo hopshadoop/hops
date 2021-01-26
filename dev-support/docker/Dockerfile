@@ -1,4 +1,3 @@
-
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -18,7 +17,7 @@
 # Dockerfile for installing the necessary dependencies for building Hadoop.
 # See BUILDING.txt.
 
-FROM ubuntu:bionic
+FROM ubuntu:focal
 
 WORKDIR /root
 
@@ -51,6 +50,7 @@ RUN apt-get -q update \
         gcc \
         git \
         gnupg-agent \
+        hugo \
         libbcprov-java \
         libbz2-dev \
         libcurl4-openssl-dev \
@@ -61,10 +61,13 @@ RUN apt-get -q update \
         libsnappy-dev \
         libssl-dev \
         libtool \
-        libzstd1-dev \
+        libzstd-dev \
         locales \
         make \
         maven \
+        nodejs \
+        node-yarn \
+        npm \
         openjdk-11-jdk \
         openjdk-8-jdk \
         pinentry-curses \
@@ -126,6 +129,12 @@ ENV PATH "${PATH}:/opt/protobuf/bin"
 # Install pylint and python-dateutil
 RUN pip3 install pylint==2.6.0 python-dateutil==2.8.1
 
+####
+# Install bower
+####
+# hadolint ignore=DL3008
+RUN npm install -g bower@1.8.8
+
 ###
 # Install hadolint
 ####
@@ -149,11 +158,6 @@ ENV HADOOP_SKIP_YETUS_VERIFICATION true
 # So tell Yetus not to read the rest of the file:
 # YETUS CUT HERE
 ###
-
-# Hugo static website generator (for new hadoop site and Ozone docs)
-RUN curl -L -o hugo.deb https://github.com/gohugoio/hugo/releases/download/v0.30.2/hugo_0.30.2_Linux-64bit.deb \
-    && dpkg --install hugo.deb \
-    && rm hugo.deb
 
 # Add a welcome message and environment checks.
 COPY hadoop_env_checks.sh /root/hadoop_env_checks.sh
