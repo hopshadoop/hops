@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 import io.hops.leaderElection.LeaderElection;
+import io.hops.leader_election.node.SortedActiveNodeList;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.OngoingSubTreeOpsDataAccess;
 import io.hops.metadata.hdfs.entity.SubTreeOperation;
@@ -24,15 +25,10 @@ import io.hops.transaction.handler.HDFSOperationType;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import io.hops.metadata.election.entity.LeDescriptor.FailedNodeLeDescriptor;
 import org.apache.hadoop.util.Daemon;
-import org.slf4j.MDC;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
 
 /**
  * Cleans metadata left behind by the failed namenodes
@@ -44,18 +40,18 @@ public class MDCleaner {
 
   private boolean run = false;
   private LeaderElection leaderElection;
-  private List<FailedNodeLeDescriptor> failedNodes;
   private Daemon mdCleaner;
-  private long stoTableCleanDelay = 0;
+  private long failedSTOCleanDelay = 0;
+  private long slowSTOCleanDelay = 0;
   private FSNamesystem namesystem;
 
-  //[S] Singleton does not work in unit tests as multiple NN run in same JVM
+//  [S] Singleton does not work in unit tests as multiple NN run in same JVM
 //  private static final MDCleaner instance = new MDCleaner();
 //  private MDCleaner() {
 //  }
 //
-  public static MDCleaner getInstance(){
-   return new MDCleaner();
+  public static MDCleaner getInstance() {
+    return new MDCleaner();
   }
 
   class Monitor implements Runnable {
@@ -63,64 +59,98 @@ public class MDCleaner {
     public void run() {
       while (run) {
         try {
-          if (leaderElection.isRunning()) {
-            failedNodes.addAll(leaderElection.getDeadNodes());
+          if (leaderElection.isRunning() && leaderElection.isLeader()) {
+            if(LOG.isTraceEnabled()) {
+              LOG.trace("Cleaning dead locks. I am th leader ");
+            }
+            clearLocks();
           }
+        } catch (IOException e) {
+          LOG.info("Eror in metadata cleaner " + e);
+        }
 
-          clearLocks();
-
-          Thread.sleep(3000);
+        try {
+          Thread.sleep(10000);
         } catch (InterruptedException e) {
           LOG.warn("Metadata Cleaner Interrupted");
-        } catch (IOException e){
-          LOG.warn(e, e);
         }
       }
     }
   }
 
   private void clearLocks() throws IOException {
-    LOG.debug("Cleaning STO Locks. Pending Locks: " + failedNodes.size());
+    SortedActiveNodeList activeNodeList = leaderElection.getActiveNamenodes();
+    if (activeNodeList.size() == 0) {
+      return;
+    }
 
-    Iterator<FailedNodeLeDescriptor> iterator = failedNodes.iterator();
-    while (iterator.hasNext()) {
-      FailedNodeLeDescriptor descriptor = iterator.next();
-      if ((System.currentTimeMillis() - descriptor.getFailTime()) > stoTableCleanDelay) {
-        //find all locked paths;
-        iterator.remove();
-        Collection<SubTreeOperation> ops = getPaths(descriptor.getId());
-        LOG.debug("Cleaning STO Lock for NN: " + descriptor +" No of stale locks: "+ops.size());
-        for(SubTreeOperation op : ops){
-          namesystem.unlockSubtree(op.getPath(), -1);
-        }
-      }
+    long aliveNNs[] = new long[activeNodeList.size()];
+    for (int i = 0; i < activeNodeList.getActiveNodes().size(); i++) {
+      aliveNNs[i] = activeNodeList.getActiveNodes().get(i).getId();
+    }
+
+    // Clean failed ops
+    Collection<SubTreeOperation> ops = getFailedPaths(aliveNNs, (System.currentTimeMillis() - failedSTOCleanDelay));
+    for (SubTreeOperation op : ops) {
+      LOG.info("Cleaning dead STO lock. OP = {" + op + "}");
+      removeLock(op.getPath(), -1);
+    }
+
+    // Clean subtree operations that belong to alive NNs
+    // Operations that take very long time are considered dead after
+    // a predefined time
+    ops = getSlowOpsPaths(aliveNNs, (System.currentTimeMillis() - slowSTOCleanDelay));
+    for (SubTreeOperation op : ops) {
+      LOG.warn("Cleaning slow STO lock. OP = {" + op + "}");
+      removeLock(op.getPath(), -1);
     }
 
     //Clean failed STO operations belonging to live NNs
-    Collection<SubTreeOperation> ops = getPathsToRecoverAsync();
-    for(SubTreeOperation op : ops){
-      LOG.info("Cleaning STO Lock. OP = {"+op+"}");
-      namesystem.unlockSubtree(op.getPath(), op.getInodeID());
+    ops = getPathsToRecoverAsync();
+    for (SubTreeOperation op : ops) {
+      LOG.warn("Cleaning async STO lock. OP = {" + op + "}");
+      removeLock(op.getPath(), op.getInodeID());
     }
   }
 
-  Collection<SubTreeOperation> getPaths(final long nnID) throws IOException {
+  private void removeLock(String path, long ignoreInodeID) {
+    try {
+      namesystem.unlockSubtree(path, ignoreInodeID);
+    } catch (IOException e) {
+      LOG.info("Error while removing sub tree lock " + e);
+    }
+  }
+
+  Collection<SubTreeOperation> getFailedPaths(final long[] nnIDs, long time) throws IOException {
     LightWeightRequestHandler subTreeLockChecker =
-            new LightWeightRequestHandler(HDFSOperationType.MDCLEANER) {
+            new LightWeightRequestHandler(HDFSOperationType.MDCLEANER_LIST_FAILED_OPS) {
               @Override
               public Object performTask() throws IOException {
                 OngoingSubTreeOpsDataAccess da = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory
                         .getDataAccess(OngoingSubTreeOpsDataAccess.class);
-                return da.allOpsByNN(nnID);
+                return da.allDeadOperations(nnIDs, time);
               }
             };
-    return (Collection<SubTreeOperation>)subTreeLockChecker.handle();
+    return (Collection<SubTreeOperation>) subTreeLockChecker.handle();
+  }
+
+  Collection<SubTreeOperation> getSlowOpsPaths(final long[] nnIDs, long time) throws IOException {
+    LightWeightRequestHandler subTreeLockChecker =
+            new LightWeightRequestHandler(HDFSOperationType.MDCLEANER_LIST_SLOW_OPS) {
+              @Override
+              public Object performTask() throws IOException {
+                OngoingSubTreeOpsDataAccess da = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory
+                        .getDataAccess(OngoingSubTreeOpsDataAccess.class);
+                return da.allSlowActiveOperations(nnIDs, time);
+              }
+            };
+    return (Collection<SubTreeOperation>) subTreeLockChecker.handle();
 
   }
 
   Collection<SubTreeOperation> getPathsToRecoverAsync() throws IOException {
     LightWeightRequestHandler subTreeLockChecker =
-            new LightWeightRequestHandler(HDFSOperationType.MDCLEANER) {
+            new LightWeightRequestHandler(HDFSOperationType.MDCLEANER_LIST_ASYNC_OPS) {
               @Override
               public Object performTask() throws IOException {
                 OngoingSubTreeOpsDataAccess da = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory
@@ -128,14 +158,15 @@ public class MDCleaner {
                 return da.allOpsToRecoverAsync();
               }
             };
-    return (Collection<SubTreeOperation>)subTreeLockChecker.handle();
+    return (Collection<SubTreeOperation>) subTreeLockChecker.handle();
 
   }
 
-  void startMDCleanerMonitor(FSNamesystem namesystem, LeaderElection leaderElection, long stoTableCleanDelay) {
+  void startMDCleanerMonitor(FSNamesystem namesystem, LeaderElection leaderElection,
+                             long failedSTOCleanDelay, long slowSTOCleanDelay) {
     this.leaderElection = leaderElection;
-    this.failedNodes = new ArrayList<FailedNodeLeDescriptor>();
-    this.stoTableCleanDelay = stoTableCleanDelay;
+    this.failedSTOCleanDelay = failedSTOCleanDelay;
+    this.slowSTOCleanDelay = slowSTOCleanDelay;
     this.namesystem = namesystem;
     run = true;
 

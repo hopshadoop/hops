@@ -233,6 +233,8 @@ public class TestSubtreeLock extends TestCase {
     MiniDFSCluster cluster = null;
     try {
       Configuration conf = new HdfsConfiguration();
+      conf.setLong(DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY,
+              10000);
       cluster = new MiniDFSCluster.Builder(conf)
               .nnTopology(MiniDFSNNTopology.simpleHOPSTopology(2)).format(true)
               .numDataNodes(1).build();
@@ -264,10 +266,8 @@ public class TestSubtreeLock extends TestCase {
 
       cluster.shutdownNameNode(0);
 
-      long delay = conf.getLong(DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY, DFSConfigKeys
-              .DFS_LEADER_CHECK_INTERVAL_IN_MS_DEFAULT) * (conf.getInt(DFSConfigKeys
-              .DFS_LEADER_MISSED_HB_THRESHOLD_KEY, DFSConfigKeys
-              .DFS_LEADER_MISSED_HB_THRESHOLD_DEFAULT) + 1);
+      long delay = conf.getLong(DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY, DFSConfigKeys
+              .DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT);
       Thread.sleep(delay);
       namesystem1.lockSubtree(path1.toUri().getPath(),
               SubTreeOperation.Type.NA);
