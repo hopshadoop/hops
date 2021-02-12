@@ -7538,9 +7538,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           inode.setSubtreeLocked(false);
           EntityManager.update(inode);
         }
-        SubTreeOperation subTreeOp = EntityManager.find(SubTreeOperation.Finder.ByPath, getSubTreeLockPathPrefix(
-            path));
-        EntityManager.remove(subTreeOp);
+        SubTreeOperation subTreeOp = EntityManager.find(
+                SubTreeOperation.Finder.ByPath, getSubTreeLockPathPrefix(path));
+        if(subTreeOp != null){
+          EntityManager.remove(subTreeOp);
+        }
         return null;
       }
     }.handle(this);
@@ -7550,7 +7552,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   void unlockSubtree(final String path, final long ignoreStoInodeId) throws IOException {
     try{
       unlockSubtreeInternal(path, ignoreStoInodeId);
-    }catch(Exception e ){
+    }catch(Exception e){
       //Unable to remove the lock. setting the async removal flag
       setAsyncLockRemoval(path);
       throw e;

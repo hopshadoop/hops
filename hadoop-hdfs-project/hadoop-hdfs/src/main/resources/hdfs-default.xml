@@ -2069,4 +2069,29 @@
     <description>Number of replicas configured in the NDB cluster.</description>
   </property>
 
+
+  <property>
+    <name>dfs.subtree.clean.failed.ops.locks.delay</name>
+    <value>600000</value>
+    <description>
+      When a NN dies then the subtree locks held be
+      it will be released after this delay.
+      The value is defined in milliseconds and the default
+    value is 600000, i.e., 10 mins
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.subtree.clean.failed.ops.locks.delay</name>
+    <value>900000</value>
+    <description>
+    When a NN dies does not complete a subtree operation in
+    a certain time then the subtree locks are recovered because
+    the subtree operation is assumed to have failed.
+    The value is defined in milliseconds and the default
+    value is 900000, i.e., 15 mins
+    </description>
+  </property>
+
 </configuration>
+

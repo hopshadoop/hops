@@ -20,10 +20,15 @@ import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.leader_election.node.ActiveNode;
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.hdfs.dal.OngoingSubTreeOpsDataAccess;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 import org.apache.hadoop.hdfs.server.namenode.INodeDirectory;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RetriableException;
 
 import java.io.IOException;
@@ -196,8 +201,7 @@ public class INodeLock extends BaseINodeLock {
   }
 
   private List<INode> acquireINodeLockByPath(String path)
-      throws UnresolvedPathException, StorageException, RetriableException,
-      TransactionContextException {
+          throws IOException {
     List<INode> resolvedINodes = new ArrayList<>();
     byte[][] components = INode.getPathComponents(path);
 
@@ -239,16 +243,49 @@ public class INodeLock extends BaseINodeLock {
     return isParent(0, components);
   }
 
-  private void checkSubtreeLock(INode iNode) throws RetriableException {
-    if (SubtreeLockHelper.isSTOLocked(iNode.isSTOLocked(),
-            iNode.getSTOLockOwner(), activeNamenodes)) {
-      if (!ignoredSTOInodes.contains(iNode.getId())) {
-        throw new RetriableException("The subtree "+iNode.getLocalName() +" is locked by " +
-                "Namenode Id: " + iNode.getSTOLockOwner() + ". Active Namenodes are: "+activeNamenodes);
+  private void checkSubtreeLock(INode iNode) throws IOException {
+    if(!iNode.isSTOLocked()){
+      return;
+    }
+
+    boolean locked = false;
+    // this check for active locks
+    if (SubtreeLockHelper.isSTOLocked(iNode.isSTOLocked(), iNode.getSTOLockOwner(), activeNamenodes)) {
+      locked = true;
+      if (ignoredSTOInodes.contains(iNode.getId())) {
+        // ignore this lock. this is needed for sub operations in a sub tree ops protocol
+        locked = false;
+      }
+    } else { // the lock flag is set but the lock is dead
+      // you can ignore the lock after some time. it is possible that
+      // the NN is alive and its ID just changed because it is slow to HB
+      long timePassed = System.currentTimeMillis() - getStoLockTime(iNode.getId());
+      if (timePassed < NameNode.getFailedSTOCleanDelay()) {
+        locked = true;
       } else {
-        LOG.trace("Ignoring subtree lock for inode id: "+iNode.getId());
+        LOG.debug("Ignoring subtree lock as more than " + timePassed + " ms has passed.  Max " +
+                "lock retention time is:" + NameNode.getFailedSTOCleanDelay());
       }
     }
+
+    if (locked) {
+      throw new RetriableException("The subtree " + iNode.getLocalName() + " is locked by " +
+              "Namenode Id: " + iNode.getSTOLockOwner() + ". Active Namenodes are: " + activeNamenodes);
+    }
+  }
+
+  private long getStoLockTime(long inodeId) throws IOException {
+    LightWeightRequestHandler subTreeLockChecker =
+            new LightWeightRequestHandler(HDFSOperationType.SUBTREE_GET_LOCK_TIME) {
+              @Override
+              public Object performTask() throws IOException {
+                OngoingSubTreeOpsDataAccess da = (OngoingSubTreeOpsDataAccess) HdfsStorageFactory
+                        .getDataAccess(OngoingSubTreeOpsDataAccess.class);
+                return da.getLockTime(inodeId);
+              }
+            };
+
+    return (long)subTreeLockChecker.handle();
   }
 
   private void handleLockUpgrade(List<INode> resolvedINodes,
