@@ -281,7 +281,8 @@ public class NameNode implements NameNodeStatusMXBean {
    * Metadata cleaner service. Cleans stale metadata left my dead NNs
    */
   private MDCleaner mdCleaner;
-  private long stoTableCleanDelay = 0;
+  static long failedSTOCleanDelay = 0;
+  long slowSTOCleanDelay = 0;
 
   private ObjectName nameNodeStatusBeanName;
   protected final Tracer tracer;
@@ -579,9 +580,12 @@ public class NameNode implements NameNodeStatusMXBean {
      this.brTrackingService = new BRTrackingService(updateThreshold, maxConcurrentBRs,
              brMaxProcessingTime);
     this.mdCleaner = MDCleaner.getInstance();
-    this.stoTableCleanDelay = conf.getLong(
+    this.failedSTOCleanDelay = conf.getLong(
             DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY,
             DFSConfigKeys.DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT);
+    this.slowSTOCleanDelay = conf.getLong(
+            DFSConfigKeys.DFS_SUBTREE_CLEAN_SLOW_OPS_LOCKS_DELAY_KEY,
+            DFSConfigKeys.DFS_SUBTREE_CLEAN_SLOW_OPS_LOCKS_DELAY_DEFAULT);
 
     String fsOwnerShortUserName = UserGroupInformation.getCurrentUser()
         .getShortUserName();
@@ -1377,7 +1381,7 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   private void startMDCleanerService(){
-    mdCleaner.startMDCleanerMonitor(namesystem, leaderElection, stoTableCleanDelay);
+    mdCleaner.startMDCleanerMonitor(namesystem, leaderElection, failedSTOCleanDelay, slowSTOCleanDelay);
   }
 
   private void stopMDCleanerService(){
@@ -1486,6 +1490,10 @@ public class NameNode implements NameNodeStatusMXBean {
         return null;
       }
     }.handle();
+  }
+
+  public static long getFailedSTOCleanDelay(){
+    return failedSTOCleanDelay;
   }
 }
 
