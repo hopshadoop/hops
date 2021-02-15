@@ -29,6 +29,7 @@
       {"name": "nn",      "url": get_location() +"/jmx?qry=Hadoop:service=NameNode,name=NameNodeInfo"},
       {"name": "nnstat",  "url": get_location() +"/jmx?qry=Hadoop:service=NameNode,name=NameNodeStatus"},
       {"name": "fs",      "url": get_location() +"/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState"},
+      {"name": "jvm",      "url": get_location() +"/jmx?qry=Hadoop:service=NameNode,name=JvmMetrics"},
       {"name": "mem",     "url": get_location() +"/jmx?qry=java.lang:type=Memory"}
     ];
 

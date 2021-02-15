@@ -344,4 +344,8 @@ public class HdfsStorageFactory {
   public static boolean hasResources(double threshold) throws StorageException {
     return dStorageFactory.hasResources(threshold);
   }
+
+  public static float getResourceMemUtilization() throws StorageException {
+    return dStorageFactory.getResourceMemUtilization();
+  }
 }

@@ -52,7 +52,8 @@ public enum JvmMetricsInfo implements MetricsInfo {
   GcNumWarnThresholdExceeded("Number of times that the GC warn threshold is exceeded"),
   GcNumInfoThresholdExceeded("Number of times that the GC info threshold is exceeded"),
   GcTotalExtraSleepTime("Total GC extra sleep time in milliseconds"),
-  GcTimePercentage("Percentage of time the JVM was paused in GC");
+  GcTimePercentage("Percentage of time the JVM was paused in GC"),
+  DirectMemUsage("Direct memory utilization");
 
   private final String desc;
 
