@@ -130,6 +130,7 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.security.GeneralSecurityException;
+import java.text.DecimalFormat;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -6694,6 +6695,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   @Override //NameNodeMXBean
   public String getLeaderNameNode(){
     return nameNode.getActiveNameNodes().getSortedActiveNodes().get(0).getHostname();
+  }
+
+  @Override //NameNodeMXBean
+  public String getDatabaseUtilization(){
+    try {
+      DecimalFormat df = new DecimalFormat("0.00");
+      return df.format(HdfsStorageFactory.getResourceMemUtilization());
+    } catch (StorageException e) {
+      e.printStackTrace();
+    }
+    return "Unable to connect to DB";
   }
 
   /**

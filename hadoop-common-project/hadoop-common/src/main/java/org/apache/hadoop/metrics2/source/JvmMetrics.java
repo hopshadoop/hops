@@ -151,7 +151,12 @@ public class JvmMetrics implements MetricsSource {
       .addGauge(MemHeapUsedM, memHeap.getUsed() / M)
       .addGauge(MemHeapCommittedM, memHeap.getCommitted() / M)
       .addGauge(MemHeapMaxM, calculateMaxMemoryUsage(memHeap))
-      .addGauge(MemMaxM, runtime.maxMemory() / M);
+      .addGauge(MemMaxM, runtime.maxMemory() / M)
+      .addGauge(DirectMemUsage, getDirectMemUtilization() / M);
+  }
+
+  float getDirectMemUtilization(){
+    return sun.misc.SharedSecrets.getJavaNioAccess().getDirectBufferPool().getMemoryUsed();
   }
 
   private float calculateMaxMemoryUsage(MemoryUsage memHeap) {
