@@ -148,6 +148,14 @@
 <p>Non Heap Memory used {used|fmt_bytes} of {committed|fmt_bytes} Commited Non Heap Memory. Max Non Heap Memory is {max|fmt_bytes}. </p>
 {/mem.NonHeapMemoryUsage}
 
+{#jvm}
+<p>Direct memory utilization: {DirectMemUsage} MB. </p>
+{/jvm}
+
+{#nn}
+<p>Database memory utilization: {DatabaseUtilization}%</p>
+{/nn}
+
 {#nn}
 <table class="table table-bordered table-striped">
   <tr><th> Configured Capacity:</th><td>{Total|fmt_bytes}</td></tr>

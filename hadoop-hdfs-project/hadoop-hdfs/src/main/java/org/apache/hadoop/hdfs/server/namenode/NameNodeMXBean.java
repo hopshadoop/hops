@@ -255,4 +255,6 @@ public interface NameNodeMXBean {
   public int getNumNameNodes();
   
   public String getLeaderNameNode();
+
+  public String getDatabaseUtilization();
 }
