@@ -132,12 +132,12 @@ public class TestLeaseManager {
    * leases, the Namenode does't enter an infinite loop while holding the FSN
    * write lock and thus become unresponsive
    */
-  @Test (timeout=2000)
+  @Test (timeout=10000)
   public void testCheckLeaseNotInfiniteLoop() throws StorageException, TransactionContextException, IOException {
     HdfsStorageFactory.setConfiguration(conf);
     int leaseCreationLockRows = conf.getInt(DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_KEY,
             DFSConfigKeys.DFS_LEASE_CREATION_LOCKS_COUNT_DEFAULT);
-    HdfsStorageFactory.formatStorage();
+    NameNode.format(conf);
     FSDirectory dir = Mockito.mock(FSDirectory.class);
     FSNamesystem fsn = Mockito.mock(FSNamesystem.class);
     Mockito.when(fsn.isRunning()).thenReturn(true);
