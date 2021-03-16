@@ -238,6 +238,7 @@ Flag              | Description                          | Notes
 `-diff <fromSnapshot> <toSnapshot>` | Use snapshot diff report between given two snapshots to identify the difference between source and target. | This option is valid only with `-update` option and the following conditions should be satisfied. 1. Both the source and target FileSystem must be DistributedFileSystem. 2. Two snapshots (e.g., s1 and s2) have been created on the source FS. The diff between these two snapshots will be copied to the target FS. 3. The target has the same snapshot s1. No changes have been made on the target since s1. All the files/directories in the target are the same with source.s1. |
 `-numListstatusThreads` | Number of threads to use for building file listing | At most 40 threads.
 `-skipcrccheck` | Whether to skip CRC checks between source and target paths. |
+direct` | Write directly to destination paths | Useful for avoiding potentially very expensive temporary file rename operations when the destination is an object store
 
 Architecture of DistCp
 ----------------------
@@ -489,7 +490,7 @@ configuration, or be otherwise available in all cluster hosts.
 DistCp can be used to upload data
 
 ```bash
-hadoop distcp hdfs://nn1:8020/datasets/set1 s3a://bucket/datasets/set1
+hadoop distcp -direct hdfs://nn1:8020/datasets/set1 s3a://bucket/datasets/set1
 ```
 
 To download data
@@ -569,6 +570,9 @@ rely on disk buffering.
     Copies each byte down to the Hadoop worker nodes and back to the
 bucket. As well as being slow, it means that charges may be incurred.
 
+* The `-direct` option can be used to write to object store target paths directly,
+avoiding the potentially very expensive temporary file rename operations that would
+otherwise occur.
 
 Frequently Asked Questions
 --------------------------

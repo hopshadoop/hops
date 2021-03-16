@@ -44,6 +44,9 @@ public class DistCpOptions {
   private boolean blocking = true;
   private boolean useDiff = false;
 
+  /** Whether data should be written directly to the target paths. */
+  private boolean directWrite;
+
   public static final int maxNumListstatusThreads = 40;
   private int numListstatusThreads = 0;  // Indicates that flag is not set.
   private int maxMaps = DistCpConstants.DEFAULT_MAPS;
@@ -635,6 +638,14 @@ public class DistCpOptions {
     }
   }
 
+  public boolean shouldDirectWrite() {
+    return directWrite;
+  }
+
+  public void setDirectWrite(final boolean directWrite) {
+    this.directWrite = directWrite;
+  }
+
   /**
    * Add options to configuration. These will be used in the Mapper/committer
    *
@@ -661,6 +672,8 @@ public class DistCpOptions {
         String.valueOf(mapBandwidth));
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.PRESERVE_STATUS,
         DistCpUtils.packAttributes(preserveStatus));
+    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.DIRECT_WRITE,
+        String.valueOf(directWrite));
     if (filtersFile != null) {
       DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.FILTERS,
           filtersFile);
@@ -696,6 +709,7 @@ public class DistCpOptions {
         ", targetPath=" + targetPath +
         ", targetPathExists=" + targetPathExists +
         ", filtersFile='" + filtersFile + '\'' +
+        ", directWrite=" + directWrite +
         '}';
   }
 

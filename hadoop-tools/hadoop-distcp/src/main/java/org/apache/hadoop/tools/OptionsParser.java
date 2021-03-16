@@ -169,6 +169,10 @@ public class OptionsParser {
           DistCpOptionSwitch.FILTERS.getSwitch()));
     }
 
+    if (command.hasOption(DistCpOptionSwitch.DIRECT_WRITE.getSwitch())) {
+      option.setDirectWrite(true);
+    }
+
     return option;
   }
 
