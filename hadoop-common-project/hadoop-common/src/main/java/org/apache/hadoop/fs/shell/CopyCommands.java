@@ -301,7 +301,6 @@ class CopyCommands {
 
       setNumberThreads(cf.getOptValue("t"));
       getRemoteDestination(args);
-      setDstRemote(true);
       // should have a -r option
       setRecursive(true);
     }
