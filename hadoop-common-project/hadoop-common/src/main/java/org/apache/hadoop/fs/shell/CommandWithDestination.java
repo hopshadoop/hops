@@ -65,7 +65,6 @@ abstract class CommandWithDestination extends FsCommand {
   private boolean lazyPersist = false;
   private boolean direct = false;
   private int numThreads = 1;
-  private boolean isDstRemote = false;
 
   /**
    * The name of the raw xattr namespace. It would be nice to use
@@ -110,14 +109,6 @@ abstract class CommandWithDestination extends FsCommand {
 
   protected int getNumThreads(){
     return numThreads;
-  }
-
-  public boolean isDstRemote() {
-    return isDstRemote;
-  }
-
-  public void setDstRemote(boolean dstRemote) {
-    isDstRemote = dstRemote;
   }
 
   /**

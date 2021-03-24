@@ -146,7 +146,8 @@ abstract class ParallelCommandWithDestination extends  CommandWithDestination{
       //for remote destination
       PathData dest = getTargetPath(src, destDir);
 
-      if( isDstRemote() ){
+      if (dest.fs.getUri().toString().startsWith("hdfs") ||
+              dest.fs.getUri().toString().startsWith("hopsfs")) {
         FileSystem dfs = fileSystems.get();
         if( dfs == null ){
           dfs = FileSystem.newInstance(dest.getURI(),getConf());
