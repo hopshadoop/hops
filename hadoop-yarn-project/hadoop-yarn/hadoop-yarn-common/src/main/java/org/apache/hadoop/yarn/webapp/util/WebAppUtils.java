@@ -456,13 +456,14 @@ public class WebAppUtils {
 
   private static HttpServer2.Builder loadFromSSLServerConf(HttpServer2.Builder builder, Configuration sslConf) {
     return builder
-        .keyPassword(getPassword(sslConf, DFS_SERVER_HTTPS_KEYPASSWORD_KEY))
+        .keyPassword(getPassword(sslConf, WEB_APP_KEY_PASSWORD_KEY))
         .keyStore(sslConf.get("ssl.server.keystore.location"),
-            getPassword(sslConf, DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
+            getPassword(sslConf, WEB_APP_KEYSTORE_PASSWORD_KEY),
             sslConf.get("ssl.server.keystore.type", "jks"))
         .trustStore(sslConf.get("ssl.server.truststore.location"),
-            getPassword(sslConf, DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
-            sslConf.get("ssl.server.truststore.type", "jks"));
+            getPassword(sslConf, WEB_APP_TRUSTSTORE_PASSWORD_KEY),
+            sslConf.get("ssl.server.truststore.type", "jks"))
+        .excludeCiphers(sslConf.get("ssl.server.exclude.cipher.list"));
   }
 
   private static HttpServer2.Builder loadFromSuperUserLoader(HttpServer2.Builder builder, Configuration sslConf) {
@@ -475,7 +476,8 @@ public class WebAppUtils {
           .keyStore(material.getKeyStoreLocation().toString(), password,
               sslConf.get("ssl.server.keystore.type", "jks"))
           .trustStore(material.getTrustStoreLocation().toString(), password,
-              sslConf.get("ssl.server.truststore.type", "jks"));
+              sslConf.get("ssl.server.truststore.type", "jks"))
+          .excludeCiphers(sslConf.get("ssl.server.exclude.cipher.list"));
     } catch (IOException ex) {
       LOG.fatal("Could not system user x.509 material with SuperuserLoader", ex);
       throw new RuntimeException(ex);
