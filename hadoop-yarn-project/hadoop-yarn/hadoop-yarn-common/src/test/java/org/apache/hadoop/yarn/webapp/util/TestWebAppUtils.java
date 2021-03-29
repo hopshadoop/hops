@@ -24,16 +24,25 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+
+import io.hops.security.SuperuserKeystoresLoader;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.http.HttpServer2.Builder;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.apache.hadoop.security.alias.JavaKeyStoreProvider;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -107,21 +116,47 @@ public class TestWebAppUtils {
   }
 
   @Test
-  public void testLoadSslConfiguration() throws Exception {
+  public void testLoadFromSSLServerConf() throws Exception {
     Configuration conf = provisionCredentialsForSSL();
+    conf.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+        FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), "kStore.jks");
+
     TestBuilder builder = (TestBuilder) new TestBuilder();
 
-    builder = (TestBuilder) WebAppUtils.loadSslConfiguration(
-        builder, conf);
+    builder = (TestBuilder) WebAppUtils.loadSslConfiguration(builder, conf);
 
     String keypass = "keypass";
     String storepass = "storepass";
-    String trustpass = "trustpass";    
+    String trustpass = "trustpass";
 
     // make sure we get the right passwords in the builder
     assertEquals(keypass, ((TestBuilder)builder).keypass);
     assertEquals(storepass, ((TestBuilder)builder).keystorePassword);
     assertEquals(trustpass, ((TestBuilder)builder).truststorePassword);
+  }
+
+  @Test
+  public void testLoadFromSuperUserLoader() throws Exception {
+    Configuration conf = provisionCredentialsForSSL();
+
+    String tmp = System.getProperty("test.build.data", "target/test-dir");
+    conf.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, tmp);
+
+    String password = "password";
+
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    java.nio.file.Path passwd = Paths.get(tmp, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+    FileUtils.writeStringToFile(passwd.toFile(), password, StandardCharsets.UTF_8);
+
+    TestBuilder builder = (TestBuilder) new TestBuilder();
+
+    builder = (TestBuilder) WebAppUtils.loadSslConfiguration(builder, conf);
+
+    // make sure we get the right passwords in the builder
+    assertEquals(password, ((TestBuilder)builder).keypass);
+    assertEquals(password, ((TestBuilder)builder).keystorePassword);
+    assertEquals(password, ((TestBuilder)builder).truststorePassword);
   }
 
   protected Configuration provisionCredentialsForSSL() throws IOException,
