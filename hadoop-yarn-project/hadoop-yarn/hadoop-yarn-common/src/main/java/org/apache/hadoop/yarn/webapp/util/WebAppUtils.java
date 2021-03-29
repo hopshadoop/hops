@@ -29,6 +29,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import io.hops.security.HopsUtil;
+import io.hops.security.SuperuserKeystoresLoader;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
@@ -36,6 +40,9 @@ import org.apache.hadoop.http.HtmlQuoting;
 import org.apache.hadoop.http.HttpConfig.Policy;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
+import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.HAUtil;
@@ -60,6 +67,8 @@ public class WebAppUtils {
       "ssl.server.keystore.keypassword";
   public static final String HTTPS_PREFIX = "https://";
   public static final String HTTP_PREFIX = "http://";
+
+  private static final Log LOG = LogFactory.getLog(WebAppUtils.class.getName());
 
   public static void setRMWebAppPort(Configuration conf, int port) {
     String hostname = getRMWebAppURLWithoutScheme(conf);
@@ -428,9 +437,20 @@ public class WebAppUtils {
     if (conf != null) {
       sslConf.addResource(conf);
     }
-    boolean needsClientAuth = YarnConfiguration.YARN_SSL_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
+
+    String keystoreLocation = sslConf.get(
+        FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
+            FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), null);
+    builder.needsClientAuth(YarnConfiguration.YARN_SSL_CLIENT_HTTPS_NEED_AUTH_DEFAULT);
+    if (keystoreLocation != null) {
+      // ssl-server.xml has been populated, load material from there
+      return loadFromSSLServerConf(builder, sslConf);
+    }
+    return loadFromSuperUserLoader(builder, sslConf);
+  }
+
+  private static HttpServer2.Builder loadFromSSLServerConf(HttpServer2.Builder builder, Configuration sslConf) {
     return builder
-        .needsClientAuth(needsClientAuth)
         .keyPassword(getPassword(sslConf, WEB_APP_KEY_PASSWORD_KEY))
         .keyStore(sslConf.get("ssl.server.keystore.location"),
             getPassword(sslConf, WEB_APP_KEYSTORE_PASSWORD_KEY),
@@ -438,8 +458,25 @@ public class WebAppUtils {
         .trustStore(sslConf.get("ssl.server.truststore.location"),
             getPassword(sslConf, WEB_APP_TRUSTSTORE_PASSWORD_KEY),
             sslConf.get("ssl.server.truststore.type", "jks"))
-        .excludeCiphers(
-            sslConf.get("ssl.server.exclude.cipher.list"));
+        .excludeCiphers(sslConf.get("ssl.server.exclude.cipher.list"));
+  }
+
+  private static HttpServer2.Builder loadFromSuperUserLoader(HttpServer2.Builder builder, Configuration sslConf) {
+    try {
+      SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(sslConf);
+      X509SecurityMaterial material = loader.loadSuperUserMaterial();
+      String password = HopsUtil.readCryptoMaterialPassword(material.getPasswdLocation().toFile());
+      return builder
+          .keyPassword(password)
+          .keyStore(material.getKeyStoreLocation().toString(), password,
+              sslConf.get("ssl.server.keystore.type", "jks"))
+          .trustStore(material.getTrustStoreLocation().toString(), password,
+              sslConf.get("ssl.server.truststore.type", "jks"))
+          .excludeCiphers(sslConf.get("ssl.server.exclude.cipher.list"));
+    } catch (IOException ex) {
+      LOG.fatal("Could not system user x.509 material with SuperuserLoader", ex);
+      throw new RuntimeException(ex);
+    }
   }
 
   /**
