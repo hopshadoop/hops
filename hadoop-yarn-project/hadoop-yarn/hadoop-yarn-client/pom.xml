@@ -17,10 +17,10 @@
   <parent>
     <artifactId>hadoop-yarn</artifactId>
     <groupId>io.hops</groupId>
-    <version>3.2.0.3-SNAPSHOT</version>
+    <version>3.2.0.3-RC0</version>
   </parent>
   <artifactId>hadoop-yarn-client</artifactId>
-  <version>3.2.0.3-SNAPSHOT</version>
+  <version>3.2.0.3-RC0</version>
   <name>Apache Hadoop YARN Client</name>
 
   <properties>
