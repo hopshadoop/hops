@@ -35,6 +35,7 @@ import io.hops.transaction.handler.LightWeightRequestHandler;
 import io.hops.transaction.lock.SubtreeLockHelper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -58,7 +59,9 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 @VisibleForTesting
 abstract class AbstractFileTree {
   public static final Log LOG = LogFactory.getLog(AbstractFileTree.class);
-  
+
+  public static int SUBTREE_QUIESCE_LOCK_BATCH_SIZE = 1000;
+
   private final FSNamesystem namesystem;
   private final FSPermissionChecker fsPermissionChecker;
   private final INodeIdentifier subtreeRootId;
@@ -175,7 +178,6 @@ abstract class AbstractFileTree {
     }
 
     int batchIndex = 0;
-    final int BATCHSIZE = 10000;
 
     private class InodesBatch {
       long[] partitionIDs = null;
@@ -190,8 +192,8 @@ abstract class AbstractFileTree {
       }
 
       int remaining = (children.size() - batchIndex);
-      if (remaining > BATCHSIZE) {
-        remaining = BATCHSIZE;
+      if (remaining > SUBTREE_QUIESCE_LOCK_BATCH_SIZE) {
+        remaining = SUBTREE_QUIESCE_LOCK_BATCH_SIZE;
       } else {
         remaining = (children.size() - batchIndex);
       }
