@@ -125,6 +125,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_SUBTREE_EXECUTOR_LIMIT_KEY = "dfs.namenode.subtree-executor-limit";
   public static final int DFS_SUBTREE_EXECUTOR_LIMIT_DEFAULT = 80;
 
+  public static final String DFS_SUBTREE_QUIESCE_LOCK_BATCH_SIZE_KEY = "dfs.subtree.quiesce.lock.batch.size.key";
+  public static final int DFS_SUBTREE_QUIESCE_LOCK_BATCH_SIZE_DEFAULT = 1000;
+
   public static final String DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY = "dfs.subtree.clean.failed.ops.locks.delay";
   public static final long DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT = 10*1000*60; //Reclaim locks after 10 mins
 
