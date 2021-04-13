@@ -337,6 +337,7 @@ message BlockReceivedAndDeletedRequestProto {
  * void response
  */
 message BlockReceivedAndDeletedResponseProto {
+  repeated StorageReceivedDeletedBlocksProto blocks = 1;
 }
 
 /**

@@ -94,6 +94,10 @@ public class TestFileCreationDelete {
               .build();
       cluster.waitActive();
       fs = cluster.getFileSystem();
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+      }
 
       assertTrue(!fs.exists(file1));
       assertTrue(fs.exists(file2));

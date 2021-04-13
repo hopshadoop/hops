@@ -5545,9 +5545,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     }
   }
 
-  public void processIncrementalBlockReport(DatanodeRegistration nodeReg, StorageReceivedDeletedBlocks r)
+  public StorageReceivedDeletedBlocks processIncrementalBlockReport(DatanodeRegistration nodeReg, StorageReceivedDeletedBlocks r)
       throws IOException {
-      blockManager.processIncrementalBlockReport(nodeReg, r);
+      return blockManager.processIncrementalBlockReport(nodeReg, r);
   }
 
   PermissionStatus createFsOwnerPermissions(FsPermission permission) {
