@@ -1057,7 +1057,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // DatanodeProtocol
-  public void blockReceivedAndDeleted(DatanodeRegistration nodeReg,
+  public StorageReceivedDeletedBlocks[] blockReceivedAndDeleted(DatanodeRegistration nodeReg,
       String poolId, StorageReceivedDeletedBlocks[] receivedAndDeletedBlocks)
       throws IOException {
     checkNNStartup();
@@ -1069,9 +1069,14 @@ class NameNodeRpcServer implements NamenodeProtocols {
               " " + receivedAndDeletedBlocks.length + " blocks.");
     }
 
-    for(StorageReceivedDeletedBlocks r : receivedAndDeletedBlocks) {
-      namesystem.processIncrementalBlockReport(nodeReg, r);
+    StorageReceivedDeletedBlocks[] failedBlocks =
+            new StorageReceivedDeletedBlocks[receivedAndDeletedBlocks.length];
+
+    for(int i = 0; i < receivedAndDeletedBlocks.length; i++){
+      failedBlocks[i] = namesystem.processIncrementalBlockReport(nodeReg,
+            receivedAndDeletedBlocks[i]);
     }
+    return failedBlocks;
   }
   
   @Override // DatanodeProtocol

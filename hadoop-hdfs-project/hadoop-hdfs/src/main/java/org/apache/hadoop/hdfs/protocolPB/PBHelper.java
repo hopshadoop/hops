@@ -2879,4 +2879,33 @@ public class PBHelper {
         setId(context.getReportId()).
         build();
   }
+
+  public static StorageReceivedDeletedBlocks[] convert
+          (DatanodeProtocolProtos.BlockReceivedAndDeletedResponseProto proto) {
+
+    List<DatanodeProtocolProtos.StorageReceivedDeletedBlocksProto> sBlocks =
+            proto.getBlocksList();
+    StorageReceivedDeletedBlocks[] info =
+            new StorageReceivedDeletedBlocks[sBlocks.size()];
+
+    ArrayList<Long> blockIds = new ArrayList<Long>();
+
+    for (int i = 0; i < sBlocks.size(); i++) {
+      DatanodeProtocolProtos.StorageReceivedDeletedBlocksProto sBlock = sBlocks.get(i);
+      List<ReceivedDeletedBlockInfoProto> list = sBlock.getBlocksList();
+      ReceivedDeletedBlockInfo[] rdBlocks =
+              new ReceivedDeletedBlockInfo[list.size()];
+      for (int j = 0; j < list.size(); j++) {
+        rdBlocks[j] = PBHelper.convert(list.get(j));
+        blockIds.add(rdBlocks[j].getBlock().getBlockId());
+      }
+      if (sBlock.hasStorage()) {
+        info[i] = new StorageReceivedDeletedBlocks(
+                PBHelper.convert(sBlock.getStorage()), rdBlocks);
+      } else {
+        info[i] = new StorageReceivedDeletedBlocks(sBlock.getStorageUuid(), rdBlocks);
+      }
+    }
+    return info;
+  }
 }

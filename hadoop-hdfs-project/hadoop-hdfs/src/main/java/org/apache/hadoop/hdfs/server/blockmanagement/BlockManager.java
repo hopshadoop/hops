@@ -4260,7 +4260,7 @@ public class BlockManager {
    * This includes blocks that are starting to be received, completed being
    * received, or deleted.
    */
-  public void processIncrementalBlockReport(final DatanodeRegistration nodeID,
+  public StorageReceivedDeletedBlocks processIncrementalBlockReport(final DatanodeRegistration nodeID,
       final StorageReceivedDeletedBlocks blockInfos)
     throws IOException {
     //hack to have the variables final to pass then to the handler.
@@ -4392,10 +4392,18 @@ public class BlockManager {
             "Got incremental block report from unregistered or dead node");
       }
 
+
+      List<ReceivedDeletedBlockInfo> failedOps = new ArrayList<>();
       for (ReceivedDeletedBlockInfo rdbi : blockInfos.getBlocks()) {
-        processIncrementalBlockReportHandler.setParams(rdbi);
-        processIncrementalBlockReportHandler.handle(namesystem);
+        try {
+          processIncrementalBlockReportHandler.setParams(rdbi);
+          processIncrementalBlockReportHandler.handle(namesystem);
+        } catch (Throwable e) {
+          failedOps.add(rdbi);
+        }
       }
+      return new StorageReceivedDeletedBlocks(blockInfos.getStorage(),
+              failedOps.toArray(new ReceivedDeletedBlockInfo[failedOps.size()]));
     } finally {
       if (blockLog.isDebugEnabled()) {
         blockLog.debug(
