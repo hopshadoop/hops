@@ -873,15 +873,28 @@ class BPOfferService implements Runnable {
 
     // Send incremental block reports to the Namenode outside the lock
     boolean success = false;
+    StorageReceivedDeletedBlocks[] failedOps = null;
     final long startTime = monotonicNow();
     try {
-      blockReceivedAndDeletedWithRetry(reports.toArray(new StorageReceivedDeletedBlocks[reports.size()]));
+      failedOps = blockReceivedAndDeletedWithRetry(
+              reports.toArray(new StorageReceivedDeletedBlocks[reports.size()]));
       success = true;
     } finally {
       dn.getMetrics().addIncrementalBlockReport(monotonicNow() - startTime);
-      if (!success) {
+      StorageReceivedDeletedBlocks[] putBack = null;
+      if (success) {
+        //the RPC was successful. However, the NN may not have processed
+        //some blocks due to transient db failures.
+        // In that case the NN will return blocks that it failed
+        //to process. Only add the failed blocks
+        putBack = failedOps;
+      } else {
+        putBack = reports.toArray(new StorageReceivedDeletedBlocks[reports.size()]);
+      }
+
+      if (putBack != null && blocksToPutBack(putBack) > 0){
         synchronized (pendingIncrementalBRperStorage) {
-          for (StorageReceivedDeletedBlocks report : reports) {
+          for (StorageReceivedDeletedBlocks report : putBack) {
             // If we didn't succeed in sending the report, put all of the
             // blocks back onto our queue, but only in the case where we
             // didn't put something newer in the meantime.
@@ -893,6 +906,14 @@ class BPOfferService implements Runnable {
       }
     }
     return;
+  }
+
+  private int blocksToPutBack(StorageReceivedDeletedBlocks[] srdbs) {
+    int count = 0;
+    for (StorageReceivedDeletedBlocks srdb : srdbs) {
+      count += srdb.getBlocks().length;
+    }
+    return count;
   }
 
   /**
@@ -1299,7 +1320,7 @@ class BPOfferService implements Runnable {
     });
   }
 
-  private void blockReceivedAndDeletedWithRetry(
+  private StorageReceivedDeletedBlocks[] blockReceivedAndDeletedWithRetry(
       final StorageReceivedDeletedBlocks[] receivedAndDeletedBlocks)
       throws IOException {
 
@@ -1314,14 +1335,15 @@ class BPOfferService implements Runnable {
     LOG.info("sending blockReceivedAndDeletedWithRetry for blocks "
         + blocks);
 
-    doActorActionWithRetry(new ActorActionHandler() {
+    StorageReceivedDeletedBlocks[] failedOps =
+            (StorageReceivedDeletedBlocks[])doActorActionWithRetry(new ActorActionHandler() {
       @Override
       public Object doAction(BPServiceActor actor) throws IOException {
-        actor.blockReceivedAndDeleted(bpRegistration, getBlockPoolId(),
+        return actor.blockReceivedAndDeleted(bpRegistration, getBlockPoolId(),
             receivedAndDeletedBlocks);
-        return null;
       }
     });
+    return failedOps;
   }
 
   private void reportRemoteBadBlockWithRetry(final DatanodeInfo dnInfo,

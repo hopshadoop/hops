@@ -195,7 +195,7 @@ public interface DatanodeProtocol {
    * this DataNode, it will call blockReceived().
    */
   @Idempotent
-  public void blockReceivedAndDeleted(DatanodeRegistration registration,
+  public StorageReceivedDeletedBlocks[] blockReceivedAndDeleted(DatanodeRegistration registration,
       String poolId, StorageReceivedDeletedBlocks[] rcvdAndDeletedBlocks)
       throws IOException;
 

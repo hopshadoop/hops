@@ -30,6 +30,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetTestUtil;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.InterDatanodeProtocol;
+import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -225,6 +226,13 @@ public class DataNodeTestUtils {
     DirectoryScanner directoryScanner = dn.getDirectoryScanner();
     if (directoryScanner != null) {
       dn.getDirectoryScanner().reconcile();
+    }
+  }
+
+  public static void injectIBR(DataNode dn, ReceivedDeletedBlockInfo bInfo,
+      String storageUuid, boolean now ){
+    for (BPOfferService bpos : dn.getAllBpOs()) {
+      bpos.notifyNamenodeBlockInt(bInfo, storageUuid, now);
     }
   }
 }

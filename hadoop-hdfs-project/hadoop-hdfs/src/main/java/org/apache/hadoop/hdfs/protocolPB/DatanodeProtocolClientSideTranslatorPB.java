@@ -246,7 +246,7 @@ public class DatanodeProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void blockReceivedAndDeleted(DatanodeRegistration registration,
+  public StorageReceivedDeletedBlocks[] blockReceivedAndDeleted(DatanodeRegistration registration,
       String poolId, StorageReceivedDeletedBlocks[] receivedAndDeletedBlocks)
       throws IOException {
     BlockReceivedAndDeletedRequestProto.Builder builder =
@@ -264,7 +264,7 @@ public class DatanodeProtocolClientSideTranslatorPB
       builder.addBlocks(repBuilder.build());
     }
     try {
-      rpcProxy.blockReceivedAndDeleted(NULL_CONTROLLER, builder.build());
+       return PBHelper.convert(rpcProxy.blockReceivedAndDeleted(NULL_CONTROLLER, builder.build()));
     } catch (ServiceException se) {
       throw ProtobufHelper.getRemoteException(se);
     }

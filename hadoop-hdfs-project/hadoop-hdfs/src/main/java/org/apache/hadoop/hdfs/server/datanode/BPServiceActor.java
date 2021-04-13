@@ -612,13 +612,14 @@ class BPServiceActor implements Runnable {
     bpos.setLastNNListUpdateTime();
   }
 
-  public void blockReceivedAndDeleted(DatanodeRegistration registration,
+  public StorageReceivedDeletedBlocks[] blockReceivedAndDeleted(DatanodeRegistration registration,
       String poolId, StorageReceivedDeletedBlocks[] receivedAndDeletedBlocks)
       throws IOException {
     if (bpNamenode != null) {
-      bpNamenode.blockReceivedAndDeleted(registration, poolId,
+      return bpNamenode.blockReceivedAndDeleted(registration, poolId,
           receivedAndDeletedBlocks);
     }
+    return null;
   }
 
   public DatanodeCommand reportHashes(DatanodeRegistration registration,

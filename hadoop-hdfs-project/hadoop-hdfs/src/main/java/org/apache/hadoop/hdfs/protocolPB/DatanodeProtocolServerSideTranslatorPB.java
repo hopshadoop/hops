@@ -63,9 +63,6 @@ public class DatanodeProtocolServerSideTranslatorPB
   private static final ErrorReportResponseProto
       VOID_ERROR_REPORT_RESPONSE_PROTO =
       ErrorReportResponseProto.newBuilder().build();
-  private static final BlockReceivedAndDeletedResponseProto
-      VOID_BLOCK_RECEIVED_AND_DELETE_RESPONSE =
-      BlockReceivedAndDeletedResponseProto.newBuilder().build();
   private static final ReportBadBlocksResponseProto
       VOID_REPORT_BAD_BLOCK_RESPONSE =
       ReportBadBlocksResponseProto.newBuilder().build();
@@ -237,12 +234,27 @@ public class DatanodeProtocolServerSideTranslatorPB
       }
     }
     try {
-      impl.blockReceivedAndDeleted(PBHelper.convert(request.getRegistration()),
+      StorageReceivedDeletedBlocks[] resp=
+              impl.blockReceivedAndDeleted(PBHelper.convert(request.getRegistration()),
           request.getBlockPoolId(), info);
+
+      BlockReceivedAndDeletedResponseProto.Builder builder =
+              BlockReceivedAndDeletedResponseProto.newBuilder();
+      for(StorageReceivedDeletedBlocks s : resp){
+
+        StorageReceivedDeletedBlocksProto.Builder srdbp =
+                StorageReceivedDeletedBlocksProto.newBuilder();
+        srdbp.setStorageUuid(s.getStorage().getStorageID());
+        srdbp.setStorage(PBHelper.convert(s.getStorage()));
+        for (ReceivedDeletedBlockInfo rdBlock : s.getBlocks()) {
+          srdbp.addBlocks(PBHelper.convert(rdBlock));
+        }
+        builder.addBlocks(srdbp.build());
+      }
+      return builder.build();
     } catch (IOException e) {
       throw new ServiceException(e);
     }
-    return VOID_BLOCK_RECEIVED_AND_DELETE_RESPONSE;
   }
 
   @Override
