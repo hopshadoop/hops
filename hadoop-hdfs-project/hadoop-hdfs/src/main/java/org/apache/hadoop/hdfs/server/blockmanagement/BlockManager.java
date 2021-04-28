@@ -5468,7 +5468,7 @@ public class BlockManager {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getINodesLocks(INodeLockType.WRITE, inodeIdentifiers))
             .add(lf.getBlockLock()).add(
-            lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.IV, BLK.UR));
+            lf.getBlockRelated(BLK.UC, BLK.RE, BLK.ER, BLK.CR, BLK.PE, BLK.IV, BLK.UR));
         if (((FSNamesystem) namesystem).isErasureCodingEnabled() &&
             !inodeIdentifiers.isEmpty()) {
           locks.add(lf.getBatchedEncodingStatusLock(LockType.WRITE,
