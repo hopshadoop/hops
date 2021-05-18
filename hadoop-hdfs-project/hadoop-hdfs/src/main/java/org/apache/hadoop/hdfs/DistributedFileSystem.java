@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdfs;
 
+import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.MetaStatus;
@@ -86,6 +87,8 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
+
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -207,6 +210,57 @@ public class DistributedFileSystem extends FileSystem {
                                          file+" is not a valid DFS filename.");
     }
     return result;
+  }
+
+  List<ActiveNode> anns = null;
+  /**
+   * Check that a Path belongs to this FileSystem.
+   *
+   * The base implementation performs case insensitive equality checks
+   * of the URIs' schemes and authorities. Subclasses may implement slightly
+   * different checks.
+   * @param path to check
+   * @throws IllegalArgumentException if the path is not considered to be
+   * part of this FileSystem.
+   *
+   */
+
+  @Override
+  protected void checkPath(Path path) {
+    try{
+       super.checkPath(path);
+       return;
+    } catch (IllegalArgumentException e){
+    }
+
+    // The authority of the input path does not match with the
+    // authority of the client. Check if it matches with any
+    // of the available NNs in the system.
+    URI pathUri = path.toUri();
+    pathUri = canonicalizeUri(pathUri);
+    String pathAuthority = pathUri.getAuthority();
+
+    try{
+      if(anns == null || anns.isEmpty()){
+        anns = dfs.getNamenode().getActiveNamenodesForClient().getActiveNodes();
+      }
+
+      for (ActiveNode ann : anns) {
+        String nnAuthority = ann.getRpcServerIpAddress() + ":" + ann.getRpcServerPort();
+        if (nnAuthority != null && nnAuthority.equalsIgnoreCase(pathAuthority)) {
+          return;
+        }
+
+        nnAuthority = ann.getRpcServerAddressForClients().getAddress().getCanonicalHostName() + ":" + ann.getRpcServerPort();
+        if (nnAuthority != null && nnAuthority.equalsIgnoreCase(pathAuthority)) {
+          return;
+        }
+      }
+    } catch (IOException e){
+      LOG.warn("Unable to get list of namenodes");
+    }
+
+    throw new IllegalArgumentException("Wrong FS: " + path + ", expected: " + this.getUri());
   }
 
   @Override
