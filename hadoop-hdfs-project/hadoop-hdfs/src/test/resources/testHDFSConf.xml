@@ -16282,7 +16282,7 @@
     <test> <!-- TESTED -->
       <description>clrSpaceQuota: Namenode is already in safemode</description>
       <test-commands>
-	<command>-fs NAMENODE -mkdir test</command>
+	<command>-fs NAMENODE -mkdir -p test</command>
         <dfs-admin-command>-fs NAMENODE -setSpaceQuota 15 test</dfs-admin-command>
         <dfs-admin-command>-fs NAMENODE -clrSpaceQuota test</dfs-admin-command>
       </test-commands>
