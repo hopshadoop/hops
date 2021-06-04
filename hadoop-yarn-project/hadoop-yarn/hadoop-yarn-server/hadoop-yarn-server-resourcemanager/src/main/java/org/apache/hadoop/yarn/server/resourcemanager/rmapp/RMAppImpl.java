@@ -143,6 +143,8 @@ public class RMAppImpl implements RMApp, Recoverable {
   private static final EnumSet<RMAppState> COMPLETED_APP_STATES =
       EnumSet.of(RMAppState.FINISHED, RMAppState.FINISHING, RMAppState.FAILED,
           RMAppState.KILLED, RMAppState.FINAL_SAVING, RMAppState.KILLING);
+  private static final EnumSet<RMAppState> FINAL_APP_STATES =
+      EnumSet.of(RMAppState.FINISHED, RMAppState.FAILED, RMAppState.KILLED);
   private static final String STATE_CHANGE_MESSAGE =
       "%s State change from %s to %s on event = %s";
   private static final String RECOVERY_MESSAGE =
@@ -2598,7 +2600,9 @@ public class RMAppImpl implements RMApp, Recoverable {
             this.callerContext, this.applicationTimeouts, keyStore, keyStorePassword,
                   trustStore, trustStorePassword, cryptoMaterialVersion, certificateExpiration,
                   isAppRotatingCryptoMaterial.get(), -1L);
-          rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
+          if(!FINAL_APP_STATES.contains(getState())){
+            rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
+          }
         }
       }
     } finally {
@@ -2619,7 +2623,9 @@ public class RMAppImpl implements RMApp, Recoverable {
             this.callerContext, this.applicationTimeouts, keyStore, keyStorePassword,
             trustStore, trustStorePassword, cryptoMaterialVersion, certificateExpiration,
             isAppRotatingCryptoMaterial.get(), -1L);
-      rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
+      if(!FINAL_APP_STATES.contains(getState())){
+        rmContext.getStateStore().updateApplicationStateNoNotify(appNewState);
+      }
     } finally {
       this.writeLock.unlock();
     }
