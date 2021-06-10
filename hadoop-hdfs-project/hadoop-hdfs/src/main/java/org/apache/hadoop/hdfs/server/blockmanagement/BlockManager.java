@@ -887,16 +887,21 @@ public class BlockManager {
     final int numNodes = blocksMap.numNodes(blk);
     final boolean isCorrupt = numCorruptNodes == numNodes;
     final int numMachines = isCorrupt ? numNodes : numNodes - numCorruptNodes;
-    final DatanodeStorageInfo[] storages = new DatanodeStorageInfo[numMachines];
+    DatanodeStorageInfo[] storages = new DatanodeStorageInfo[numMachines];
     int j = 0;
     if (numMachines > 0) {
       for (final DatanodeStorageInfo storage : blocksMap.storageList(blk)){
         final boolean replicaCorrupt = corruptReplicas.isReplicaCorrupt(blk,
             storage.getDatanodeDescriptor());
-        if (isCorrupt || (!replicaCorrupt)){
+        if ((isCorrupt || (!replicaCorrupt)) &&
+                storage.getState() != State.FAILED) {
           storages[j++] = storage;
         }
       }
+    }
+
+    if (j < storages.length) {
+      storages = Arrays.copyOf(storages, j);
     }
 
     assert j == storages.length : "isCorrupt: " + isCorrupt +
