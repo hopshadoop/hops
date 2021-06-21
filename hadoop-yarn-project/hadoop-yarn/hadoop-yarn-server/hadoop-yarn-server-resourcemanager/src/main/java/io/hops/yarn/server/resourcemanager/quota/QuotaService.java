@@ -313,7 +313,7 @@ public class QuotaService extends CompositeService {
     float charge = computeCharge(resourcesMap, usedMillis);
     chargeProjectQuota(projectQuota, projectName, user, containerId, charge);
     //** ProjectDailyCost charging**
-    chargeProjectDailyCost(projectDailyCost, projectName, user, curentDay, charge, appId);
+    projectDailyCost = chargeProjectDailyCost(projectDailyCost, projectName, user, curentDay, charge, appId);
     if (projectQuota != null) {
       pqDA.add(projectQuota);
     }
@@ -352,7 +352,7 @@ public class QuotaService extends CompositeService {
     }
   }
 
-  private void chargeProjectDailyCost(ProjectDailyCost projectDailyCost, String projectName, String user, long day,
+  private ProjectDailyCost chargeProjectDailyCost(ProjectDailyCost projectDailyCost, String projectName, String user, long day,
       float charge, ApplicationId appId) {
 
     LOG.debug("Quota: project " + projectName + " user " + user + " has used " + charge + " credits, on day: " + day);
@@ -362,6 +362,7 @@ public class QuotaService extends CompositeService {
     }
 
     projectDailyCost.incrementCharge(charge, appId.toString());
+    return projectDailyCost;
   }
 
   /**
