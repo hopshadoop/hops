@@ -1930,7 +1930,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           HdfsFileStatus test = PBHelper.convert(HdfsProtos.HdfsFileStatusProto.parseFrom(cacheEntry.getPayload()));
           return test;
         }
-        if (NameNode.stateChangeLog.isDebugEnabled()) {
+        if (NameNode.stateChangeLog.isInfoEnabled()) {
           StringBuilder builder = new StringBuilder();
           builder.append("DIR* NameSystem.startFile: src=" + src
               + ", holder=" + holder
@@ -1945,7 +1945,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           } else {
             builder.append("null");
           }
-          NameNode.stateChangeLog.debug(builder.toString());
+          NameNode.stateChangeLog.info(builder.toString());
         }
         HdfsFileStatus status = null;
         try {
