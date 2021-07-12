@@ -216,8 +216,8 @@ message LocatedBlockProto {
   repeated string storageIDs = 8;
 
   // hopsfs
-  optional bytes data = 9;
-  optional uint64 checksum = 10;
+  optional bytes data = 15;
+  optional uint64 checksum = 16;
 }
 
 message DataEncryptionKeyProto {
@@ -351,7 +351,7 @@ message HdfsFileStatusProto {
   optional uint32 storagePolicy = 16 [default = 0]; // block storage policy id
   
   //hopsfs
-  optional bool isFileStoredInDB = 17; // false if not supplied
+  optional bool isFileStoredInDB = 20; // false if not supplied
 }
 
 /**
