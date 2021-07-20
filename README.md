@@ -19,7 +19,7 @@ For compiling the Hops Hadoop Distribution you will need the following software.
 - Maven
 - cmake for compiling the native code 
 - [Google Protocol Buffer](https://github.com/google/protobuf) Version [2.5](https://github.com/google/protobuf/releases/download/v2.5.0/protobuf-2.5.0.tar.gz)
-- [MySQL Cluster NDB](https://dev.mysql.com/downloads/cluster/) native client library 
+- [RonDB](repo.hops.works/master/rondb-21.04.1-linux-glibc2.17-x86_64.tar.gz) native client library 
 
 We combine Apache and GPL licensed code, from Hops and MySQL Cluster, respectively, by providing a DAL API (similar to JDBC). We dynamically link our DAL implementation for MySQL Cluster with the Hops code. Both binaries are distributed separately.
 
@@ -42,36 +42,15 @@ git clone https://github.com/hopshadoop/hops-metadata-dal-impl-ndb
 git checkout master
 mvn clean install -DskipTests
 ```
-This project also contains c++ code that requires NDB `libndbclient.so` library. Download the [MySQL Cluster Distribution](https://dev.mysql.com/downloads/cluster/) and extract the `libndbclient.so` library. Alternatively you can download a custom MySQL Cluster library from our servers. Our custom library supports binding I/O threads to CPU cores for better performance.		
+This project also contains c++ code that requires RonDB `libndbclient.so` library. Download the [RonDB Distribution](repo.hops.works/master/rondb-21.04.1-linux-glibc2.17-x86_64.tar.gz) and extract the `libndbclient.so` library. Alternatively you can extract it from the jar file.		
 ```sh
 cd tmp
-wget https://archiva.hops.works/repository/Hops/com/mysql/ndb/clusterj-native/7.6.10/clusterj-native-7.6.10-natives-linux.jar
-unzip clusterj-native-7.6.10-natives-linux.jar
+wget https://archiva.hops.works/repository/Hops/com/mysql/ndb/clusterj-native/21.04.0/clusterj-native-21.04.0-natives-linux.jar
+unzip clusterj-native-21.04.0-natives-linux.jar
 cp libndbclient.so /usr/lib
 ```
 
 See this [section](#connecting-the-driver-to-the-database) for specifying the database `URI` and `username/password`. 
-
-#### GPU Abstraction Layer
-```sh
-git clone https://github.com/hopshadoop/hops-gpu-management
-git checkout master
-mvn clean install -DskipTests
-```
-
-#### NVIDIA GPU Implementation
-```sh
-git clone https://github.com/hopshadoop/hops-gpu-management-impl-nvidia
-git checkout master
-mvn clean install -DskipTests
-```
-
-#### ROCm GPU Implementation
-```sh
-git clone https://github.com/hopshadoop/hops-gpu-management-impl-amd
-git checkout master
-mvn clean install -DskipTests
-```
 
 #### Building Hops Hadoop 
 ```sh
