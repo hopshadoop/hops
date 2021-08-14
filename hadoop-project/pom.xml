@@ -160,7 +160,7 @@
     <snakeyaml.version>1.16</snakeyaml.version>
     <hbase.one.version>1.2.6</hbase.one.version>
     <hbase.two.version>2.2.0</hbase.two.version>
-    <json-smart.version>2.4.2</json-smart.version>
+    <json-smart.version>2.4.7</json-smart.version>
     <nimbus-jose-jwt.version>9.8.1</nimbus-jose-jwt.version>
   </properties>
 
