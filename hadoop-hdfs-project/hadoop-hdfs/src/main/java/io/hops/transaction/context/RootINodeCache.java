@@ -57,6 +57,10 @@ public class RootINodeCache {
     }
   }
 
+  public static boolean isRunning() {
+    return running;
+  }
+
   public static INode getRootINode() {
     if(rootCacheUpdater!=null) {
       synchronized (rootCacheUpdater) {

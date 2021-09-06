@@ -475,7 +475,7 @@ public class INodeContext extends BaseEntityContext<Long, INode> {
   }
 
   private boolean canReadCachedRootINode(String name, long parentId) {
-    if (name.equals(INodeDirectory.ROOT_NAME) && parentId == HdfsConstantsClient.GRANDFATHER_INODE_ID) {
+    if (name.equals(INodeDirectory.ROOT_NAME) && parentId == HdfsConstantsClient.GRANDFATHER_INODE_ID && RootINodeCache.isRunning()) {
       if (RootINodeCache.isRootInCache() && currentLockMode.get() == LockMode.READ_COMMITTED) {
         return true;
       } else {
