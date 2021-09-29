@@ -131,6 +131,7 @@ public class TestKMS {
     // resetting kerberos security
     Configuration conf = new Configuration();
     UserGroupInformation.setConfiguration(conf);
+    KeyManagersReloaderThreadPool.clearThreadPool();
     KeyManagersReloaderThreadPool.getInstance(true).clearListOfTasks();
   }
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.security.ssl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.util.ShutdownHookManager;
 
@@ -90,5 +91,10 @@ public final class KeyManagersReloaderThreadPool {
     public void run() {
       scheduler.shutdownNow();
     }
+  }
+
+  @VisibleForTesting
+  public static void clearThreadPool() {
+    _INSTANCE = null;
   }
 }
