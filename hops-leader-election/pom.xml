@@ -6,12 +6,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>3.2.0.5-SNAPSHOT</version>
+    <version>3.2.0.5-RC0</version>
     <relativePath>../hadoop-project</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hops-leader-election</artifactId>
-  <version>3.2.0.5-SNAPSHOT</version>
+  <version>3.2.0.5-RC0</version>
   <description>hops-leader-election</description>
   <name>hops-leader-election</name>
   <packaging>jar</packaging>
