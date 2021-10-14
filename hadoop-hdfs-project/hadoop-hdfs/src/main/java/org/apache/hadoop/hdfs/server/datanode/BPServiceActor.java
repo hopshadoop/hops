@@ -405,6 +405,8 @@ class BPServiceActor implements Runnable {
         LOG.warn("IOException in offerService", e);
         //not connected to namenode
         connectedToNN = false;
+        long sleepTime = Math.min(1000, dnConf.heartBeatInterval);
+        Thread.sleep(sleepTime);
       }
     } // while (shouldRun())
   } // offerService
