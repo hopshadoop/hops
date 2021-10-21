@@ -35,6 +35,7 @@ import io.hops.transaction.lock.TransactionLockTypes.INodeLockType;
 import io.hops.transaction.lock.TransactionLockTypes.INodeResolveType;
 import io.hops.transaction.lock.TransactionLockTypes.LockType;
 import io.hops.transaction.lock.TransactionLocks;
+import io.hops.util.Slicer;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Options;
@@ -58,6 +59,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.UnresolvedLinkException;
@@ -72,7 +74,7 @@ class FSDirRenameOp {
   static boolean renameToInt(
       FSDirectory fsd, final String srcArg, final String dstArg)
       throws IOException {
-    
+
     String src = srcArg;
     String dst = dstArg;
     if (NameNode.stateChangeLog.isDebugEnabled()) {
@@ -253,12 +255,13 @@ class FSDirRenameOp {
       }
 
       boolean retValue = renameToTransaction(fsd, src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0L,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, timestamp);
-
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks, timestamp);
       // the rename Tx has committed. it has also remove the subTreeLocks
       renameTransactionCommitted = true;
-      return retValue;
 
+      addLogEntries(fsd, logEntries);
+
+      return retValue;
     } finally {
       if (!renameTransactionCommitted) {
         if (srcSubTreeRoot != null) { //only unlock if locked
@@ -267,11 +270,48 @@ class FSDirRenameOp {
      }
     }
   }
+  private static void addLogEntries(FSDirectory fsd, Collection<INodeMetadataLogEntry> logEntries) throws IOException {
+    List<INodeMetadataLogEntry> entries = new ArrayList<>(logEntries);
+    try {
+      Slicer.slice(entries.size(), fsd.getFSNamesystem().getSlicerBatchSize(),
+              fsd.getFSNamesystem().getSlicerNbThreads(),
+             fsd.getFSNamesystem().getFSOperationsExecutor(),
+              new Slicer.OperationHandler() {
+                @Override
+                public void handle(int startIndex, int endIndex)
+                        throws Exception {
+                  new HopsTransactionalRequestHandler(
+                          HDFSOperationType.ADD_METADATA_LOG_ENTRIES) {
+                    @Override
+                    public void acquireLock(TransactionLocks locks) {
+                    }
+
+                    @Override
+                    public Object performTask() throws IOException {
+                      List<INodeMetadataLogEntry> subList = entries.subList(startIndex, endIndex);
+
+                      for (INodeMetadataLogEntry logEntry : subList) {
+                        EntityManager.add(logEntry);
+                      }
+
+                      AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(subList);
+                      return null;
+                    }
+                  }.handle();
+                }
+              });
+    } catch (Exception ex) {
+      if (ex instanceof  IOException){
+        throw (IOException)ex;
+      } else {
+        throw new IOException(ex);
+      }
+    }
+  }
 
   private static boolean renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID,
       final String dst, final QuotaCounts srcCounts, final QuotaCounts dstCounts,
-      final boolean isUsingSubTreeLocks,
-      final Collection<INodeMetadataLogEntry> logEntries, final long timestamp) throws IOException {
+      final boolean isUsingSubTreeLocks, final long timestamp) throws IOException {
 
     HopsTransactionalRequestHandler renameToHandler = new HopsTransactionalRequestHandler(
         isUsingSubTreeLocks ? HDFSOperationType.SUBTREE_DEPRICATED_RENAME : HDFSOperationType.DEPRICATED_RENAME,
@@ -296,7 +336,7 @@ class FSDirRenameOp {
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED));
         } else {
           locks.add(lf.getLeaseLockAllPaths(LockType.READ_COMMITTED,
-                  fsd.getFSNamesystem().getLeaseCreationLockRows()))
+                          fsd.getFSNamesystem().getLeaseCreationLockRows()))
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src)).
               add(lf.getSubTreeOpsLock(LockType.WRITE, fsd.getFSNamesystem().getSubTreeLockPathPrefix(src), false));
         }
@@ -328,12 +368,6 @@ class FSDirRenameOp {
         }
         // remove the subtree locks
         removeSubTreeLocksForRenameInternal(fsd, src, isUsingSubTreeLocks);
-
-        for (INodeMetadataLogEntry logEntry : logEntries) {
-          EntityManager.add(logEntry);
-        }
-
-        AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(logEntries);
 
         fsd.ezManager.checkMoveValidity(srcIIP, dstIIP, src);
         // Ensure dst has quota to accommodate rename
@@ -539,10 +573,11 @@ class FSDirRenameOp {
       }
 
       RenameResult ret = renameToTransaction(fsd, src, srcSubTreeRoot != null?srcSubTreeRoot.getInodeId():0,
-              dst, srcCounts, dstCounts, isUsingSubTreeLocks, logEntries, timestamp, options);
-
+              dst, srcCounts, dstCounts, isUsingSubTreeLocks, timestamp, options);
       renameTransactionCommitted = true;
-      
+
+      addLogEntries(fsd, logEntries);
+
       return ret;
     } finally {
       if (!renameTransactionCommitted) {
@@ -557,8 +592,7 @@ class FSDirRenameOp {
   private 
   static RenameResult renameToTransaction(final FSDirectory fsd, final String src, final long srcINodeID, final String dst,
       final QuotaCounts srcCounts, final QuotaCounts dstCounts,
-      final boolean isUsingSubTreeLocks,
-      final Collection<INodeMetadataLogEntry> logEntries, final long timestamp,
+      final boolean isUsingSubTreeLocks, final long timestamp,
       final Options.Rename... options) throws IOException {
 
     return (RenameResult) new HopsTransactionalRequestHandler(
@@ -626,12 +660,6 @@ class FSDirRenameOp {
                 false);
           }
         }
-
-        for (INodeMetadataLogEntry logEntry : logEntries) {
-          EntityManager.add(logEntry);
-        }
-
-        AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(logEntries);
 
         BlockStoragePolicySuite bsps = fsd.getBlockStoragePolicySuite();
         

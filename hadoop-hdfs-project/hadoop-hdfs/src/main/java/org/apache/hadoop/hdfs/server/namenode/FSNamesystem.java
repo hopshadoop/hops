@@ -396,6 +396,14 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return leaseManager;
   }
 
+  public int getSlicerNbThreads() {
+    return slicerNbThreads;
+  }
+
+  public int getSlicerBatchSize() {
+    return slicerBatchSize;
+  }
+
   /**
    * Instantiates an FSNamesystem loaded from the image and edits
    * directories specified in the passed Configuration.
