@@ -8691,7 +8691,20 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           INodeDirectory quotaDir = (INodeDirectory) subtreeRoot;
           final DirectoryWithQuotaFeature q = quotaDir.getDirectoryWithQuotaFeature();
           if (q != null) {
-            
+
+            // HW.ai sometimes shows incorrect disk space consumed.
+            // Logging incorrect quota attributes
+            if (q.getSpaceConsumed().getNameSpace() < 0 ||
+                    q.getSpaceConsumed().getStorageSpace() < 0 ||
+                    q.getQuota().getNameSpace() < 0 ||
+                    q.getQuota().getStorageSpace() < 0) {
+              LOG.warn("Possible incorrect quota values: "+
+                    "NameSpace: "+q.getSpaceConsumed().getNameSpace()+
+                    "StorageSpace: "+q.getSpaceConsumed().getStorageSpace()+
+                    "NameSpaceQuota: "+q.getQuota().getNameSpace()+
+                    "StorageSpaceQuota: "+q.getQuota().getStorageSpace());
+            }
+
             LastUpdatedContentSummary.Builder builder =
                 new LastUpdatedContentSummary.Builder()
                     .fileAndDirectoryCount(q.getSpaceConsumed().getNameSpace())
