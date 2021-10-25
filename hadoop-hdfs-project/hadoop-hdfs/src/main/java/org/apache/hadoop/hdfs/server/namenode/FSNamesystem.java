@@ -1389,6 +1389,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           return null;
         }
       }.setParams(stoRootINode.getInodeId()).handle(this);
+
+      if(metaStatus.isMetaEnabled()) {
+        logMetadataEvents(fileTree);
+      }
     } finally {
       if(stoRootINode != null) {
         unlockSubtree(src, stoRootINode.getInodeId());
@@ -1439,43 +1443,71 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       EntityManager.update(dirNode);
     }
   
-    if(metaStatus.isMetaEnabled()) {
-      logMetadataEvents(fileTree);
-    }
   }
 
   private void logMetadataEvents(AbstractFileTree.FileTree fileTree) throws IOException {
     ProjectedINode dataSetDir = fileTree.getSubtreeRoot();
-    Collection<INodeMetadataLogEntry> logEntries = new ArrayList<>(fileTree
-        .getAllChildren().size());
-    for (ProjectedINode node : fileTree.getAllChildren()) {
-    
-      node.incrementLogicalTime();
-      INodeMetadataLogEntry logEntry =
-          new INodeMetadataLogEntry(dataSetDir.getId(),
-              node.getId(), node.getPartitionId(), node.getParentId(), node
-              .getName(), node.getLogicalTime(),
-              INodeMetadataLogEntry.Operation.Add);
-      EntityManager.add(logEntry);
-    
-      if (node.getNumUserXAttrs() > 0) {
-        node.incrementLogicalTime();
-        XAttrMetadataLogEntry xattrLogEntry =
-            new XAttrMetadataLogEntry(dataSetDir.getId(), node.getId(),
-                node.getLogicalTime(), node.getPartitionId(),
-                node.getParentId(), node.getName());
-        EntityManager.add(xattrLogEntry);
-        //dummy log entry to update the logical time on the inode
-        logEntry = new INodeMetadataLogEntry(dataSetDir.getId(),
-            node.getId(), node.getPartitionId(), node.getParentId(), node
-            .getName(), node.getLogicalTime(),
-            INodeMetadataLogEntry.Operation.Add);
+
+    ArrayList<ProjectedINode> children = new ArrayList<ProjectedINode>(fileTree.getAllChildren());
+
+    try {
+      Slicer.slice(children.size(), getSlicerBatchSize(),
+              getSlicerNbThreads(),
+              getFSOperationsExecutor(),
+              new Slicer.OperationHandler() {
+                @Override
+                public void handle(int startIndex, int endIndex)
+                        throws Exception {
+                  new HopsTransactionalRequestHandler(
+                          HDFSOperationType.ADD_METADATA_LOG_ENTRIES) {
+                    @Override
+                    public void acquireLock(TransactionLocks locks) {
+                    }
+
+                    @Override
+                    public Object performTask() throws IOException {
+                      List<ProjectedINode> subList = children.subList(startIndex, endIndex);
+                      List<INodeMetadataLogEntry> logEntries= new ArrayList<>(subList.size());
+
+                      for (ProjectedINode node : subList) {
+                        node.incrementLogicalTime();
+                        INodeMetadataLogEntry logEntry =
+                                new INodeMetadataLogEntry(dataSetDir.getId(),
+                                        node.getId(), node.getPartitionId(), node.getParentId(), node
+                                        .getName(), node.getLogicalTime(),
+                                        INodeMetadataLogEntry.Operation.Add);
+                        EntityManager.add(logEntry);
+
+                        if (node.getNumUserXAttrs() > 0) {
+                          node.incrementLogicalTime();
+                          XAttrMetadataLogEntry xattrLogEntry =
+                                  new XAttrMetadataLogEntry(dataSetDir.getId(), node.getId(),
+                                          node.getLogicalTime(), node.getPartitionId(),
+                                          node.getParentId(), node.getName());
+                          EntityManager.add(xattrLogEntry);
+                          //dummy log entry to update the logical time on the inode
+                          logEntry = new INodeMetadataLogEntry(dataSetDir.getId(),
+                                  node.getId(), node.getPartitionId(), node.getParentId(), node
+                                  .getName(), node.getLogicalTime(),
+                                  INodeMetadataLogEntry.Operation.Add);
+                        }
+
+                        logEntries.add(logEntry);
+                      }
+
+                      AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime(logEntries);
+                      return null;
+                    }
+                  }.handle();
+                }
+              });
+    } catch (Exception ex) {
+      if (ex instanceof  IOException){
+        throw (IOException)ex;
+      } else {
+        throw new IOException(ex);
       }
-    
-      logEntries.add(logEntry);
     }
-    AbstractFileTree.LoggingQuotaCountingFileTree.updateLogicalTime
-        (logEntries);
   }
 
   /**
