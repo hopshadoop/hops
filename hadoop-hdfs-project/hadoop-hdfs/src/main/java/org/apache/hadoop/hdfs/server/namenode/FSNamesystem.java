@@ -1948,9 +1948,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               Server.getCallId(), Server.getRpcEpoch()));
         }
 
-        if (flag.contains(CreateFlag.OVERWRITE) && dir.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(src));
-        }
         if (flag.contains(CreateFlag.OVERWRITE) && erasureCodingEnabled) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
         }
@@ -3468,6 +3465,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   @Deprecated
   boolean renameTo(String src, String dst)
       throws IOException {
+
+    if(!nameNode.isLeader() && dir.isQuotaEnabled()){
+      throw new NotALeaderException("Quota enabled. Rename operation can only be performed on a " +
+        "leader namenode");
+    }
+
     //only for testing
     saveTimes();
     boolean ret = false;
@@ -3485,6 +3488,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   void renameTo(final String src, final String dst,
                 Options.Rename... options)
       throws IOException {
+
+    if(!nameNode.isLeader() && dir.isQuotaEnabled()){
+      throw new NotALeaderException("Quota enabled. Rename operation can only be performed on a " +
+        "leader namenode");
+    }
+
     //only for testing
     saveTimes();
     Map.Entry<BlocksMapUpdateInfo, HdfsFileStatus> res = null;
@@ -7261,7 +7270,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     safeMode.adjustSafeBlocks(safeBlocks);
   }
 
-  QuotaUpdateManager getQuotaUpdateManager() {
+  public QuotaUpdateManager getQuotaUpdateManager() {
     return quotaUpdateManager;
   }
 
@@ -8579,6 +8588,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                     quota = q.getQuota();
                   } else {
                     quota = leafInode.getQuotaCounts();
+                  }
+
+                  if(!((INodeDirectory)leafInode).isWithQuota()) {
+                    // Here we can only calculate the size of the directory if it is empty
+                    if (((INodeDirectory) leafInode).getChildrenNum() == 0) {
+                      usage.setNameSpace(1);
+                    }
                   }
                 }
               }

@@ -962,34 +962,7 @@ public class FSDirectory implements Closeable {
     }
 
     if (isQuotaEnabled()) {
-      
-      
-      QuotaCounts outStandingDelta= new QuotaCounts.Builder().build();
-      
-      //apply the quota update that have not been applied yet in order for them to be forwarded to the parent eventhough
-      //they will be droped due to the fact that the dir will not exist anymore when trying to apply them
-      
-      //if the removed Inode has quota set, counts already contains the usage that need to be removed from 
-      //the parent, update not applied yet should be canceled by this update (removal will already be part off the value
-      //of counts and add will be added to be removed imediatly
-      if (!last.isQuotaSet()) {
-        //if the removed Inode does not have quota set we need to compute the ammount of data that need to be removed
-        //if children have been removed before and the removal quota update is not applied yet this need to be 
-        //propagated to the parent
-        List<QuotaUpdate> outstandingUpdates = (List<QuotaUpdate>) EntityManager
-            .findList(QuotaUpdate.Finder.ByINodeId, last.getId());
-        for (QuotaUpdate update : outstandingUpdates) {
-          EnumCounters<StorageType> typeCounts = new EnumCounters<StorageType>(StorageType.class);
-          for(StorageType type: StorageType.asList()){
-            typeCounts.add(type, update.getTypeSpaces().get(QuotaUpdate.StorageType.valueOf(type.name())));
-          }
-          QuotaCounts up = new QuotaCounts.Builder().storageSpace(update.getStorageSpaceDelta()).nameSpace(update.
-              getNamespaceDelta()).typeSpaces(typeCounts).build();
-          outStandingDelta.add(up);
-        }
-      }
-      outStandingDelta.add(counts.negation());
-      updateCountNoQuotaCheck(iip, iip.length() - 1, outStandingDelta);
+      updateCountNoQuotaCheck(iip, iip.length() - 1, counts.negation());
       return counts.getNameSpace();
     }
     return 1;

@@ -1584,7 +1584,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public boolean rename(String src, String dst) throws IOException {
     checkOpen();
     try (TraceScope ignored = newSrcDstTraceScope("rename", src, dst)) {
-      return namenode.rename(src, dst);
+      if (getServerDefaults().getQuotaEnabled()) {
+        return leaderNN.rename(src, dst);
+      } else {
+        return namenode.rename(src, dst);
+      }
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      NSQuotaExceededException.class,
@@ -1615,7 +1619,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       throws IOException {
     checkOpen();
     try (TraceScope ignored = newSrcDstTraceScope("rename2", src, dst)) {
-      namenode.rename2(src, dst, options);
+      if (getServerDefaults().getQuotaEnabled()) {
+        leaderNN.rename2(src, dst, options);
+      } else {
+        namenode.rename2(src, dst, options);
+      }
     } catch(RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
                                      DSQuotaExceededException.class,

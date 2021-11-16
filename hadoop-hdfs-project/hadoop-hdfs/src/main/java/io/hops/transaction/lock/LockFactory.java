@@ -252,18 +252,10 @@ public class LockFactory {
     return new NameNodeLeaseLock(lockType);
   }
 
-  public Lock getQuotaUpdateLock(boolean includeChildren, String... targets) {
-    return new QuotaUpdateLock(includeChildren, targets);
+  public Lock getQuotaUpdateLock(final long inodeID, final int limit) {
+    return new QuotaUpdateLock(inodeID, limit);
   }
 
-  public Lock getQuotaUpdateLock(String... targets) {
-    return new QuotaUpdateLock(targets);
-  }
-
-  public Lock getQuotaUpdateLock(List<QuotaUpdate> updates) {
-    return new QuotaUpdateLock(updates);
-  }
-  
   public Lock getVariableLock(Variable.Finder[] finders,
       TransactionLockTypes.LockType[] lockTypes) {
     assert finders.length == lockTypes.length;

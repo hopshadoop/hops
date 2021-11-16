@@ -15,10 +15,10 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.IDsGeneratorFactory;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.exception.TransientStorageException;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
@@ -59,6 +59,7 @@ public class QuotaUpdateManager {
 
   private final Daemon updateThread = new Daemon(new QuotaUpdateMonitor());
 
+  public boolean pauseAsyncOps = false;
   private final ConcurrentLinkedQueue<Iterator<Long>> prioritizedUpdates =
       new ConcurrentLinkedQueue<>();
 
@@ -109,26 +110,29 @@ public class QuotaUpdateManager {
     public void run() {
       long startTime;
       while (namesystem.isRunning()) {
-        startTime = System.currentTimeMillis();
         try {
-          boolean rerunImmediatly = false;
-          if (namesystem.isLeader()) {
-            if (!prioritizedUpdates.isEmpty()) {
-              Iterator<Long> iterator = prioritizedUpdates.poll();
-              while (iterator.hasNext()) {
-                processUpdates(iterator.next());
-              }
-              synchronized (iterator) {
-                iterator.notify();
-              }
-            }
-            rerunImmediatly = processNextUpdateBatch();
+          if (!namesystem.isLeader()) {
+            Thread.sleep(updateInterval);
+            continue;
           }
+
+          startTime = System.currentTimeMillis();
+
+          boolean rerunImmediatly = false;
+          applyAllPrioritizedUpdates();
+
+          if (!pauseAsyncOps/*only for testing*/) {
+            processNextUpdateBatch();
+            rerunImmediatly = countPendingQuota() > 0 || prioritizedUpdates.size() > 0;
+          }
+          
           //if there is parrent updates apply them immediately
           if (!rerunImmediatly) {
             long sleepDuration = updateInterval - (System.currentTimeMillis() - startTime);
             if (sleepDuration > 0) {
-              Thread.sleep(updateInterval);
+              synchronized (updateThread){
+                updateThread.wait(updateInterval);
+              }
             }
           }
         } catch (InterruptedException ie) {
@@ -144,106 +148,98 @@ public class QuotaUpdateManager {
     }
   }
 
-  private final Comparator<QuotaUpdate> quotaUpdateComparator =
-      new Comparator<QuotaUpdate>() {
+  private int countPendingQuota() throws IOException {
+    LightWeightRequestHandler quotaApplicationChecker =
+      new LightWeightRequestHandler(HDFSOperationType.COUNT_QUOTA_UPDATES) {
         @Override
-        public int compare(QuotaUpdate quotaUpdate, QuotaUpdate quotaUpdate2) {
-          if (quotaUpdate.getInodeId() < quotaUpdate2.getInodeId()) {
-            return -1;
-          }
-          if (quotaUpdate.getInodeId() > quotaUpdate2.getInodeId()) {
-            return 1;
-          }
-          return 0;
+        public Object performTask() throws StorageException, IOException {
+          QuotaUpdateDataAccess da = (QuotaUpdateDataAccess) HdfsStorageFactory.getDataAccess(QuotaUpdateDataAccess.class);
+          return da.getCount();
         }
       };
-
-  private void processUpdates(final Long id) throws IOException {
-    LightWeightRequestHandler findHandler =
-        new LightWeightRequestHandler(HDFSOperationType.GET_UPDATES_FOR_ID) {
-          @Override
-          public Object performTask() throws IOException {
-            QuotaUpdateDataAccess<QuotaUpdate> dataAccess =
-                (QuotaUpdateDataAccess) HdfsStorageFactory
-                    .getDataAccess(QuotaUpdateDataAccess.class);
-            return dataAccess.findByInodeId(id);
-          }
-        };
-
-    List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
-    LOG.debug("processUpdates for inode id="+id+" quotaUpdates ids are "+ Arrays.toString(quotaUpdates.toArray()));
-    applyBatchedUpdate(quotaUpdates);
+    return (int) quotaApplicationChecker.handle();
   }
 
-  private boolean processNextUpdateBatch() throws IOException {
-    LightWeightRequestHandler findHandler =
-        new LightWeightRequestHandler(HDFSOperationType.GET_NEXT_QUOTA_BATCH) {
-          @Override
-          public Object performTask() throws IOException {
-            QuotaUpdateDataAccess<QuotaUpdate> dataAccess =
-                (QuotaUpdateDataAccess) HdfsStorageFactory
-                    .getDataAccess(QuotaUpdateDataAccess.class);
-            return dataAccess.findLimited(updateLimit);
-          }
-        };
-
-    List<QuotaUpdate> quotaUpdates = (List<QuotaUpdate>) findHandler.handle();
-    Collections.sort(quotaUpdates, quotaUpdateComparator);
-    boolean rerunImmediatly = false;
-    ArrayList<QuotaUpdate> batch = new ArrayList<>();
-    for (QuotaUpdate update : quotaUpdates) {
-      if (batch.size() == 0 ||
-          batch.get(0).getInodeId() == update.getInodeId()) {
-        batch.add(update);
-      } else {
-        rerunImmediatly = rerunImmediatly || applyBatchedUpdate(batch);
-        batch = new ArrayList<>();
-        batch.add(update);
+  
+  private void applyAllPrioritizedUpdates() throws IOException {
+    if (namesystem.isLeader()) {
+      if (!prioritizedUpdates.isEmpty()) {
+        Iterator<Long> iterator = prioritizedUpdates.poll();
+        while (iterator.hasNext()) {
+          applyBatchedUpdateForINode(iterator.next(), true);
+        }
+        synchronized (iterator) {
+          iterator.notify();
+        }
       }
     }
-
-    if (batch.size() != 0) {
-      rerunImmediatly = rerunImmediatly || applyBatchedUpdate(batch);
-    }
-    if(quotaUpdates.size()==updateLimit){
-      rerunImmediatly = true;
-    }
-    return rerunImmediatly;
   }
 
-  private boolean applyBatchedUpdate(final List<QuotaUpdate> updates)
-      throws IOException {
-    if (updates.size() == 0) {
-      return false;
+  private List<Long> getPendingInodes() throws IOException {
+   return (List<Long>) (new LightWeightRequestHandler(HDFSOperationType.GET_QUOTA_PENDING_INODES) {
+              @Override
+              public Object performTask() throws IOException {
+                QuotaUpdateDataAccess<QuotaUpdate> dataAccess =
+                        (QuotaUpdateDataAccess) HdfsStorageFactory
+                                .getDataAccess(QuotaUpdateDataAccess.class);
+                return dataAccess.getDistinctInodes();
+              }
+            }).handle();
+  }
+
+  private void processNextUpdateBatch() throws IOException {
+    if(namesystem.isLeader()) {
+      List<Long> pendingInodes = getPendingInodes();
+      // Sort in descending order.
+      // In general leaves have higher ID than the parent.
+      Collections.sort(pendingInodes, Collections.reverseOrder());
+
+      for (Long inodeID : pendingInodes) {
+        applyBatchedUpdateForINode(inodeID, false);
+
+        // if there is priority work then break
+        if (prioritizedUpdates.size() > 0) {
+          break;
+        }
+      }
     }
-    return (boolean) new HopsTransactionalRequestHandler(HDFSOperationType.APPLY_QUOTA_UPDATE) {
+  }
+
+  private void applyBatchedUpdateForINode(final Long inodeID, boolean thisIsPriorityWork)
+          throws IOException {
+    LOG.debug("Applying quota updates for INode ID: "+inodeID+" Priority: "+thisIsPriorityWork);
+    HopsTransactionalRequestHandler handler =
+      new HopsTransactionalRequestHandler(HDFSOperationType.APPLY_QUOTA_UPDATE) {
       INodeIdentifier iNodeIdentifier;
 
       @Override
       public void setUp() throws IOException {
         super.setUp();
-        iNodeIdentifier = new INodeIdentifier(updates.get(0).getInodeId());
+        iNodeIdentifier = new INodeIdentifier(inodeID);
       }
 
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
-        locks.add(
-            lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, iNodeIdentifier))
-            .add(lf.getQuotaUpdateLock(updates));
+        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, iNodeIdentifier));
+        locks.add(lf.getQuotaUpdateLock(inodeID, updateLimit));
       }
 
       @Override
       public Object performTask() throws IOException {
-        INodeDirectory dir = (INodeDirectory) EntityManager
-            .find(INode.Finder.ByINodeIdFTIS, updates.get(0).getInodeId());
-        Collection<QuotaUpdate> dbUpdates = EntityManager.findList(QuotaUpdate.Finder.ByINodeId, updates.get(0).
-            getInodeId());
-        
-        if (dir != null && SubtreeLockHelper
-            .isSTOLocked(dir.isSTOLocked(), dir.getSTOLockOwner(),
-                namesystem.getNameNode().getActiveNameNodes()
-                    .getActiveNodes()) && dir.getSTOLockOwner() != namesystem.getNamenodeId()) {
+        // get the updates for this inode
+        Collection<QuotaUpdate> dbUpdates = EntityManager.findList(QuotaUpdate.Finder.ByINodeId,
+          inodeID, updateLimit);
+        LOG.debug("Read "+dbUpdates.size()+" quota updates for INode ID: "+inodeID);
+
+        if (dbUpdates.size() == 0) {
+          return 0;
+        }
+
+        INodeDirectory dir = (INodeDirectory) EntityManager.find(INode.Finder.ByINodeIdFTIS, inodeID);
+
+        if (dir != null && SubtreeLockHelper.isSTOLocked(dir.isSTOLocked(), dir.getSTOLockOwner(),
+          namesystem.getNameNode().getActiveNameNodes().getActiveNodes()) && dir.getSTOLockOwner() != namesystem.getNamenodeId()) {
           LOG.warn("Ignoring updates as the subtree lock is set");
           /*
            * We cannot process updates to keep move operations consistent. Otherwise the calculated size of the subtree
@@ -257,7 +253,7 @@ public class QuotaUpdateManager {
         for (QuotaUpdate update : dbUpdates) {
           counts.addStorageSpace(update.getStorageSpaceDelta());
           counts.addNameSpace(update.getNamespaceDelta());
-          
+
           for (Map.Entry<QuotaUpdate.StorageType, Long> entry : update.getTypeSpaces().entrySet()) {
             counts.addTypeSpace(StorageType.valueOf(entry.getKey().name()), entry.getValue());
           }
@@ -266,21 +262,21 @@ public class QuotaUpdateManager {
         }
 
         if (dir == null) {
-          LOG.debug("dropping update for " + updates.get(0) + " quota " + counts + " because of deletion");
-          return false;
+          LOG.warn("Dropping update for INode ID: " + inodeID + " because the node has been " +
+              "deleted. Quota " + counts.toString());
+          return dbUpdates.size();
         }
 
         if (dir != null && dir.isQuotaSet()) {
           final DirectoryWithQuotaFeature q = dir.getDirectoryWithQuotaFeature();
           if (q != null) {
             q.addSpaceConsumed2Cache(counts);
-            
+
             LOG.debug("applying aggregated update for directory " + dir.getId() +
-                " with quota " + counts);
+                    " with quota " + counts);
           }
         }
 
-        boolean hasParentUpdate = false;
         if (dir != null && dir.getId() != INodeDirectory.ROOT_INODE_ID) {
           boolean allNull = counts.getStorageSpace()==0 && counts.getNameSpace()==0;
           Map<QuotaUpdate.StorageType, Long > typeSpace = new HashMap<>();
@@ -290,15 +286,24 @@ public class QuotaUpdateManager {
           }
           if (!allNull) {
             QuotaUpdate parentUpdate = new QuotaUpdate(nextId(), dir.getParentId(), counts.getNameSpace(),
-                counts.getStorageSpace(), typeSpace);
+                    counts.getStorageSpace(), typeSpace);
             EntityManager.add(parentUpdate);
-            hasParentUpdate = true;
             LOG.debug("adding parent update " + parentUpdate);
           }
         }
-        return hasParentUpdate;
+        return dbUpdates.size();
       }
-    }.handle(this);
+    };
+
+    long processed = 0;
+    do {
+      processed = (int) handler.handle();
+      if (!thisIsPriorityWork) {
+        if (prioritizedUpdates.size() > 0) {
+          break; // break as high priority work is waiting
+        }
+      }
+    } while (processed > 0);
   }
 
   /**
@@ -309,12 +314,16 @@ public class QuotaUpdateManager {
    * @param iterator
    *     Ids to be updates sorted from the leaves to the root of the subtree
    */
-  void addPrioritizedUpdates(Iterator<Long> iterator) throws QuotaUpdateException {
-      if(namesystem.isLeader()) {
-        prioritizedUpdates.add(iterator);
-      } else {
-        throw  new QuotaUpdateException("Non leader name" +
-                "node cannot prioritize quota updates for inodes");
+  @VisibleForTesting
+  public void addPrioritizedUpdates(Iterator<Long> iterator) throws QuotaUpdateException {
+    if (namesystem.isLeader()) {
+      prioritizedUpdates.add(iterator);
+      synchronized (updateThread){
+        updateThread.notify();
       }
+    } else {
+      throw new QuotaUpdateException("Non leader name" +
+        "node cannot prioritize quota updates for inodes");
+    }
   }
 }

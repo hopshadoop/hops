@@ -57,7 +57,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 
 @VisibleForTesting
-abstract class AbstractFileTree {
+public abstract class AbstractFileTree {
   public static final Log LOG = LogFactory.getLog(AbstractFileTree.class);
 
   public static int SUBTREE_QUIESCE_LOCK_BATCH_SIZE = 1000;
@@ -439,17 +439,19 @@ abstract class AbstractFileTree {
   }
   
   @VisibleForTesting
-  static class QuotaCountingFileTree extends AbstractFileTree {
+  static class QuotaCountingFileTree extends FileTree {
     private final QuotaCounts quotaCounts = new QuotaCounts.Builder().build();
   
-    public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId)
+    public QuotaCountingFileTree(FSNamesystem namesystem, INodeIdentifier subtreeRootId, List<AclEntry> subtreeRootDefaultEntries)
         throws AccessControlException {
-      super(namesystem, subtreeRootId, subtreeRootId.getStoragePolicy());
+      super(namesystem, subtreeRootId, null, true, subtreeRootDefaultEntries,
+              subtreeRootId.getStoragePolicy());
     }
-  
+
     @Override
     protected void addSubtreeRoot(ProjectedINode node, BlockStoragePolicySuite bsps, byte inheritedStoragePolicy) {
       addNode(node, bsps, inheritedStoragePolicy);
+      super.addSubtreeRoot(node, bsps, inheritedStoragePolicy);
     }
 
     @Override
@@ -458,6 +460,7 @@ abstract class AbstractFileTree {
       if (!parent.isDirWithQuota()) {
         addNode(node, bsps, inheritedStoragePolicy);
       }
+      super.addChildNode(parent, level, node, bsps, inheritedStoragePolicy);
     }
   
     protected void addNode(final ProjectedINode node,
@@ -511,8 +514,8 @@ abstract class AbstractFileTree {
       
       public LoggingQuotaCountingFileTree(
           FSNamesystem namesystem, INodeIdentifier subtreeRootId, INode srcDataset,
-          INode dstDataset) throws AccessControlException {
-        super(namesystem, subtreeRootId);
+          INode dstDataset, List<AclEntry> nearestDefaultsForSubtree) throws AccessControlException {
+        super(namesystem, subtreeRootId, nearestDefaultsForSubtree);
         this.srcDataset = srcDataset;
         this.dstDataset = dstDataset;
       }
