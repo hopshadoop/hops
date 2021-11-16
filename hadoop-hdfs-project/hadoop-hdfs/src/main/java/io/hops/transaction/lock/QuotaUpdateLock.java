@@ -17,70 +17,27 @@
  */
 package io.hops.transaction.lock;
 
-import io.hops.exception.StorageException;
-import io.hops.exception.TransactionContextException;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import org.apache.hadoop.hdfs.server.namenode.INode;
 
 import java.io.IOException;
-import java.util.List;
 
 final class QuotaUpdateLock extends Lock {
-  private final String[] targets;
-  private final boolean includeChildren;
-  private final List<QuotaUpdate> updates;
+  private final int limit;
+  private final long inodeID;
   
-  QuotaUpdateLock(boolean includeChildren, String... targets) {
-    this.includeChildren = includeChildren;
-    this.targets = targets;
-    updates = null;
+  // limit is needed as we may have lots of rows for this inode
+  QuotaUpdateLock(final long inodeID, final int limit) {
+    this.inodeID = inodeID;
+    this.limit = limit;
   }
 
-  QuotaUpdateLock(String... paths) {
-    this(false, paths);
-  }
-
-  QuotaUpdateLock(List<QuotaUpdate> updates) {
-    this.includeChildren=false;
-    this.targets=null;
-    this.updates = updates;
-  }
-  
   @Override
   protected void acquire(TransactionLocks locks) throws IOException {
-    if (targets != null) {
-      INodeLock inodeLock = (INodeLock) locks.getLock(Type.INode);
-      for (String target : targets) {
-        acquireQuotaUpdate(inodeLock.getTargetINode(target));
-        if (includeChildren) {
-          acquireQuotaUpdate(inodeLock.getChildINodes(target));
-        }
-      }
-    } else if (updates!=null){
-      for(QuotaUpdate update : updates){
-        acquireQuotaUpdate(update);
-      }
+    if (inodeID != INode.NON_EXISTING_INODE_ID) {
+      acquireLockList(DEFAULT_LOCK_TYPE, QuotaUpdate.Finder.ByINodeId,
+        inodeID, limit);
     }
-  }
-
-  private void acquireQuotaUpdate(List<INode> iNodes)
-      throws StorageException, TransactionContextException {
-    if(iNodes != null){
-      for (INode iNode : iNodes) {
-      acquireQuotaUpdate(iNode);
-      }
-    }
-  }
-
-  private void acquireQuotaUpdate(INode iNode)
-      throws StorageException, TransactionContextException {
-    acquireLockList(DEFAULT_LOCK_TYPE, QuotaUpdate.Finder.ByINodeId,
-        iNode.getId());
-  }
-  
-  private void acquireQuotaUpdate(QuotaUpdate update)
-      throws StorageException, TransactionContextException {
-    acquireLock(DEFAULT_LOCK_TYPE, QuotaUpdate.Finder.ByKey, update.getId(), update.getInodeId());
   }
 
   @Override

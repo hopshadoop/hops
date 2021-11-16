@@ -156,16 +156,8 @@ class FSDirDeleteOp {
         fsn.delayAfterBbuildingTree("Built tree for " + srcArg + " for delete op");
 
         if (fsd.isQuotaEnabled()) {
-          Iterator<Long> idIterator = fileTree.getAllINodesIds().iterator();
-          synchronized (idIterator) {
-            fsn.getQuotaUpdateManager().addPrioritizedUpdates(idIterator);
-            try {
-              idIterator.wait();
-            } catch (InterruptedException e) {
-              // Not sure if this can happen if we are not shutting down but we need to abort in case it happens.
-              throw new IOException("Operation failed due to an Interrupt");
-            }
-          }
+          //apply pending quota level by level
+          FSSTOHelper.applyAllPendingQuotaInSubTree(fsn, fileTree);
         }
 
         for (int i = fileTree.getHeight(); i > 0; i--) {
@@ -194,14 +186,15 @@ class FSDirDeleteOp {
       for (final ProjectedINode dir : fileTree.getDirsByLevel(level)) {
         if (fileTree.countChildren(dir.getId()) <= BIGGEST_DELETABLE_DIR) {
           final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-          Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
+          Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID, true, dir.getId());
           barrier.add(f);
         } else {
           //delete the content of the directory one by one.
           for (final ProjectedINode inode : fileTree.getChildren(dir.getId())) {
             if (!inode.isDirectory()) {
               final String path = fileTree.createAbsolutePath(subtreeRootPath, inode);
-              Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
+              Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID,
+                false, INode.NON_EXISTING_INODE_ID);
               barrier.add(f);
             }
           }
@@ -216,7 +209,7 @@ class FSDirDeleteOp {
       //delete the empty Dirs
       for (ProjectedINode dir : emptyDirs) {
         final String path = fileTree.createAbsolutePath(subtreeRootPath, dir);
-        Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID);
+        Future f = multiTransactionDeleteInternal(fsn, path, subTreeRootID, true, dir.getId());
         barrier.add(f);
       }
 
@@ -247,13 +240,28 @@ class FSDirDeleteOp {
   }
     
   private static Future multiTransactionDeleteInternal(final FSNamesystem fsn, final String src,
-      final long subTreeRootId)
+      final long subTreeRootId, final boolean isDir, final long toDeleteINode)
       throws StorageException, TransactionContextException, IOException {
     final FSDirectory fsd = fsn.getFSDirectory();
 
     return fsn.getFSOperationsExecutor().submit(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
+        //before we delete this we make sure that all the quota updates are applied for this directory
+        if (isDir) {
+          List<Long> prioritizedUpdates = new ArrayList<>();
+          prioritizedUpdates.add(toDeleteINode);
+          Iterator<Long> itr = prioritizedUpdates.iterator();
+          synchronized (itr) {
+            try {
+              fsn.getQuotaUpdateManager().addPrioritizedUpdates(itr);
+              itr.wait();
+            } catch (InterruptedException e) {
+              throw new IOException("Operation failed due to an Interrupt");
+            }
+          }
+        }
+
         HopsTransactionalRequestHandler deleteHandler = new HopsTransactionalRequestHandler(
             HDFSOperationType.SUBTREE_DELETE) {
           @Override
@@ -274,10 +282,6 @@ class FSDirDeleteOp {
 
             locks.add(lf.getAllUsedHashBucketsLock());
 
-            if (fsd.isQuotaEnabled()) {
-              locks.add(lf.getQuotaUpdateLock(true, src));
-            }
-
             if (fsn.isErasureCodingEnabled()) {
               locks.add(lf.getEncodingStatusLock(true, LockType.WRITE, src));
             }
@@ -287,11 +291,13 @@ class FSDirDeleteOp {
           @Override
           public Object performTask() throws IOException {
             final INodesInPath iip = fsd.getINodesInPath4Write(src);
-            if (!deleteInternal(fsn, src, iip)) {
+            boolean deleted = deleteInternal(fsn, src, iip);
+            if (!deleted) {
               //at this point the delete op is expected to succeed. Apart from DB errors
               // this can only fail if the quiesce phase in subtree operation failed to
               // quiesce the subtree. See TestSubtreeConflicts.testConcurrentSTOandInodeOps
-              throw new RetriableException("Unable to Delete path: " + src + "." + " Possible subtree quiesce failure");
+              throw new RetriableException("Unable to Delete path: " + src + "." + " Possible " +
+                "subtree quiesce failure. Deleted: " + deleted);
 
             }
             return true;
@@ -329,9 +335,6 @@ class FSDirDeleteOp {
 
         locks.add(lf.getAllUsedHashBucketsLock());
 
-        if (fsd.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(true, src));
-        }
         if (fsn.isErasureCodingEnabled()) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE, src));
         }

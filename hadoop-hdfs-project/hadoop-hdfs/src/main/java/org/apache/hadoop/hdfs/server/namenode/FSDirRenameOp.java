@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -213,10 +214,9 @@ class FSDirRenameOp {
     INode dstDataSet = getMetaEnabledParent(dstInfo.getINodesInPath().getReadOnlyINodes());
     Collection<INodeMetadataLogEntry> logEntries = Collections.EMPTY_LIST;
 
-    //TODO [S]  if src is a file then there is no need for sub tree locking
+    //if src is a file then there is no need for sub tree locking
     //mechanism on the src and dst
-    //However the quota is enabled then all the quota update on the dst
-    //must be applied before the move operation.
+
     QuotaCounts srcCounts = new QuotaCounts.Builder().quotaCount(srcInfo.getUsage()).build();
     QuotaCounts dstCounts = new QuotaCounts.Builder().quotaCount(dstInfo.getUsage()).build();
     
@@ -226,6 +226,8 @@ class FSDirRenameOp {
 
     try {
       if (isUsingSubTreeLocks) {
+        List<AclEntry> nearestDefaultsForSubtree =
+          fsd.getFSNamesystem().calculateNearestDefaultAclForSubtree(srcInfo);
         LOG.debug("Rename src: "+src+" dst: "+dst+" requires sub-tree locking mechanism");
         //checkin parentAccess is enough for this operation, no need to pass access argument to QuotaCountingFileTree
         //permission check in Apache Hadoop: doCheckOwner:false, ancestorAccess:null, parentAccess:FsAction.WRITE, 
@@ -238,15 +240,29 @@ class FSDirRenameOp {
           if (shouldLogSubtreeInodes(srcInfo, dstInfo, srcDataSet,
               dstDataSet, srcSubTreeRoot)) {
             srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(fsd.getFSNamesystem(),
-                    srcSubTreeRoot, srcDataSet, dstDataSet);
+                    srcSubTreeRoot, srcDataSet, dstDataSet, nearestDefaultsForSubtree);
             srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
             logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree) srcFileTree).getMetadataLogEntries();
           } else {
             srcFileTree = new AbstractFileTree.QuotaCountingFileTree(fsd.getFSNamesystem(),
-                    srcSubTreeRoot);
+                    srcSubTreeRoot, nearestDefaultsForSubtree);
             srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
           }
           srcCounts = new QuotaCounts.Builder().quotaCount(srcFileTree.getQuotaCount()).build();
+
+          if (fsd.isQuotaEnabled()) {
+            //apply pending quota level by level for src folder
+            FSSTOHelper.applyAllPendingQuotaInSubTree(fsd.getFSNamesystem(), srcFileTree);
+
+            // we should apply quota updates to the destination folder in case it is
+            // overwritten. However, in case of rename the folder is overwritten
+            // only if the destination folder is empty. So applying prioritized
+            // updates only for the destination folder is sufficient
+            if (dstIIP.getLastINode() != null && dstIIP.getLastINode().isDirectory()) {
+              FSSTOHelper.applyAllPendingQuotaForDirectory(fsd.getFSNamesystem(),
+                dstIIP.getLastINode().getId());
+            }
+          }
         }
         fsd.getFSNamesystem().delayAfterBbuildingTree("Built tree of "+ src +" for rename. ");
       } else {
@@ -320,7 +336,7 @@ class FSDirRenameOp {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         INodeLock il = lf.getLegacyRenameINodeLock(
-            INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH, src, dst)
+            INodeLockType.WRITE_ON_TARGET_AND_PARENT, INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src, dst)
             .setNameNodeID(fsd.getFSNamesystem().getNamenodeId())
             .setActiveNameNodes(fsd.getFSNamesystem().getNameNode().getActiveNameNodes().getActiveNodes())
             .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
@@ -340,9 +356,7 @@ class FSDirRenameOp {
               .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src)).
               add(lf.getSubTreeOpsLock(LockType.WRITE, fsd.getFSNamesystem().getSubTreeLockPathPrefix(src), false));
         }
-        if (fsd.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(true, src, dst));
-        }
+
         locks.add(lf.getEZLock());
         locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_ENCRYPTION_ZONE));
         locks.add(lf.getAcesLock());
@@ -529,11 +543,8 @@ class FSDirRenameOp {
     INode dstDataSet = getMetaEnabledParent(dstInfo.getINodesInPath().getReadOnlyINodes());
     Collection<INodeMetadataLogEntry> logEntries = Collections.EMPTY_LIST;
 
-    //--
-    //TODO [S]  if src is a file then there is no need for sub tree locking
+    //if src is a file then there is no need for sub tree locking
     //mechanism on the src and dst
-    //However the quota is enabled then all the quota update on the dst
-    //must be applied before the move operation.
     QuotaCounts srcCounts = new QuotaCounts.Builder().quotaCount(srcInfo.getUsage()).build();
     QuotaCounts dstCounts = new QuotaCounts.Builder().quotaCount(dstInfo.getUsage()).build();
     boolean isUsingSubTreeLocks = srcInfo.isDir();
@@ -549,18 +560,35 @@ class FSDirRenameOp {
             FsAction.WRITE, SubTreeOperation.Type.RENAME_STO);
 
         if (srcSubTreeRoot != null) {
+          List<AclEntry> nearestDefaultsForSubtree =
+            fsd.getFSNamesystem().calculateNearestDefaultAclForSubtree(srcInfo);
           AbstractFileTree.QuotaCountingFileTree srcFileTree;
           if (shouldLogSubtreeInodes(srcInfo, dstInfo, srcDataSet,
               dstDataSet, srcSubTreeRoot)) {
             srcFileTree = new AbstractFileTree.LoggingQuotaCountingFileTree(fsd.getFSNamesystem(),
-                    srcSubTreeRoot, srcDataSet, dstDataSet);
+                    srcSubTreeRoot, srcDataSet, dstDataSet, nearestDefaultsForSubtree);
             srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
             logEntries = ((AbstractFileTree.LoggingQuotaCountingFileTree) srcFileTree).getMetadataLogEntries();
           } else {
             srcFileTree = new AbstractFileTree.QuotaCountingFileTree(fsd.getFSNamesystem(),
-                    srcSubTreeRoot);
+                    srcSubTreeRoot, nearestDefaultsForSubtree);
             srcFileTree.buildUp(fsd.getBlockStoragePolicySuite());
           }
+
+          if (fsd.isQuotaEnabled()) {
+            //apply pending quota level by level
+            FSSTOHelper.applyAllPendingQuotaInSubTree(fsd.getFSNamesystem(), srcFileTree);
+
+            // we should apply quota updates to the destination folder in case it is
+            // overwritten. However, in case of rename the folder is overwritten
+            // only if the destination folder is empty. So applying prioritized
+            // updates only for the destination folder is sufficient
+            if(dstIIP.getLastINode() != null && dstIIP.getLastINode().isDirectory()) {
+              FSSTOHelper.applyAllPendingQuotaForDirectory(fsd.getFSNamesystem(),
+                dstIIP.getLastINode().getId());
+            }
+          }
+
           srcCounts = new QuotaCounts.Builder().quotaCount(srcFileTree.getQuotaCount()).build();
 
           fsd.getFSNamesystem().delayAfterBbuildingTree("Built Tree for "+src+" for rename. ");
@@ -601,7 +629,7 @@ class FSDirRenameOp {
       public void acquireLock(TransactionLocks locks) throws IOException {
         LockFactory lf = LockFactory.getInstance();
         INodeLock il = lf.getRenameINodeLock(INodeLockType.WRITE_ON_TARGET_AND_PARENT,
-            INodeResolveType.PATH, src, dst)
+            INodeResolveType.PATH_AND_IMMEDIATE_CHILDREN, src, dst)
             .setNameNodeID(fsd.getFSNamesystem().getNamenodeId())
             .setActiveNameNodes(fsd.getFSNamesystem().getNameNode().getActiveNameNodes().getActiveNodes());
         if (isUsingSubTreeLocks) {
@@ -611,9 +639,7 @@ class FSDirRenameOp {
             .add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.IV,
                 BLK.PE, BLK.ER));
-        if (fsd.isQuotaEnabled()) {
-          locks.add(lf.getQuotaUpdateLock(true, src, dst));
-        }
+
         if (!isUsingSubTreeLocks) {
           locks.add(lf.getLeaseLockAllPaths(LockType.WRITE,
                   fsd.getFSNamesystem().getLeaseCreationLockRows()))

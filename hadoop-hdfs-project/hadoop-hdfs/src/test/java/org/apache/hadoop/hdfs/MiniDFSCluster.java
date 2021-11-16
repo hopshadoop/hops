@@ -2669,4 +2669,8 @@ public class MiniDFSCluster {
       writer.close();
     }
   }
+
+  public List<DataNodeProperties> getDataNodeProperties(){
+    return dataNodes;
+  }
 }

@@ -127,12 +127,13 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
   protected boolean inTree = false;
   protected long parentId = 0;
   public static int RANDOM_PARTITIONING_MAX_LEVEL=1;
+  public static int NON_EXISTING_INODE_ID=-1;
 
   protected boolean subtreeLocked;
   protected long subtreeLockOwner;
 
   public final static long ROOT_INODE_ID = 1;
-  
+
   private byte numUserXAttrs;
   private byte numSysXAttrs;
   /**

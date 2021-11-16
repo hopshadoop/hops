@@ -24,6 +24,7 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.dal.QuotaUpdateDataAccess;
 import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import io.hops.transaction.lock.TransactionLocks;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -55,13 +56,10 @@ public class QuotaUpdateContext
   public void remove(QuotaUpdate quotaUpdate)
       throws TransactionContextException {
     if (quotaUpdate != null) {
-      if (!contains(quotaUpdate.getId())) {
-        super.update(quotaUpdate);
+      super.remove(quotaUpdate);
+      if(isLogTraceEnabled()) {
+        log("removed-quotaUpdate", "id", quotaUpdate);
       }
-    }
-    super.remove(quotaUpdate);
-    if(isLogTraceEnabled()) {
-      log("removed-quotaUpdate", "id", quotaUpdate);
     }
   }
 
@@ -110,13 +108,14 @@ public class QuotaUpdateContext
   private List<QuotaUpdate> findByINodeId(QuotaUpdate.Finder qFinder,
       Object[] params) throws StorageCallPreventedException, StorageException {
     final long inodeId = (Long) params[0];
+    final int limit = (Integer) params[1];
     List<QuotaUpdate> result = null;
     if (inodeIdToQuotaUpdates.containsKey(inodeId)) {
       result = inodeIdToQuotaUpdates.get(inodeId);
       hit(qFinder, result, "inodeid", inodeId);
     } else {
       aboutToAccessStorage(qFinder, params);
-      result = dataAccess.findByInodeId(inodeId);
+      result = dataAccess.findByInodeId(inodeId, limit);
       gotFromDB(inodeId, result);
       miss(qFinder, result, "inodeid", inodeId);
     }
