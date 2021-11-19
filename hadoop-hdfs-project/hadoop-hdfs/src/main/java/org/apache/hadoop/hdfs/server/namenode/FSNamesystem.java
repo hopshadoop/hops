@@ -8819,6 +8819,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       while (fsRunning && shouldCacheCleanerRun) {
         try {
           if (isLeader()) {
+            Thread.sleep(1000);
             long lastDeletedEpochSec = HdfsVariables.getRetryCacheCleanerEpoch();
             long toBeDeletedEpochSec = lastDeletedEpochSec + 1L;
             if (toBeDeletedEpochSec < ((timer.now() - entryExpiryMillis) / 1000)) {
@@ -8832,7 +8833,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
               continue;
             }
           }
-          Thread.sleep(1000);
         } catch (Exception e) {
           if (e instanceof InterruptedException) {
             cleanerLog.warn("RetryCacheCleaner Interrupted");

@@ -4933,6 +4933,7 @@ public class BlockManager {
     public void run() {
       while (namesystem.isRunning()) {
         try {
+          Thread.sleep(replicationRecheckInterval);
           if (namesystem.isLeader()) {
             LOG.debug("Running replication monitor");
             // Process replication work only when active NN is out of safe mode.
@@ -4945,7 +4946,6 @@ public class BlockManager {
             updateState();
             LOG.debug("Namesystem is not leader: will not run replication monitor");
           }
-          Thread.sleep(replicationRecheckInterval);
         } catch (Throwable t) {
           if(t instanceof TransientStorageException){
             continue;
