@@ -110,7 +110,7 @@ public class LeaderElection extends Thread {
             "sucessfulTx " + sucessfulTx + " failedTx " + failedtx +
             " time period " + context.time_period + " " + te.getMessage(), te);
         // transaction failed
-        sleepDuration = 0;
+        sleepDuration = 50;
         txFailed = true;
         failedtx++;
       } catch (StorageException e) {
@@ -119,7 +119,7 @@ public class LeaderElection extends Thread {
                 "sucessfulTx " + sucessfulTx + " failedTx " + failedtx +
                 " time period " + context.time_period + " " + e.getMessage(), e);
         // transaction failed
-        sleepDuration = 0;
+        sleepDuration = 1000;
         txFailed = true;
         failedtx++;
       } catch (LeaderElectionForceAbort fa) {
