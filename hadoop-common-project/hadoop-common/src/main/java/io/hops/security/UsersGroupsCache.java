@@ -279,6 +279,7 @@ class UsersGroupsCache {
         if (localTx) {
           connector.beginTransaction();
         }
+        Exception exception = null;
         try {
 
           user = userDataAccess.getUser(lockRowName);
@@ -296,11 +297,12 @@ class UsersGroupsCache {
             connector.commit();
           }
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
         lockUser = user;
@@ -350,7 +352,7 @@ class UsersGroupsCache {
 
   private User getUserFromDB(final String userName, final Integer userId)
           throws IOException {
-    return (User) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.GET_USER) {
+    return (User) new LightWeightRequestHandler(UsersOperationsType.GET_USER) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Get User: " + userName + " from DB.");
@@ -360,6 +362,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugSharedLock(connector);
           User user = userName == null ? userDataAccess.getUser(userId) :
@@ -371,11 +374,12 @@ class UsersGroupsCache {
 
           return user;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -384,7 +388,7 @@ class UsersGroupsCache {
 
   private User addUserToDB(final String userName) throws IOException {
 
-    return (User) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_USER) {
+    return (User) new LightWeightRequestHandler(UsersOperationsType.ADD_USER) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Add User: " + userName + " to DB.");
@@ -394,6 +398,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugExclusiveLock(connector);
           User user = userDataAccess.addUser(userName);
@@ -403,11 +408,12 @@ class UsersGroupsCache {
           }
           return user;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -417,7 +423,7 @@ class UsersGroupsCache {
   @VisibleForTesting
   protected void removeUserFromDB(final Integer userId) throws IOException {
 
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_USER) {
+    new LightWeightRequestHandler(UsersOperationsType.REMOVE_USER) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Remove UserID: " + userId + " from DB.");
@@ -427,6 +433,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugExclusiveLock(connector);
           userDataAccess.removeUser(userId);
@@ -437,11 +444,12 @@ class UsersGroupsCache {
 
           return null;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -451,7 +459,7 @@ class UsersGroupsCache {
   private Group getGroupFromDB(final String groupName, final Integer groupId) throws IOException {
 
     return (Group) new LightWeightRequestHandler(
-            UsersGroupsCache.UsersOperationsType.GET_GROUP) {
+            UsersOperationsType.GET_GROUP) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Get GroupName: " + groupName + " GroupID: " + groupId + " from DB.");
@@ -461,6 +469,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugSharedLock(connector);
           Group group = groupName == null ? groupDataAccess.getGroup(groupId) :
@@ -472,11 +481,12 @@ class UsersGroupsCache {
 
           return group;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -485,7 +495,7 @@ class UsersGroupsCache {
 
   private Group addGroupToDB(final String groupName) throws IOException {
 
-    return (Group) new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.ADD_GROUP) {
+    return (Group) new LightWeightRequestHandler(UsersOperationsType.ADD_GROUP) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Add Group: " + groupName + " to DB.");
@@ -496,6 +506,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugExclusiveLock(connector);
           Group group = groupDataAccess.addGroup(groupName);
@@ -506,11 +517,12 @@ class UsersGroupsCache {
 
           return group;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -520,7 +532,7 @@ class UsersGroupsCache {
   @VisibleForTesting
   protected void removeGroupFromDB(final Integer groupId) throws IOException {
 
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_GROUP) {
+    new LightWeightRequestHandler(UsersOperationsType.REMOVE_GROUP) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Remove GroupID: " + groupId + " from DB.");
@@ -531,6 +543,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugExclusiveLock(connector);
           groupDataAccess.removeGroup(groupId);
@@ -541,11 +554,12 @@ class UsersGroupsCache {
 
           return null;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -555,7 +569,7 @@ class UsersGroupsCache {
   private void removeUserFromGroupDB(final Integer userId, final Integer groupId) throws
           IOException {
 
-    new LightWeightRequestHandler(UsersGroupsCache.UsersOperationsType.REMOVE_USER_FROM_GROUPS) {
+    new LightWeightRequestHandler(UsersOperationsType.REMOVE_USER_FROM_GROUPS) {
       @Override
       public Object performTask() throws IOException {
         LOG.debug("Removing user from group. UserID: " + userId + " GropuID: " + groupId + ".");
@@ -566,6 +580,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugExclusiveLock(connector);
           userGroupDataAccess.removeUserFromGroup(userId, groupId);
@@ -576,11 +591,12 @@ class UsersGroupsCache {
 
           return null;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -601,6 +617,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugExclusiveLock(connector);
           userGroupDataAccess.addUserToGroup(userId, groupId);
@@ -611,6 +628,7 @@ class UsersGroupsCache {
 
           return null;
         } catch (IOException e) {
+          exception = e;
           fail = true;
 
           if (e instanceof ForeignKeyConstraintViolationException) {
@@ -632,7 +650,7 @@ class UsersGroupsCache {
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
@@ -643,7 +661,7 @@ class UsersGroupsCache {
           IOException {
 
     return (List<Group>) new LightWeightRequestHandler
-            (UsersGroupsCache.UsersOperationsType.GET_USER_GROUPS) {
+            (UsersOperationsType.GET_USER_GROUPS) {
       @Override
       public Object performTask() throws IOException {
         List<Group> result = null;
@@ -653,6 +671,7 @@ class UsersGroupsCache {
           connector.beginTransaction();
         }
 
+        Exception exception = null;
         try {
           ugSharedLock(connector);
           User user = userId == null ? userDataAccess.getUser(userName) :
@@ -667,11 +686,12 @@ class UsersGroupsCache {
 
           return result;
         } catch (IOException e) {
+          exception = e;
           fail = true;
           throw e;
         } finally {
           if (fail && localTx) {
-            connector.rollback();
+            connector.rollback(exception);
           }
         }
       }
