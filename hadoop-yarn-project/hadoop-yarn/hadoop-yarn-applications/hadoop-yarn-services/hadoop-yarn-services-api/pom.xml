@@ -19,7 +19,7 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-yarn-services</artifactId>
-    <version>3.2.0.3-RC0</version>
+    <version>3.2.0.3</version>
   </parent>
   <artifactId>hadoop-yarn-services-api</artifactId>
   <name>Apache Hadoop YARN Services API</name>
