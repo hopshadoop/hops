@@ -1362,6 +1362,7 @@ Then see if complete successfully in roughly the same time once the upgrade is a
 to AWS services.
 * Try and get other people, especially anyone with their own endpoints,
   apps or different deployment environments, to run their own tests.
+* Checkout cloudstore, build it against your version of hadoop, then use its CLI to run some commands (`storediag` etc)
 
 ### Dealing with Deprecated APIs and New Features
 
