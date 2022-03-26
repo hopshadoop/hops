@@ -20,7 +20,6 @@ package io.hops.transaction.lock;
 import io.hops.metadata.hdfs.dal.BlockChecksumDataAccess;
 import io.hops.metadata.hdfs.entity.BlockChecksum;
 import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.codehaus.jackson.map.MapperConfig;
 
 import java.io.IOException;
 

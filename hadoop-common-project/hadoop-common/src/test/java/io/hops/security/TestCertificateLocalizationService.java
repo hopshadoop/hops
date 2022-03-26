@@ -26,7 +26,7 @@ import org.apache.hadoop.security.ssl.JWTSecurityMaterial;
 import org.apache.hadoop.security.ssl.X509SecurityMaterial;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
