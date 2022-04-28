@@ -96,6 +96,10 @@
           <groupId>tomcat</groupId>
           <artifactId>jasper-runtime</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-json</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -294,6 +298,10 @@
         <exclusion>
           <groupId>io.hops</groupId>
           <artifactId>hadoop-auth</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-json</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
