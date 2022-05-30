@@ -72,8 +72,8 @@ public class TestRunTimeExceptionInTxReqHandler {
     try {
       txHandler.handle();
       fail();
-    } catch (RuntimeException e) {
-      assert e.getMessage().compareToIgnoreCase("Test") == 0;
+    } catch (IOException e) {
+      assert e.getMessage().contains("Test");
     }
 
     //Exception in perform phase
@@ -94,8 +94,8 @@ public class TestRunTimeExceptionInTxReqHandler {
     try {
       txHandler.handle();
       fail();
-    } catch (RuntimeException e) {
-      assert e.getMessage().compareToIgnoreCase("Test") == 0;
+    } catch (IOException e) {
+      assert e.getMessage().contains("Test");
     }
 
     //Exception in lock phase
@@ -117,8 +117,8 @@ public class TestRunTimeExceptionInTxReqHandler {
     try {
       txHandler.handle();
       fail();
-    } catch (RuntimeException e) {
-      assert e.getMessage().compareToIgnoreCase("Test") == 0;
+    } catch (IOException e) {
+      assert e.getMessage().contains("Test");
     }
   }
 }
