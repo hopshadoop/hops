@@ -1599,6 +1599,9 @@ public class ResourceManager extends CompositeService
     // transfer service context to new RM service Context
     rmContextImpl.setServiceContext(rmContext.getServiceContext());
 
+    // transfer CertificateLocalizationService to new RM Context
+    rmContextImpl.setCertificateLocalizationService(rmContext.getCertificateLocalizationService());
+
     // reset dispatcher
     Dispatcher dispatcher = setupDispatcher();
     ((Service) dispatcher).init(this.conf);

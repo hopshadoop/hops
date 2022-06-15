@@ -19,16 +19,26 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.base.Supplier;
+import io.hops.security.SuperuserKeystoresLoader;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.cert.X509Certificate;
 
 import javax.ws.rs.core.MediaType;
 
@@ -62,8 +72,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.sun.jersey.api.client.Client;
@@ -92,7 +104,15 @@ public class TestRMHA {
 
   private static final String RM3_ADDRESS = "2.2.2.2:2";
   private static final String RM3_NODE_ID = "rm3";
+  private static final String BASE_DIR = Paths.get(
+          System.getProperty("test.build.dir", Paths.get("target", "test-dir").toString()),
+          TestRMHA.class.getSimpleName()).toString();
 
+  @BeforeClass
+  public static void beforeClass() throws Exception {
+    File baseDirFile = new File(BASE_DIR);
+    baseDirFile.mkdirs();
+  }
   @Before
   public void setUp() throws Exception {
     configuration = new Configuration();
@@ -118,6 +138,14 @@ public class TestRMHA {
     ClusterMetrics.destroy();
     QueueMetrics.clearQueueMetrics();
     DefaultMetricsSystem.shutdown();
+  }
+
+  @AfterClass
+  public static void afterClass() throws Exception {
+    File baseDirFile = new File(BASE_DIR);
+    if (baseDirFile.exists()) {
+      FileUtils.deleteDirectory(baseDirFile);
+    }
   }
 
   private void checkMonitorHealth() throws IOException {
@@ -186,6 +214,61 @@ public class TestRMHA {
     // Other stuff is verified in the regular web-services related tests
   }
 
+  /*
+    Make sure that transitioning StandBy->Active->StandBy->Active
+    transfers the CertificateLocalizationService to the new RM context
+    https://hopshadoop.atlassian.net/browse/HOPS-1659
+   */
+  @Test
+  public void testCertificateLocalizationService() throws Exception {
+    configuration.setBoolean(YarnConfiguration.AUTO_FAILOVER_ENABLED, false);
+    configuration.setBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED, true);
+    configuration.setBoolean(CommonConfigurationKeysPublic.HOPS_CRL_VALIDATION_ENABLED_KEY, false);
+    configuration.set(CommonConfigurationKeysPublic.HOPS_TLS_SUPER_MATERIAL_DIRECTORY, BASE_DIR);
+    Configuration conf = new YarnConfiguration(configuration);
+
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    SuperuserKeystoresLoader loader = new SuperuserKeystoresLoader(conf);
+    Path keyStore = Paths.get(BASE_DIR, loader.getSuperKeystoreFilename(ugi.getUserName()));
+    Path trustStore = Paths.get(BASE_DIR, loader.getSuperTruststoreFilename(ugi.getUserName()));
+    Path passwdFile = Paths.get(BASE_DIR, loader.getSuperMaterialPasswdFilename(ugi.getUserName()));
+
+    FileUtils.writeStringToFile(passwdFile.toFile(), "passwd");
+
+    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
+    X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=" + NetUtils.getLocalCanonicalHostname()
+            + ",L=" + ugi.getUserName(), keyPair, 10, "SHA256withRSA");
+
+    KeyStoreTestUtil.createKeyStore(keyStore.toString(), "passwd", "server", keyPair.getPrivate(), cert);
+    KeyStoreTestUtil.createTrustStore(trustStore.toString(), "passwd", "server", cert);
+
+    rm = new MockRM(conf);
+    rm.init(conf);
+    checkMonitorHealth();
+    rm.start();
+
+    assertNotNull(rm.rmContext.getCertificateLocalizationService());
+
+    StateChangeRequestInfo requestInfo = new StateChangeRequestInfo(
+            HAServiceProtocol.RequestSource.REQUEST_BY_USER);
+
+    // RM starts from Standby. Make it Active
+    rm.adminService.transitionToActive(requestInfo);
+    checkMonitorHealth();
+    assertNotNull(rm.rmContext.getCertificateLocalizationService());
+
+    // Transition to StandBy
+    rm.adminService.transitionToStandby(requestInfo);
+    checkMonitorHealth();
+    assertNotNull(rm.rmContext.getCertificateLocalizationService());
+
+    // Transition back to Active
+    rm.adminService.transitionToActive(requestInfo);
+    checkMonitorHealth();
+    assertNotNull(rm.rmContext.getCertificateLocalizationService());
+
+    rm.stop();
+  }
   /**
    * Test to verify the following RM HA transitions to the following states.
    * 1. Standby: Should be a no-op
