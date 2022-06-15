@@ -57,7 +57,7 @@ public class TestRunTimeExceptionInTxReqHandler {
             new HopsTransactionalRequestHandler(HDFSOperationType.TEST) {
               @Override
               public void setUp() throws IOException {
-                throw new RuntimeException("Test");
+                throw new RuntimeException("My Test Exception");
               }
 
               @Override
@@ -72,7 +72,7 @@ public class TestRunTimeExceptionInTxReqHandler {
     try {
       txHandler.handle();
       fail();
-    } catch (IOException e) {
+    } catch (Exception e) {
       assert e.getMessage().contains("Test");
     }
 
