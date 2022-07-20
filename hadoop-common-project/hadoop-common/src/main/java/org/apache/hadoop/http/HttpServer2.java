@@ -735,6 +735,7 @@ public final class HttpServer2 implements FilterContainer {
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
     staticContext.setSessionHandler(handler);
+
     setContextAttributes(staticContext, conf);
     defaultContexts.put(staticContext, true);
   }
