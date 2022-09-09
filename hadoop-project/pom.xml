@@ -154,7 +154,7 @@
     <declared.hadoop.version>${hadoop.version}</declared.hadoop.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <snakeyaml.version>1.16</snakeyaml.version>
+    <snakeyaml.version>1.26</snakeyaml.version>
     <hbase.one.version>1.2.6</hbase.one.version>
     <hbase.two.version>2.2.0</hbase.two.version>
   </properties>
