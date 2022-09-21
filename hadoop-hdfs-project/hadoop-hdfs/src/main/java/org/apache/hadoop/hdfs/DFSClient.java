@@ -1829,6 +1829,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     if (null == blockLocations) {
       throw new FileNotFoundException("File does not exist: " + src);
     }
+    if (blockLocations.hasPhantomBlock()) {
+      throw new IOException("Checksum not supported for files stored in DB. File: " + src);
+    }
     List<LocatedBlock> locatedblocks = blockLocations.getLocatedBlocks();
     final DataOutputBuffer md5out = new DataOutputBuffer();
     int bytesPerCRC = -1;
