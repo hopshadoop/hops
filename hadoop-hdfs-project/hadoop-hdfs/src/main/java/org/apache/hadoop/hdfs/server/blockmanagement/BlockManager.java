@@ -801,6 +801,9 @@ public class BlockManager {
 
   private List<LocatedBlock> createPhantomLocatedBlockList(INodeFile file, final byte[] data,
       final AccessMode mode) throws IOException, StorageException {
+    if (file.getSize() == 0) {
+      return null;
+    }
     List<LocatedBlock> results = new ArrayList<>(1);
     BlockInfoContiguous fakeBlk = new BlockInfoContiguous();
     fakeBlk.setBlockIdNoPersistance(-file.getId());

@@ -1470,6 +1470,83 @@ public class TestSmallFilesCreation {
     }
   }
 
+  @Test
+  public void TestChecksum() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024 * 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+      cluster.waitActive();
+
+      final int INMEMORY_BUCKET_SIZE = FSNamesystem.getDBInMemBucketSize();
+
+      final String FILE_NAME1 = "/dir/TEST-FLIE1";
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      dfs.mkdirs(new Path("/dir"));
+      dfs.setStoragePolicy(new Path("/dir"), "DB");
+
+      writeFile(dfs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
+      verifyFile(dfs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
+
+      try {
+        dfs.getFileChecksum(new Path(FILE_NAME1));
+      }catch (IOException e){
+       assertTrue(e.getMessage().contains("Checksum not supported for files stored in DB."));
+      }
+
+
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  public void TestAppendToEmptyFile() throws IOException {
+    MiniDFSCluster cluster = null;
+    try {
+      Configuration conf = new HdfsConfiguration();
+      final int BLOCK_SIZE = 1024 * 1024;
+      conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
+
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).format(true).build();
+      cluster.waitActive();
+
+      final int INMEMORY_BUCKET_SIZE = FSNamesystem.getDBInMemBucketSize();
+
+      final String FILE_NAME1 = "/dir/TEST-FLIE1";
+      DistributedFileSystem dfs = cluster.getFileSystem();
+
+      dfs.mkdirs(new Path("/dir"));
+      dfs.setStoragePolicy(new Path("/dir"), "DB");
+
+      dfs.create(new Path(FILE_NAME1)).close();
+
+      FSDataOutputStream out = dfs.append(new Path(FILE_NAME1));
+
+      writeData(out, 0, INMEMORY_BUCKET_SIZE);
+      out.close();
+      verifyFile(dfs, FILE_NAME1, INMEMORY_BUCKET_SIZE);
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail(e.getMessage());
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
   @AfterClass
   /** force format the database to release the extents
    *

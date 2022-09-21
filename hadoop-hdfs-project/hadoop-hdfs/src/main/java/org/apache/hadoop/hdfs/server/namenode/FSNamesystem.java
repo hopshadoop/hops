@@ -2236,8 +2236,13 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     if(file.isFileStoredInDB()){
       LOG.debug("Stuffed Inode:  prepareFileForWrite stored in database. " +
           "Returning phantom block");
-      return blockManager.createPhantomLocatedBlocks(file, file.getFileDataInDB(), true, false, null).getLocatedBlocks().
-          get(0);
+      List<LocatedBlock> lblocks = blockManager.createPhantomLocatedBlocks(file,
+        file.getFileDataInDB(), true, false, null).getLocatedBlocks();
+      if (lblocks != null) {
+        return lblocks.get(0);
+      } else {
+        return null;
+      }
     } else {
       LocatedBlock ret = null;
       if (!newBlock) {
