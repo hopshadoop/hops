@@ -43,12 +43,16 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 import org.apache.hadoop.net.ConnectTimeoutException;
+import org.apache.hadoop.net.HopsSSLSocketFactory;
+import org.apache.hadoop.net.HopsSSLSocketWrapper;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.SaslRpcClient;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -59,6 +63,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.TrustManager;
 import javax.security.sasl.Sasl;
 import java.io.*;
 import java.net.*;
@@ -426,6 +432,8 @@ public class Client implements AutoCloseable {
     private SaslRpcClient saslRpcClient;
     
     private Socket socket = null;                 // connected socket
+    private KeyManager[] keyManagers = null;
+    private TrustManager[] trustManagers = null;
     private IpcStreams ipcStreams;
     private final int maxResponseLength;
     private final int rpcTimeout;
@@ -654,7 +662,14 @@ public class Client implements AutoCloseable {
       short timeoutFailures = 0;
       while (true) {
         try {
-          this.socket = socketFactory.createSocket();
+          if (socketFactory instanceof HopsSSLSocketFactory) {
+            final HopsSSLSocketWrapper sslSocketWrapper = ((HopsSSLSocketFactory) socketFactory).createHopsSSLSocket();
+            this.socket = sslSocketWrapper.getSocket();
+            this.keyManagers = sslSocketWrapper.getKeyManagers();
+            this.trustManagers = sslSocketWrapper.getTrustManagers();
+          } else {
+            this.socket = socketFactory.createSocket();
+          }
           this.socket.setTcpNoDelay(tcpNoDelay);
           this.socket.setKeepAlive(true);
           
@@ -890,6 +905,27 @@ public class Client implements AutoCloseable {
         socket.close();
       } catch (IOException e) {
         LOG.warn("Not able to close a socket", e);
+      }
+      if (keyManagers != null) {
+        LOG.debug("Closing KeyManagers");
+        for (KeyManager km : keyManagers) {
+          if (km instanceof ReloadingX509KeyManager) {
+            LOG.debug("Closing Reloading Key Manager");
+            ((ReloadingX509KeyManager) km).stop();
+          }
+        }
+        keyManagers = null;
+      }
+
+      if (trustManagers != null) {
+        LOG.debug("Closing TrustManagers");
+        for (TrustManager tm : trustManagers) {
+          if (tm instanceof ReloadingX509TrustManager) {
+            LOG.debug("Closing Reloading Trust Manager");
+            ((ReloadingX509TrustManager) tm).destroy();
+          }
+        }
+        trustManagers = null;
       }
       // set socket to null so that the next call to setupIOstreams
       // can start the process of connect all over again.

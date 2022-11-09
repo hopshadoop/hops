@@ -287,15 +287,21 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
             backOff.reset();
             backOffTimeout = 0L;
           }
+        } catch (InterruptedException ex) {
+          stop();
         } catch (Exception ex) {
           backOffTimeout = backOff.getBackOffInMillis();
           numberOfFailures++;
           if (backOffTimeout != -1) {
-            LOG.warn("Could not reload Key Manager (using the old), trying again in " + backOffTimeout + " ms");
+            LOG.debug("Could not reload Key Manager (using the old), trying again in " + backOffTimeout + " ms");
           } else {
             LOG.error("Could not reload Key Manager, stop retrying", ex);
             stop();
           }
+        }
+      } else {
+        if (!fileExists.get()) {
+          stop();
         }
       }
     }

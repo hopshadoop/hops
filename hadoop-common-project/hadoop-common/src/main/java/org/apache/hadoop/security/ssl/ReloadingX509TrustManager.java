@@ -38,6 +38,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.util.BackOff;
@@ -71,6 +72,7 @@ public final class ReloadingX509TrustManager
   private final BackOff backOff;
   private long backOffTimeout = 0L;
 
+  private final AtomicBoolean fileExists = new AtomicBoolean(true);
   private int numberOfFailures = 0;
   
   /**
@@ -165,6 +167,11 @@ public final class ReloadingX509TrustManager
   public int getNumberOfFailures() {
     return numberOfFailures;
   }
+
+  @VisibleForTesting
+  public AtomicBoolean getFileExists() {
+    return fileExists;
+  }
   
   @Override
   public void checkClientTrusted(X509Certificate[] chain, String authType)
@@ -201,16 +208,16 @@ public final class ReloadingX509TrustManager
     return issuers;
   }
 
-  boolean needsReload() {
-    boolean reload = true;
+  private boolean needsReload() {
     if (file.exists()) {
-      if (file.lastModified() == lastLoaded) {
-        reload = false;
+      if (file.lastModified() > lastLoaded) {
+        return true;
       }
     } else {
-      lastLoaded = 0;
+      fileExists.set(false);
     }
-    return reload;
+
+    return false;
   }
 
   X509TrustManager loadTrustManager()
@@ -259,16 +266,22 @@ public final class ReloadingX509TrustManager
           backOff.reset();
           numberOfFailures = 0;
           backOffTimeout = 0L;
-      }
+        }
+      } catch (InterruptedException ex) {
+        destroy();
         } catch (Exception ex) {
         backOffTimeout = backOff.getBackOffInMillis();
         numberOfFailures++;
         if (backOffTimeout != -1) {
-          LOG.warn(RELOAD_ERROR_MESSAGE + ex.toString() + " trying again in " + backOffTimeout + " ms");
+          LOG.debug(RELOAD_ERROR_MESSAGE + ex.toString() + " trying again in " + backOffTimeout + " ms");
         } else {
           LOG.error(RELOAD_ERROR_MESSAGE + ", stop retrying", ex);
           destroy();
         }
+      }
+    } else {
+      if (!fileExists.get()) {
+        destroy();
       }
     }
   }

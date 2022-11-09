@@ -279,19 +279,32 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
     }
   }
   
-  public Socket createSocket() throws IOException, UnknownHostException {
+  public HopsSSLSocketWrapper createHopsSSLSocket() throws IOException, UnknownHostException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Creating SSL client socket");
+      LOG.debug("Creating Hops SSL client socket");
     }
     if (conf.getBoolean(FORCE_CONFIGURE, false)) {
       setConf(conf);
     }
-    SSLContext sslCtx = initializeSSLContext();
-    SSLSocketFactory socketFactory = sslCtx.getSocketFactory();
-    return socketFactory.createSocket();
+    SSLContextMaterial sslContextMaterial = initializeSSLContext();
+    SSLSocketFactory socketFactory = sslContextMaterial.sslContext.getSocketFactory();
+    Socket s = socketFactory.createSocket();
+    return new HopsSSLSocketWrapper(s, sslContextMaterial.keyManagers, sslContextMaterial.trustManagers);
   }
-  
-  private SSLContext initializeSSLContext() throws IOException {
+
+  private class SSLContextMaterial {
+    private final KeyManager[] keyManagers;
+    private final TrustManager[] trustManagers;
+    private final SSLContext sslContext;
+
+    private SSLContextMaterial(KeyManager[] keyManagers, TrustManager[] trustManagers, SSLContext sslContext) {
+      this.keyManagers = keyManagers;
+      this.trustManagers = trustManagers;
+      this.sslContext = sslContext;
+    }
+  }
+
+  private SSLContextMaterial initializeSSLContext() throws IOException {
     try {
       String enabledProtocol = conf.get(HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getValue(),
           HopsSSLSocketFactory.CryptoKeys.SOCKET_ENABLED_PROTOCOL.getDefaultValue());
@@ -318,9 +331,10 @@ public class HopsSSLSocketFactory extends SocketFactory implements Configurable 
         }
       }
       TimeUnit timeUnit = TimeUnit.valueOf(timeUnitStr);
-      sslCtx.init(createKeyManagers(keyStoreReloadInterval, timeUnit), createTrustManagers(trustStoreReloadInterval),
-          null);
-      return sslCtx;
+      KeyManager[] keyManagers = createKeyManagers(keyStoreReloadInterval, timeUnit);
+      TrustManager[] trustManagers = createTrustManagers(trustStoreReloadInterval);
+      sslCtx.init(keyManagers, trustManagers, null);
+      return new SSLContextMaterial(keyManagers, trustManagers, sslCtx);
     } catch (GeneralSecurityException ex) {
       String keyStore = conf.get(CryptoKeys.KEY_STORE_FILEPATH_KEY.getValue());
       LOG.error("Could not initialize SSLContext with keystore " + keyStore, ex);

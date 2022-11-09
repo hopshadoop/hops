@@ -34,13 +34,16 @@ import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.assertEquals;
 import static org.apache.hadoop.security.ssl.KeyStoreTestUtil.createTrustStore;
 import static org.apache.hadoop.security.ssl.KeyStoreTestUtil.generateCertificate;
 import static org.apache.hadoop.security.ssl.KeyStoreTestUtil.generateKeyPair;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class TestReloadingX509TrustManager {
 
@@ -134,14 +137,21 @@ public class TestReloadingX509TrustManager {
       new ReloadingX509TrustManager("jks", truststoreLocation, "password", 10);
     try {
       tm.init();
+      TimeUnit.MILLISECONDS.sleep(100);
       assertEquals(1, tm.getAcceptedIssuers().length);
       X509Certificate cert = tm.getAcceptedIssuers()[0];
+
+      AtomicBoolean fileExists = tm.getFileExists();
+      assertTrue(fileExists.get());
 
       assertFalse(reloaderLog.getOutput().contains(
           ReloadingX509TrustManager.RELOAD_ERROR_MESSAGE));
       new File(truststoreLocation).delete();
 
-      waitForFailedReloadAtLeastOnce((int) tm.getReloadInterval());
+      TimeUnit.MILLISECONDS.sleep(tm.getReloadInterval());
+      TimeUnit.MILLISECONDS.sleep(100);
+      fileExists = tm.getFileExists();
+      assertFalse("Trust manager should detect file does not exist", fileExists.get());
 
       assertEquals(1, tm.getAcceptedIssuers().length);
       assertEquals(cert, tm.getAcceptedIssuers()[0]);
