@@ -80,13 +80,15 @@ public class AMLauncher implements Runnable {
 
   private static final Log LOG = LogFactory.getLog(AMLauncher.class);
 
+  protected YarnRPC rpc;
   private ContainerManagementProtocol containerMgrProxy;
-
+  
   private final RMAppAttempt application;
   private final Configuration conf;
   private final AMLauncherEventType eventType;
   private final RMContext rmContext;
   private final Container masterContainer;
+  
 
   @SuppressWarnings("rawtypes")
   private final EventHandler handler;
@@ -108,43 +110,49 @@ public class AMLauncher implements Runnable {
   }
 
   private void launch() throws IOException, YarnException {
-    connect();
-    ContainerId masterContainerID = masterContainer.getId();
-    ApplicationSubmissionContext applicationContext =
-        application.getSubmissionContext();
-    LOG.info("Setting up container " + masterContainer
-        + " for AM " + application.getAppAttemptId());
-    ContainerLaunchContext launchContext =
-        createAMContainerLaunchContext(applicationContext, masterContainerID);
+    try {
+      connect();
+      ContainerId masterContainerID = masterContainer.getId();
+      ApplicationSubmissionContext applicationContext
+              = application.getSubmissionContext();
+      LOG.info("Setting up container " + masterContainer
+              + " for AM " + application.getAppAttemptId());
+      ContainerLaunchContext launchContext
+              = createAMContainerLaunchContext(applicationContext, masterContainerID);
 
-    StartContainerRequest scRequest =
-        StartContainerRequest.newInstance(launchContext,
-          masterContainer.getContainerToken());
-    List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
-    list.add(scRequest);
-    StartContainersRequest allRequests =
-        StartContainersRequest.newInstance(list);
+      StartContainerRequest scRequest
+              = StartContainerRequest.newInstance(launchContext,
+                      masterContainer.getContainerToken());
+      List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
+      list.add(scRequest);
+      StartContainersRequest allRequests
+              = StartContainersRequest.newInstance(list);
 
-    RMApp rmApp = rmContext.getRMApps().get(application.getAppAttemptId().getApplicationId());
-    if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
-        CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
-      setupX509Material(allRequests, rmApp);
-    }
-    
-    if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
-      setupJWTMaterial(allRequests, rmApp);
-    }
-    
-    StartContainersResponse response =
-        containerMgrProxy.startContainers(allRequests);
-    if (response.getFailedRequests() != null
-        && response.getFailedRequests().containsKey(masterContainerID)) {
-      Throwable t =
-          response.getFailedRequests().get(masterContainerID).deSerialize();
-      parseAndThrowException(t);
-    } else {
-      LOG.info("Done launching container " + masterContainer + " for AM "
-          + application.getAppAttemptId());
+      RMApp rmApp = rmContext.getRMApps().get(application.getAppAttemptId().getApplicationId());
+      if (conf.getBoolean(CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED,
+              CommonConfigurationKeysPublic.IPC_SERVER_SSL_ENABLED_DEFAULT)) {
+        setupX509Material(allRequests, rmApp);
+      }
+
+      if (conf.getBoolean(YarnConfiguration.RM_JWT_ENABLED, YarnConfiguration.DEFAULT_RM_JWT_ENABLED)) {
+        setupJWTMaterial(allRequests, rmApp);
+      }
+
+      StartContainersResponse response
+              = containerMgrProxy.startContainers(allRequests);
+      if (response.getFailedRequests() != null
+              && response.getFailedRequests().containsKey(masterContainerID)) {
+        Throwable t
+                = response.getFailedRequests().get(masterContainerID).deSerialize();
+        parseAndThrowException(t);
+      } else {
+        LOG.info("Done launching container " + masterContainer + " for AM "
+                + application.getAppAttemptId());
+      }
+    } finally {
+      if (containerMgrProxy != null && rpc!=null) {
+        rpc.stopProxy(containerMgrProxy, conf);
+      }
     }
   }
 
@@ -177,6 +185,9 @@ public class AMLauncher implements Runnable {
         parseAndThrowException(t);
       }
     } finally {
+      if(containerMgrProxy!=null && rpc!=null){
+        rpc.stopProxy(containerMgrProxy, conf);
+      }
       if (application.getFinalApplicationStatus() != null) {
         // Application has really finished and it's not just another attempt
         RMApp application = rmContext.getRMApps().get(
@@ -197,7 +208,7 @@ public class AMLauncher implements Runnable {
       }
     }
   }
-
+  
   // Protected. For tests.
   protected ContainerManagementProtocol getContainerMgrProxy(
       final ContainerId containerId) {
@@ -206,7 +217,7 @@ public class AMLauncher implements Runnable {
     final InetSocketAddress containerManagerConnectAddress =
         NetUtils.createSocketAddrForHost(node.getHost(), node.getPort());
 
-    final YarnRPC rpc = getYarnRPC();
+    rpc = getYarnRPC();
 
     UserGroupInformation currentUser =
         UserGroupInformation.createRemoteUser(containerId

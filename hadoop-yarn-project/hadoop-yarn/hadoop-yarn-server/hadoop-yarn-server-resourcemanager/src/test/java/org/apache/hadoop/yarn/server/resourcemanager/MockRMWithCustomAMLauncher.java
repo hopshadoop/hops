@@ -26,6 +26,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
@@ -40,14 +41,24 @@ import org.mockito.Mockito;
 public class MockRMWithCustomAMLauncher extends MockRM {
 
   private final ContainerManagementProtocol containerManager;
-
+  private final YarnRPC yarnRPC;
+  
   public MockRMWithCustomAMLauncher(ContainerManagementProtocol containerManager) {
-    this(new Configuration(), containerManager);
+    this(new Configuration(), containerManager, null);
+  }
+  
+  public MockRMWithCustomAMLauncher(ContainerManagementProtocol containerManager, YarnRPC yarnRPC) {
+    this(new Configuration(), containerManager, yarnRPC);
   }
 
   public MockRMWithCustomAMLauncher(Configuration conf, ContainerManagementProtocol containerManager) {
+    this(conf, containerManager, null);
+  }
+  
+  public MockRMWithCustomAMLauncher(Configuration conf, ContainerManagementProtocol containerManager, YarnRPC yarnRPC) {
     super(conf);
     this.containerManager = containerManager;
+    this.yarnRPC = yarnRPC;
   }
 
   @Override
@@ -60,6 +71,7 @@ public class MockRMWithCustomAMLauncher extends MockRM {
           @Override
           protected ContainerManagementProtocol getContainerMgrProxy(
               ContainerId containerId) {
+            this.rpc = yarnRPC;
             return containerManager;
           }
           @Override

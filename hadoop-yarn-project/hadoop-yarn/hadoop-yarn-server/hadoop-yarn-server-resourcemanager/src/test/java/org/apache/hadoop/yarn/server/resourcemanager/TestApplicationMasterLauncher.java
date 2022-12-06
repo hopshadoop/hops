@@ -321,8 +321,9 @@ public class TestApplicationMasterLauncher {
   public void testAMLaunchAndCleanup() throws Exception {
     Logger rootLogger = LogManager.getRootLogger();
     rootLogger.setLevel(Level.DEBUG);
+    YarnRPC rpcMock = mock(YarnRPC.class);
     MyContainerManagerImpl containerManager = new MyContainerManagerImpl();
-    MockRMWithCustomAMLauncher rm = new MockRMWithCustomAMLauncher(containerManager) {
+    MockRMWithCustomAMLauncher rm = new MockRMWithCustomAMLauncher(containerManager, rpcMock) {
       protected RMAppSecurityManager createRMAppSecurityManager() throws Exception {
         RMAppSecurityManager rmAppSecurityManager = Mockito.spy(new RMAppSecurityManager(rmContext));
         RMAppSecurityHandler<X509SecurityHandler.X509SecurityManagerMaterial, X509SecurityHandler.X509MaterialParameter> x509SecurityHandler
@@ -402,6 +403,8 @@ public class TestApplicationMasterLauncher {
     jwtParam.setExpirationDate(app.getJWTExpiration());
     verify(rm.rmAppSecurityManager.getSecurityHandler(JWTSecurityHandler.class))
         .revokeMaterial(Mockito.eq(jwtParam), anyBoolean());
+    
+    verify(rpcMock, times(2)).stopProxy(anyObject(), anyObject());
     rm.stop();
   }
 
