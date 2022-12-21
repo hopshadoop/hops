@@ -240,13 +240,6 @@ public class Log4Json extends Layout {
   }
 
   /**
-   * Do nothing
-   */
-  @Override
-  public void activateOptions() {
-  }
-
-  /**
    * For use in tests
    *
    * @param json incoming JSON to parse
