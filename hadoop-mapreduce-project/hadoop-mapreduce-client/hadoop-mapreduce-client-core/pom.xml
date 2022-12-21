@@ -117,7 +117,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
 	<configuration>
           <systemPropertyVariables>
-            <log4j.configuration>file:///${project.basedir}/src/test/resources/log4j.properties</log4j.configuration>
+            <log4j2.configuration>file:///${project.basedir}/src/test/resources/log4j2.properties</log4j2.configuration>
           </systemPropertyVariables>
         </configuration>
       </plugin>

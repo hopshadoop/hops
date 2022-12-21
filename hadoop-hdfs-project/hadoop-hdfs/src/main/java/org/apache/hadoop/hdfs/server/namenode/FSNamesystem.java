@@ -115,8 +115,8 @@ import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.util.Timer;
 import org.apache.hadoop.util.*;
 import org.apache.log4j.Appender;
-import org.apache.log4j.AsyncAppender;
 import org.apache.log4j.Logger;
+import org.apache.logging.log4j.core.appender.AsyncAppender;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.eclipse.jetty.util.ajax.JSON;
 
@@ -466,11 +466,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         LOG.info("No KeyProvider found.");
       } else {
         LOG.info("Found KeyProvider: " + provider.toString());
-      }
-      if (conf.getBoolean(DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY,
-          DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT)) {
-        LOG.info("Enabling async auditlog");
-        enableAsyncAuditLog();
       }
       this.conf = conf;
       this.nameNode = namenode;
@@ -7161,27 +7156,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     public void logAuditMessage(String message) {
       auditLog.info(message);
-    }
-  }
-
-  private static void enableAsyncAuditLog() {
-    if (!(auditLog instanceof Log4JLogger)) {
-      LOG.warn("Log4j is required to enable async auditlog");
-      return;
-    }
-    Logger logger = ((Log4JLogger)auditLog).getLogger();
-    @SuppressWarnings("unchecked")
-    List<Appender> appenders = Collections.list(logger.getAllAppenders());
-    // failsafe against trying to async it more than once
-    if (!appenders.isEmpty() && !(appenders.get(0) instanceof AsyncAppender)) {
-      AsyncAppender asyncAppender = new AsyncAppender();
-      // change logger to have an async appender containing all the
-      // previously configured appenders
-      for (Appender appender : appenders) {
-        logger.removeAppender(appender);
-        asyncAppender.addAppender(appender);
-      }
-      logger.addAppender(asyncAppender);
     }
   }
 
