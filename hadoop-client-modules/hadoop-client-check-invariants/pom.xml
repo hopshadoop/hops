@@ -87,7 +87,9 @@
                     <!-- Leave commons-logging unshaded so downstream users can configure logging. -->
                     <exclude>commons-logging:commons-logging</exclude>
                     <!-- Leave log4j unshaded so downstream users can configure logging. -->
-                    <exclude>log4j:log4j</exclude>
+                    <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+                    <exclude>org.apache.logging.log4j:log4j-core</exclude>
+                    <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                     <!-- Leave javax annotations we need exposed -->
                     <exclude>com.google.code.findbugs:jsr305</exclude>
                     <!-- for ndb profile -->

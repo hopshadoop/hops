@@ -54,7 +54,6 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.log4j.Appender;
-import org.apache.log4j.AsyncAppender;
 import org.apache.log4j.LogManager;
 
 import static org.junit.Assert.assertEquals;
@@ -68,21 +67,10 @@ import org.junit.runners.Parameterized;
 /**
  * A JUnit test that audit logs are generated
  */
-@RunWith(Parameterized.class)
 public class TestAuditLogs {
   static final String auditLogFile = PathUtils.getTestDirName(TestAuditLogs.class) + "/TestAuditLogs-audit.log";
-  boolean useAsyncLog;
-  
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    Collection<Object[]> params = new ArrayList<Object[]>();
-    params.add(new Object[]{new Boolean(false)});
-    params.add(new Object[]{new Boolean(true)});
-    return params;
-  }
-  
-  public TestAuditLogs(boolean useAsyncLog) {
-    this.useAsyncLog = useAsyncLog;
+
+  public TestAuditLogs() {
   }
 
   // Pattern for: 
@@ -116,7 +104,6 @@ public class TestAuditLogs {
     conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY,
         precision);
     conf.setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY, 10000L);
-    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY, useAsyncLog);
     util = new DFSTestUtil.Builder().setName("TestAuditAllowed").
         setNumFiles(20).build();
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
@@ -128,7 +115,6 @@ public class TestAuditLogs {
     @SuppressWarnings("unchecked")
     List<Appender> appenders = Collections.list(logger.getAllAppenders());
     assertEquals(1, appenders.size());
-    assertEquals(useAsyncLog, appenders.get(0) instanceof AsyncAppender);
 
     fnames = util.getFileNames(fileName);
     util.waitReplication(fs, fileName, (short) 3);

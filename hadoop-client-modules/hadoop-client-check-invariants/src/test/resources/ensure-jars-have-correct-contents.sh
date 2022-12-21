@@ -72,6 +72,7 @@ allowed_expr+="|^io/hops/util/"
 allowed_expr+="|^libndbclient.so"
 #   * the ndb-config.properties
 allowed_expr+="|^ndb-config.properties$"
+allowed_expr+="|^Log4j-charsets.properties$"
 #   * some anoying bug with consul force us to have that in our jar :(
 allowed_expr+="|^android/|^android/os/|^android/os/Handler.class$"
 

@@ -119,8 +119,8 @@
          * one of the three custom log4j appenders we have
       -->
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-1.2-api</artifactId>
       <scope>runtime</scope>
       <optional>true</optional>
     </dependency>
@@ -169,7 +169,10 @@
                       <!-- Leave commons-logging unshaded so downstream users can configure logging. -->
                       <exclude>commons-logging:commons-logging</exclude>
                       <!-- Leave log4j unshaded so downstream users can configure logging. -->
-                      <exclude>log4j:log4j</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-api</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-core</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                       <!-- Leave javax APIs that are stable -->
                       <!-- the jdk ships part of the javax.annotation namespace, so if we want to relocate this we'll have to care it out by class :( -->
                       <exclude>com.google.code.findbugs:jsr305</exclude>
@@ -239,6 +242,17 @@
                         <exclude>update*</exclude>
                       </excludes>
                     </filter>
+
+                    <filter>
+                      <artifact>org.apache.logging.log4j:log4j-core</artifact>
+                      <excludes>
+                        <exclude>Log4j-levels.xsd</exclude>
+                        <exclude>Log4j-events.xsd</exclude>
+                        <exclude>Log4j-events.dtd</exclude>
+                        <exclude>Log4j-config.xsd</exclude>
+                        <exclude>Log4j-charsets.properties</exclude>
+                      </excludes>
+                    </filter>
                   </filters>
                   <relocations>
                     <relocation>
@@ -254,8 +268,8 @@
                         <exclude>org/slf4j/**/*</exclude>
                         <exclude>org/apache/commons/logging/*</exclude>
                         <exclude>org/apache/commons/logging/**/*</exclude>
-                        <exclude>org/apache/log4j/*</exclude>
-                        <exclude>org/apache/log4j/**/*</exclude>
+                        <exclude>org/apache/logging/log4j/*</exclude>
+                        <exclude>org/apache/logging/log4j/**/*</exclude>
                         <exclude>**/pom.xml</exclude>
                         <!-- Not the org/ packages that are a part of the jdk -->
                         <exclude>org/ietf/jgss/*</exclude>

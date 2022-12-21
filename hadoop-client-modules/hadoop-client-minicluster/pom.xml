@@ -187,12 +187,12 @@
           <artifactId>slf4j-api</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-log4j12</artifactId>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.fasterxml.jackson.core</groupId>
@@ -532,6 +532,10 @@
           <artifactId>slf4j-api</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.loggging</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>javax.xml.bind</groupId>
           <artifactId>jaxb-api</artifactId>
         </exclusion>
@@ -681,7 +685,10 @@
                       <exclude>commons-logging:commons-logging</exclude>
                       <exclude>junit:junit</exclude>
                       <exclude>com.google.code.findbugs:jsr305</exclude>
-                      <exclude>log4j:log4j</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-api</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-core</exclude>
+                      <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                       <!-- We need a filter that matches just those things that are included in the above artiacts -->
                     </excludes>
                   </artifactSet>
@@ -818,8 +825,8 @@
                         <exclude>org/slf4j/**/*</exclude>
                         <exclude>org/apache/commons/logging/*</exclude>
                         <exclude>org/apache/commons/logging/**/*</exclude>
-                        <exclude>org/apache/log4j/*</exclude>
-                        <exclude>org/apache/log4j/**/*</exclude>
+                        <exclude>org/apache/logging/log4j/*</exclude>
+                        <exclude>org/apache/logging/log4j/**/*</exclude>
                         <exclude>**/pom.xml</exclude>
                         <!-- Our non-shaded JUnit library -->
                         <exclude>org/junit/*</exclude>
