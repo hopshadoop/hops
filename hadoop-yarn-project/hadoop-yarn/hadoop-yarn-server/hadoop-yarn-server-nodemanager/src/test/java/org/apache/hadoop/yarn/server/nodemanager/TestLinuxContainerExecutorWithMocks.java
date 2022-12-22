@@ -280,7 +280,7 @@ public class TestLinuxContainerExecutorWithMocks {
       Assert.assertEquals(result.get(9), "-classpath" );
       Assert.assertEquals(result.get(12), "-Xmx256m" );
       Assert.assertEquals(result.get(13),
-          "-Dlog4j.configuration=container-log4j.properties" );
+          "-Dlog4j.configurationFile=container-log4j.properties" );
       Assert.assertEquals(result.get(14),
           String.format("-Dyarn.app.container.log.dir=%s/application_0/12345",
           mockExec.getConf().get(YarnConfiguration.NM_LOG_DIRS)));

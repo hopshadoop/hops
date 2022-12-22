@@ -423,7 +423,7 @@ public class ContainerLocalizer {
 
   private static void addLog4jSystemProperties(
       String logLevel, List<String> command) {
-    command.add("-Dlog4j.configuration=container-log4j.properties");
+    command.add("-Dlog4j.configurationFile=container-log4j.properties");
     command.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_DIR + "=" +
         ApplicationConstants.LOG_DIR_EXPANSION_VAR);
     command.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_SIZE + "=0");
