@@ -860,7 +860,7 @@ public class TestContainerLaunch extends BaseContainerManagerTest {
     List<String> invalidCommand = new ArrayList<String>();
     invalidCommand.add("$JAVA_HOME/bin/java");
     invalidCommand.add("-Djava.io.tmpdir=$PWD/tmp");
-    invalidCommand.add("-Dlog4j.configuration=container-log4j.properties");
+    invalidCommand.add("-Dlog4j.configurationFile=container-log4j.properties");
     invalidCommand.add("-Dyarn.app.container.log.dir=" + containerLogDir);
     invalidCommand.add("-Dyarn.app.container.log.filesize=0");
     invalidCommand.add("-Dhadoop.root.logger=INFO,CLA");

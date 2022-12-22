@@ -61,7 +61,7 @@ public class TestMapReduceChildJVM {
       " -Djava.net.preferIPv4Stack=true" +
       " -Dhadoop.metrics.log.level=WARN " +
       "  -Xmx820m -Djava.io.tmpdir=" + MRApps.crossPlatformify("PWD") + "/tmp" +
-      " -Dlog4j.configuration=container-log4j.properties" +
+      " -Dlog4j.configurationFile=container-log4j.properties" +
       " -Dyarn.app.container.log.dir=<LOG_DIR>" +
       " -Dyarn.app.container.log.filesize=0" +
       " -Dhadoop.root.logger=INFO,CLA -Dhadoop.root.logfile=syslog" +
@@ -124,7 +124,7 @@ public class TestMapReduceChildJVM {
             " -Djava.net.preferIPv4Stack=true" +
             " -Dhadoop.metrics.log.level=WARN " +
             "  -Xmx820m -Djava.io.tmpdir=" + MRApps.crossPlatformify("PWD") + "/tmp" +
-            " -Dlog4j.configuration=container-log4j.properties" +
+            " -Dlog4j.configurationFile=container-log4j.properties" +
             " -Dyarn.app.container.log.dir=<LOG_DIR>" +
             " -Dyarn.app.container.log.filesize=0" +
             " -Dhadoop.root.logger=INFO,CLA -Dhadoop.root.logfile=syslog" +
