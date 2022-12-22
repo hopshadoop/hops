@@ -599,7 +599,7 @@ public class MRApps extends Apps {
     String log4jPropertyFile =
         conf.get(MRJobConfig.MAPREDUCE_JOB_LOG4J_PROPERTIES_FILE, "");
     if (log4jPropertyFile.isEmpty()) {
-      vargs.add("-Dlog4j.configuration=container-log4j.properties");
+      vargs.add("-Dlog4j.configurationFile=container-log4j.properties");
     } else {
       URI log4jURI = null;
       try {
