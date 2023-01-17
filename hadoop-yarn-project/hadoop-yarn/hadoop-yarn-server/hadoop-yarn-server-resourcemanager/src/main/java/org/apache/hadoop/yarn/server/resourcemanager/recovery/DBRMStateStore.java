@@ -163,7 +163,7 @@ public class DBRMStateStore extends RMStateStore {
   protected synchronized Version loadVersion() throws Exception {
     byte[] protoFound = loadVersionInternal();
     Version versionFound = null;
-    if (protoFound != null) {
+    if (protoFound != null && protoFound.length > 0) {
       versionFound = new VersionPBImpl(VersionProto.parseFrom(protoFound));
     }
     return versionFound;
@@ -257,7 +257,7 @@ public class DBRMStateStore extends RMStateStore {
           throws IOException {
     ByteArrayVariable var = (ByteArrayVariable) getVariableInt(
             Variable.Finder.AMRMToken);
-    if(var==null || var.getValue()==null){
+    if(var==null || var.getValue()==null || ((byte[])var.getValue()).length == 0){
       return;
     }
     AMRMTokenSecretManagerStatePBImpl stateData

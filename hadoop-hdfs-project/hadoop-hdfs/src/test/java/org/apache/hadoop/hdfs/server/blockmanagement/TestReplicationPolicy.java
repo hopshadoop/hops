@@ -45,6 +45,7 @@ import org.apache.hadoop.net.Node;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
+import org.apache.logging.log4j.message.SimpleMessage;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -556,7 +557,8 @@ public class TestReplicationPolicy {
     assertTrue(Level.WARN.isGreaterOrEqual(lastLogEntry.getLevel()));
     // Suppose to place replicas on each node but two data nodes are not
     // available for placing replica, so here we expect a short of 2
-    assertTrue(((String)lastLogEntry.getMessage()).contains("in need of 2"));
+    assertTrue(((SimpleMessage)lastLogEntry.getMessage()).getFormattedMessage().contains("in need" +
+            " of 2"));
 
     resetHeartbeatForStorages();
   }

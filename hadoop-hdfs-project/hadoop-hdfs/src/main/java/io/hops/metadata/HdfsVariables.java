@@ -397,10 +397,15 @@ public class HdfsVariables {
   public static RollingUpgradeInfo getRollingUpgradeInfo() throws TransactionContextException, StorageException,
       InvalidProtocolBufferException {
     ByteArrayVariable var = (ByteArrayVariable) Variables.getVariable(Variable.Finder.RollingUpgradeInfo);
-    if (var == null || var.getLength() <= 0) {
+    if (var == null) {
       return null;
     }
-    byte[] array = var.getBytes();
+
+    byte[] value = (byte[]) var.getValue();
+    if (value.length == 0) {
+      return null;
+    }
+
     ClientNamenodeProtocolProtos.RollingUpgradeInfoProto proto = ClientNamenodeProtocolProtos.RollingUpgradeInfoProto.
         parseFrom((byte[]) var.getValue());
     return PBHelper.convert(proto);
@@ -804,34 +809,34 @@ public class HdfsVariables {
   }
   
   public static void registerDefaultValues(Configuration conf) {
-    Variable.registerVariableDefaultValue(Variable.Finder.BlockID,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.BlockID,
         new LongVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.INodeID,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.INodeID,
         new LongVariable(2)
             .getBytes()); // 1 is taken by the root and zero is parent of the root
-    Variable.registerVariableDefaultValue(Variable.Finder.ReplicationIndex,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.ReplicationIndex,
         new ArrayVariable(Arrays.asList(0, 0, 0, 0, 0)).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.SIdCounter,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.SIdCounter,
         new IntVariable(0).getBytes());
     Variable
-        .registerVariableDefaultValue(Variable.Finder.MisReplicatedFilesIndex,
+        .registerUserDefinedDefaultValue(Variable.Finder.MisReplicatedFilesIndex,
             new LongVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.SafeModeReached,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.SafeModeReached,
         new IntVariable(-1).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.QuotaUpdateID,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.QuotaUpdateID,
         new IntVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.BrLbMaxConcurrentBRs,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.BrLbMaxConcurrentBRs,
             new LongVariable(conf.getLong(DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN,
                     DFSConfigKeys.DFS_BR_LB_MAX_CONCURRENT_BR_PER_NN_DEFAULT)).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.CacheDirectiveID,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.CacheDirectiveID,
         new LongVariable(1).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.neededScanCount,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.neededScanCount,
         new IntVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.completedScanCount,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.completedScanCount,
         new IntVariable(0).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.curScanCount,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.curScanCount,
         new IntVariable(-1).getBytes());
-    Variable.registerVariableDefaultValue(Variable.Finder.RetryCacheCleanerEpoch,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.RetryCacheCleanerEpoch,
             new LongVariable(0).getBytes());  // special value. when NN reads 0 value then it
                                               // will update it with proper epoch value
     VarsRegister.registerHdfsDefaultValues();

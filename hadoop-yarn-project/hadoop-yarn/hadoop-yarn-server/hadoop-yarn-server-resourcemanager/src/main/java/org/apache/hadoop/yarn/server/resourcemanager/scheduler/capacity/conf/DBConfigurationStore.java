@@ -225,7 +225,10 @@ public class DBConfigurationStore extends YarnConfigurationStore {
    */
   protected Version getConfStoreVersion() throws Exception {
     ByteArrayVariable var = (ByteArrayVariable) getVariable(Variable.Finder.ConfigurationStoreVersion);
-    byte[] data = var == null ? null : (byte[]) var.getValue();
+    byte[] data = null;
+    if (var != null && ((byte[])var.getValue()).length > 0) {
+      data = (byte[]) var.getValue();
+    }
     if (data != null) {
       return new VersionPBImpl(YarnServerCommonProtos.VersionProto
           .parseFrom(data));
