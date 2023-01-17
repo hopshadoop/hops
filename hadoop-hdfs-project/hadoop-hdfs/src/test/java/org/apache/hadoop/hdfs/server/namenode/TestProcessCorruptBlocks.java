@@ -145,6 +145,9 @@ public class TestProcessCorruptBlocks {
 
       DFSTestUtil.waitReplication(fs, fileName, (short) 3);
 
+      // wait for block reports to complete
+      Thread.sleep(10000);
+
       assertEquals(3, countReplicas(namesystem, block).liveReplicas());
       assertEquals(0, countReplicas(namesystem, block).corruptReplicas());
     } finally {

@@ -1687,7 +1687,7 @@ public class TestFileCreation {
       final int BLOCK_SIZE = 1024;
       conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE); // 4 byte
       conf.setBoolean(DFSConfigKeys.ERASURE_CODING_ENABLED_KEY, false);
-      conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_KEY,false);
+      conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_QUOTA_ENABLED_KEY,true);
 
       cluster = new MiniDFSCluster.Builder(conf).format(true).numDataNodes(1).build();
       cluster.waitActive();

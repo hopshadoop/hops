@@ -1219,6 +1219,7 @@ public class TestINodeFile {
   
       @Override
       public Object performTask() throws IOException {
+        file.setLocalNameNoPersistance("");
         file.setPartitionId(1L);
         file.toUnderConstruction(clientName, clientMachine);
         return null;
@@ -1281,6 +1282,7 @@ public class TestINodeFile {
       @Override
       public Object performTask() throws IOException {
         INodeFile inf = createINodeFile(replication, preferredBlockSize);
+        inf.setLocalNameNoPersistance("");
         inf.setPartitionId(1L);
         return inf;
       }

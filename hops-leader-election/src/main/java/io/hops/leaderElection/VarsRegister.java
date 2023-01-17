@@ -83,7 +83,7 @@ public class VarsRegister {
     LeVariables param = new LeVariables(false, 0, 0);
     StringVariable YarnVars =
         new StringVariable(Variable.Finder.YarnLeParams, param.toString());
-    Variable.registerVariableDefaultValue(Variable.Finder.YarnLeParams,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.YarnLeParams,
         YarnVars.getBytes());
   }
   
@@ -91,7 +91,7 @@ public class VarsRegister {
     LeVariables param = new LeVariables(false, 0, 0);
     StringVariable hdfsVars =
         new StringVariable(Variable.Finder.HdfsLeParams, param.toString());
-    Variable.registerVariableDefaultValue(Variable.Finder.HdfsLeParams,
+    Variable.registerUserDefinedDefaultValue(Variable.Finder.HdfsLeParams,
         hdfsVars.getBytes());
   }
 }
