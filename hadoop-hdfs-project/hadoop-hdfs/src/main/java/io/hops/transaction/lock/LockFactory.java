@@ -18,7 +18,6 @@ package io.hops.transaction.lock;
 
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
-import io.hops.metadata.hdfs.entity.QuotaUpdate;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -417,6 +416,8 @@ public class LockFactory {
     BaseINodeLock.enableSetRandomPartitionKey(conf.getBoolean(DFSConfigKeys
         .DFS_SET_RANDOM_PARTITION_KEY_ENABLED, DFSConfigKeys
         .DFS_SET_RANDOM_PARTITION_KEY_ENABLED_DEFAULT));
+    XAttrLock.setBacthLockSize(conf.getInt(DFSConfigKeys.DFS_DIR_XATTR_LOCK_BATCH_SIZE_KEY,
+            DFSConfigKeys.DFS_DIR_XATTR_LOCK_BATCH_SIZE_DEFAULT));
   }  
   public Lock getCacheDirectiveLock(long id) {
     return new CacheDirectiveLock(id);
