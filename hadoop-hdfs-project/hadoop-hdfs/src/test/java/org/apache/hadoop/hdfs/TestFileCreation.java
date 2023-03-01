@@ -32,6 +32,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
@@ -1212,7 +1214,10 @@ public class TestFileCreation {
                   128 * 1024 * 1024L, null);
               fail("Should have thrown exception when creating '" + pathStr +
                   "'" + " by " + method);
-            } catch (InvalidPathException ipe) {
+            } catch (IOException ipe) {
+              if (!(ipe.getCause() instanceof InvalidPathException)) {
+                throw ipe;
+              }
               // When we create by direct NN RPC, the NN just rejects the
               // non-canonical paths, rather than trying to normalize them.
               // So, we expect all of them to fail.
