@@ -2010,6 +2010,14 @@
   </property>
 
   <property>
+    <name>dfs.dir.xattr.lock.batch.size</name>
+    <value>1000</value>
+    <description>
+      Batch size for locking inode's XAttrs
+    </description>
+  </property>
+
+  <property>
     <name>dfs.force.client.to.write.small.files.to.disk.key</name>
     <value>false</value>
     <description>Even if the storeage type for the file is set to "DB"

@@ -403,6 +403,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String  DFS_NAMENODE_MAX_XATTR_SIZE_KEY = "dfs.namenode.fs-limits.max-xattr-size";
   public static final int     DFS_NAMENODE_MAX_XATTR_SIZE_DEFAULT = XAttrStorage.getDefaultXAttrSize();
   public static final int     DFS_NAMENODE_MAX_XATTR_SIZE_HARD_LIMIT = XAttrStorage.getMaxXAttrSize();
+  public static final String  DFS_DIR_XATTR_LOCK_BATCH_SIZE_KEY = "dfs.dir.xattr.lock.batch.size";
+  public static final int     DFS_DIR_XATTR_LOCK_BATCH_SIZE_DEFAULT = 1000;
 
   //Following keys have no defaults
   public static final String  DFS_DATANODE_DATA_DIR_KEY = "dfs.datanode.data.dir";
