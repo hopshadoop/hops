@@ -31,27 +31,55 @@ import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.times;
+import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGroupVersion.*;
 
+@RunWith(Parameterized.class)
 public class TestCGroupsCpuResourceHandlerImpl {
 
+  private static final Collection<Object> CGROUP_VERSION_PARAMS = new ArrayList<>();
+  static {
+    CGROUP_VERSION_PARAMS.add(V1);
+    CGROUP_VERSION_PARAMS.add(V2);
+  }
+
+  @Parameterized.Parameters
+  public static Collection<Object> params() {
+    return CGROUP_VERSION_PARAMS;
+  }
+
   private CGroupsHandler mockCGroupsHandler;
-  private CGroupsCpuResourceHandlerImpl cGroupsCpuResourceHandler;
+  private BaseCGroupsCpuResourceHandler cGroupsCpuResourceHandler;
   private ResourceCalculatorPlugin plugin;
   final int numProcessors = 4;
+
+  private CGroupsHandler.CGroupVersion cGroupVersion;
+  public TestCGroupsCpuResourceHandlerImpl(CGroupsHandler.CGroupVersion cGroupVersion) {
+    this.cGroupVersion = cGroupVersion;
+  }
 
   @Before
   public void setup() {
     mockCGroupsHandler = mock(CGroupsHandler.class);
     when(mockCGroupsHandler.getPathForCGroup(any(), any())).thenReturn(".");
-    cGroupsCpuResourceHandler =
-        new CGroupsCpuResourceHandlerImpl(mockCGroupsHandler);
+    if (cGroupVersion.equals(V1)) {
+      cGroupsCpuResourceHandler =
+          new CGroupsCpuResourceHandlerImpl(mockCGroupsHandler);
+    } else if (cGroupVersion.equals(V2)) {
+      cGroupsCpuResourceHandler = new CGroups2CpuResourceHandlerImpl(mockCGroupsHandler);
+    } else {
+      throw new RuntimeException("Unsupported cgroup version " + cGroupVersion);
+    }
 
     plugin = mock(ResourceCalculatorPlugin.class);
     Mockito.doReturn(numProcessors).when(plugin).getNumProcessors();
@@ -68,10 +96,10 @@ public class TestCGroupsCpuResourceHandlerImpl {
         .initializeCGroupController(CGroupsHandler.CGroupController.CPU);
     verify(mockCGroupsHandler, times(0))
         .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-            CGroupsHandler.CGROUP_CPU_PERIOD_US, "");
+            CGroupsHandler.CpuParameters.PERIOD_US.getName(), "");
     verify(mockCGroupsHandler, times(0))
         .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-            CGroupsHandler.CGROUP_CPU_QUOTA_US, "");
+            CGroupsHandler.CpuParameters.QUOTA_US.getName(), "");
     Assert.assertNull(ret);
   }
 
@@ -88,22 +116,39 @@ public class TestCGroupsCpuResourceHandlerImpl {
         cGroupsCpuResourceHandler.bootstrap(plugin, conf);
     verify(mockCGroupsHandler, times(1))
         .initializeCGroupController(CGroupsHandler.CGroupController.CPU);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-            CGroupsHandler.CGROUP_CPU_PERIOD_US, String.valueOf(period));
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-            CGroupsHandler.CGROUP_CPU_QUOTA_US,
-            String.valueOf(CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
+
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+              CGroupsHandler.CpuParameters.PERIOD_US.getName(), String.valueOf(period));
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+              CGroupsHandler.CpuParameters.QUOTA_US.getName(),
+              String.valueOf(CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+              CGroupsHandler.CpuParameters.MAX.getName(), String.format("%d %d",
+                  CGroups2CpuResourceHandlerImpl.MAX_QUOTA_US, period));
+    }
+
     Assert.assertNull(ret);
   }
 
   @Test
   public void testBootstrapExistingLimits() throws Exception {
-    File existingLimit = new File(CGroupsHandler.CGroupController.CPU.getName()
-        + "." + CGroupsHandler.CGROUP_CPU_QUOTA_US);
-    try {
+    File existingLimit = null;
+    if (cGroupVersion.equals(V1)) {
+     existingLimit = new File(CGroupsHandler.CGroupController.CPU.getName()
+         + "." + CGroupsHandler.CpuParameters.QUOTA_US.getName());
       FileUtils.write(existingLimit, "10000"); // value doesn't matter
+    } else if (cGroupVersion.equals(V2)) {
+      existingLimit = new File(CGroupsHandler.CGroupController.CPU.getName()
+          + "." + CGroupsHandler.CpuParameters.MAX.getName());
+      FileUtils.write(existingLimit, "10000 10000"); // value doesn't matter
+    }
+    try {
+      Assert.assertNotNull(existingLimit);
       when(mockCGroupsHandler
           .getPathForCGroup(CGroupsHandler.CGroupController.CPU, ""))
           .thenReturn(".");
@@ -113,12 +158,22 @@ public class TestCGroupsCpuResourceHandlerImpl {
           cGroupsCpuResourceHandler.bootstrap(plugin, conf);
       verify(mockCGroupsHandler, times(1))
           .initializeCGroupController(CGroupsHandler.CGroupController.CPU);
-      verify(mockCGroupsHandler, times(1))
-          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-              CGroupsHandler.CGROUP_CPU_QUOTA_US, "-1");
+
+      if (cGroupVersion.equals(V1)) {
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+                CGroupsHandler.CpuParameters.QUOTA_US.getName(), "-1");
+      } else if (cGroupVersion.equals(V2)) {
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+                CGroupsHandler.CpuParameters.MAX.getName(),
+                String.format("%s %d", "max", CGroups2CpuResourceHandlerImpl.DEFAULT_CPU_PERIOD));
+      }
       Assert.assertNull(ret);
     } finally {
-      FileUtils.deleteQuietly(existingLimit);
+      if (existingLimit != null) {
+        FileUtils.deleteQuietly(existingLimit);
+      }
     }
   }
 
@@ -139,18 +194,31 @@ public class TestCGroupsCpuResourceHandlerImpl {
         cGroupsCpuResourceHandler.preStart(mockContainer);
     verify(mockCGroupsHandler, times(1))
         .createCGroup(CGroupsHandler.CGroupController.CPU, id);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-            CGroupsHandler.CGROUP_CPU_SHARES, String
-                .valueOf(CGroupsCpuResourceHandlerImpl.CPU_DEFAULT_WEIGHT * 2));
 
-    // don't set quota or period
-    verify(mockCGroupsHandler, never())
-        .updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
-            eq(CGroupsHandler.CGROUP_CPU_PERIOD_US), anyString());
-    verify(mockCGroupsHandler, never())
-        .updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
-            eq(CGroupsHandler.CGROUP_CPU_QUOTA_US), anyString());
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.SHARES.getName(), String
+                  .valueOf(cGroupsCpuResourceHandler.getDefaultWeight() * 2));
+      // don't set quota or period
+      verify(mockCGroupsHandler, never())
+          .updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
+              eq(CGroupsHandler.CpuParameters.PERIOD_US.getName()), anyString());
+      verify(mockCGroupsHandler, never())
+          .updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
+              eq(CGroupsHandler.CpuParameters.QUOTA_US.getName()), anyString());
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.WEIGHT.getName(), String
+                  .valueOf(cGroupsCpuResourceHandler.getDefaultWeight() * 2));
+      // don't set quota or period
+      verify(mockCGroupsHandler, never())
+          .updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
+              eq(CGroupsHandler.CpuParameters.MAX.getName()), anyString());
+    }
+
+
     Assert.assertNotNull(ret);
     Assert.assertEquals(1, ret.size());
     PrivilegedOperation op = ret.get(0);
@@ -185,19 +253,32 @@ public class TestCGroupsCpuResourceHandlerImpl {
         cGroupsCpuResourceHandler.preStart(mockContainer);
     verify(mockCGroupsHandler, times(1))
         .createCGroup(CGroupsHandler.CGroupController.CPU, id);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-            CGroupsHandler.CGROUP_CPU_SHARES,
-            String.valueOf(CGroupsCpuResourceHandlerImpl.CPU_DEFAULT_WEIGHT));
-    // set quota and period
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-            CGroupsHandler.CGROUP_CPU_PERIOD_US,
-            String.valueOf(CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-            CGroupsHandler.CGROUP_CPU_QUOTA_US, String.valueOf(
-                (int) (CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US * share)));
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.SHARES.getName(),
+              String.valueOf(CGroupsCpuResourceHandlerImpl.CPU_DEFAULT_WEIGHT));
+      // set quota and period
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.PERIOD_US.getName(),
+              String.valueOf(CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.QUOTA_US.getName(), String.valueOf(
+                  (int) (CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US * share)));
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.WEIGHT.getName(),
+              String.valueOf(CGroups2CpuResourceHandlerImpl.DEFAULT_WEIGHT));
+      // set quota and period
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.MAX.getName(),
+              String.format("%d %d", (int) (CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US * share),
+                  CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
+    }
     Assert.assertNotNull(ret);
     Assert.assertEquals(1, ret.size());
     PrivilegedOperation op = ret.get(0);
@@ -222,13 +303,20 @@ public class TestCGroupsCpuResourceHandlerImpl {
     conf.setInt(YarnConfiguration.NM_RESOURCE_PERCENTAGE_PHYSICAL_CPU_LIMIT,
         cpuPerc);
     cGroupsCpuResourceHandler.bootstrap(plugin, conf);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-            CGroupsHandler.CGROUP_CPU_PERIOD_US, String.valueOf("333333"));
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
-            CGroupsHandler.CGROUP_CPU_QUOTA_US,
-            String.valueOf(CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+              CGroupsHandler.CpuParameters.PERIOD_US.getName(), String.valueOf("333333"));
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+              CGroupsHandler.CpuParameters.QUOTA_US.getName(),
+              String.valueOf(CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US));
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, "",
+              CGroupsHandler.CpuParameters.MAX.getName(),
+              String.format("%d %d", CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US, 333333));
+    }
     float yarnCores = (cpuPerc * numProcessors) / 100;
     int[] containerVCores = { 2, 4 };
     for (int cVcores : containerVCores) {
@@ -257,17 +345,29 @@ public class TestCGroupsCpuResourceHandlerImpl {
         periodUS = CGroupsCpuResourceHandlerImpl.MAX_QUOTA_US;
       }
       cGroupsCpuResourceHandler.preStart(mockContainer);
-      verify(mockCGroupsHandler, times(1))
-          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-              CGroupsHandler.CGROUP_CPU_SHARES, String.valueOf(
-              CGroupsCpuResourceHandlerImpl.CPU_DEFAULT_WEIGHT * cVcores));
-      // set quota and period
-      verify(mockCGroupsHandler, times(1))
-          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-              CGroupsHandler.CGROUP_CPU_PERIOD_US, String.valueOf(periodUS));
-      verify(mockCGroupsHandler, times(1))
-          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-              CGroupsHandler.CGROUP_CPU_QUOTA_US, String.valueOf(quotaUS));
+      if (cGroupVersion.equals(V1)) {
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+                CGroupsHandler.CpuParameters.SHARES.getName(), String.valueOf(
+                    CGroupsCpuResourceHandlerImpl.CPU_DEFAULT_WEIGHT * cVcores));
+        // set quota and period
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+                CGroupsHandler.CpuParameters.PERIOD_US.getName(), String.valueOf(periodUS));
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+                CGroupsHandler.CpuParameters.QUOTA_US.getName(), String.valueOf(quotaUS));
+      } else if (cGroupVersion.equals(V2)) {
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+                CGroupsHandler.CpuParameters.WEIGHT.getName(), String.valueOf(
+                    CGroups2CpuResourceHandlerImpl.DEFAULT_WEIGHT * cVcores));
+        // set quota and period
+        verify(mockCGroupsHandler, times(1))
+            .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+                CGroupsHandler.CpuParameters.MAX.getName(),
+                String.format("%d %d", quotaUS, periodUS));
+      }
     }
   }
 
@@ -313,9 +413,16 @@ public class TestCGroupsCpuResourceHandlerImpl {
     when(container.getContainerTokenIdentifier()).thenReturn(tokenId);
     when(container.getResource()).thenReturn(Resource.newInstance(1024, 2));
     cGroupsCpuResourceHandler.preStart(container);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
-            CGroupsHandler.CGROUP_CPU_SHARES, "2");
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.SHARES.getName(), "2");
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
+              CGroupsHandler.CpuParameters.WEIGHT.getName(),
+              String.valueOf(CGroups2CpuResourceHandlerImpl.DEFAULT_WEIGHT_OPPORTUNISTIC));
+    }
   }
 
 }

@@ -35,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_FILE_TASKS;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_MEMSW_USAGE_BYTES;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_OOM_CONTROL;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_USAGE_BYTES;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
@@ -61,7 +60,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
 
     DefaultOOMHandler handler = new DefaultOOMHandler(context, false) {
@@ -97,7 +96,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
         c1.getContainerId().toString(), CGROUP_FILE_TASKS))
@@ -161,7 +160,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
         c1.getContainerId().toString(), CGROUP_FILE_TASKS))
@@ -225,7 +224,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
         c1.getContainerId().toString(), CGROUP_FILE_TASKS))
@@ -289,7 +288,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
         c1.getContainerId().toString(), CGROUP_FILE_TASKS))
@@ -353,7 +352,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
         c1.getContainerId().toString(), CGROUP_FILE_TASKS))
@@ -416,7 +415,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1").thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
         c1.getContainerId().toString(), CGROUP_FILE_TASKS))
@@ -485,7 +484,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
@@ -564,7 +563,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 0");
     when(cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
@@ -641,7 +640,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 0");
@@ -728,7 +727,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")
@@ -821,7 +820,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")
@@ -915,7 +914,7 @@ public class TestDefaultOOMHandler {
     when(cGroupsHandler.getCGroupParam(
         CGroupsHandler.CGroupController.MEMORY,
         "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL))
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName()))
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")
         .thenReturn("under_oom 1")

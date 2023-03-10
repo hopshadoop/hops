@@ -18,52 +18,40 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+public class CGroups2MemoryResourceHandlerImpl extends BaseCGroupsMemoryResourceHandler implements MemoryResourceHandler {
 
+  private static final String NO_OOM_KILL = "oom_kill 0";
 
-/**
- * Handler class to handle the memory controller. YARN already ships a
- * physical memory monitor in Java but it isn't as
- * good as CGroups. This handler sets the soft and hard memory limits. The soft
- * limit is set to 90% of the hard limit.
- */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
-public class CGroupsMemoryResourceHandlerImpl extends BaseCGroupsMemoryResourceHandler implements MemoryResourceHandler {
-
-  static final String UNDER_OOM = "under_oom 1";
-
-  CGroupsMemoryResourceHandlerImpl(CGroupsHandler cGroupsHandler) {
+  CGroups2MemoryResourceHandlerImpl(CGroupsHandler cGroupsHandler) {
     super(cGroupsHandler);
   }
 
   @Override
   void updateHardLimit(String cgroupId, String limit) throws ResourceHandlerException {
     cGroupsHandler.updateCGroupParam(MEMORY, cgroupId,
-        CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(), limit);
+        CGroupsHandler.MemoryParameters.MEMORY_MAX.getName(), limit);
   }
 
   @Override
   void updateSoftLimit(String cgroupId, String limit) throws ResourceHandlerException {
     cGroupsHandler.updateCGroupParam(MEMORY, cgroupId,
-        CGroupsHandler.MemoryParameters.SOFT_LIMIT_BYTES.getName(), limit);
+        CGroupsHandler.MemoryParameters.MEMORY_HIGH.getName(), limit);
   }
 
   @Override
   void updateSwappiness(String cgroupId, String value) throws ResourceHandlerException {
-    cGroupsHandler.updateCGroupParam(MEMORY, cgroupId,
-        CGroupsHandler.MemoryParameters.SWAPPINESS.getName(), value);
+    // cgroup2 does not have swappiness control
+    // https://github.com/opencontainers/runtime-spec/issues/1005
   }
 
   @Override
   String getOOMStatus(String cgroupId) throws ResourceHandlerException {
     return cGroupsHandler.getCGroupParam(CGroupsHandler.CGroupController.MEMORY,
-        cgroupId, CGroupsHandler.MemoryParameters.OOM_CONTROL.getName());
+        cgroupId, CGroupsHandler.MemoryParameters.EVENTS_LOCAL.getName());
   }
 
   @Override
   boolean parseOOMStatus(String status) {
-    return status.contains(UNDER_OOM);
+    return !status.contains(NO_OOM_KILL);
   }
 }

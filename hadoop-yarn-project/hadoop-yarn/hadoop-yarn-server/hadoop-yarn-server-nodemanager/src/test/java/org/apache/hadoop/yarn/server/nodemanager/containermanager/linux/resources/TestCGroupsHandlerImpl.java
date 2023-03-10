@@ -185,6 +185,25 @@ public class TestCGroupsHandlerImpl {
     return mockMtab;
   }
 
+  public static File createCGroups2Mtab(File parentDir) throws IOException {
+    String cgroups2 = "cgroup2 " + parentDir.getAbsolutePath() + "/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime," +
+        "nsdelegate," +
+        "memory_recursiveprot 0 0";
+
+    File mockMtab = new File(parentDir, UUID.randomUUID().toString());
+    if (!mockMtab.exists()) {
+      if (!mockMtab.createNewFile()) {
+        String message = "Could not create file " + mockMtab.getAbsolutePath();
+        throw new IOException(message);
+      }
+    }
+    FileWriter mtabWriter = new FileWriter(mockMtab.getAbsoluteFile());
+    mtabWriter.write(cgroups2);
+    mtabWriter.close();
+    mockMtab.deleteOnExit();
+    return mockMtab;
+  }
+
   @Test
   public void testMountController() throws IOException {
     File parentDir = new File(tmpPath);
@@ -382,6 +401,16 @@ public class TestCGroupsHandlerImpl {
         controllerPaths.get(CGroupsHandler.CGroupController.BLKIO);
     Assert.assertEquals(parentDir.getAbsolutePath() + "/cpu", cpuDir);
     Assert.assertEquals(parentDir.getAbsolutePath() + "/blkio", blkioDir);
+  }
+
+  @Test
+  public void testIdentifyingCgroupVersion() throws Exception {
+    File parentDir = new File(tmpPath);
+    File mockMtab = createPremountedCgroups(parentDir, false);
+    Assert.assertEquals(1, CGroupsHandlerImpl.cgroupsVersion(mockMtab.getAbsolutePath()));
+
+    mockMtab = createCGroups2Mtab(parentDir);
+    Assert.assertEquals(2, CGroupsHandlerImpl.cgroupsVersion(mockMtab.getAbsolutePath()));
   }
 
   /**

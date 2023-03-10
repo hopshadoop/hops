@@ -69,10 +69,9 @@ public class ResourceHandlerModule {
   private static volatile CGroupsHandler cGroupsHandler;
   private static volatile CGroupsBlkioResourceHandlerImpl
       cGroupsBlkioResourceHandler;
-  private static volatile CGroupsMemoryResourceHandlerImpl
-      cGroupsMemoryResourceHandler;
-  private static volatile CGroupsCpuResourceHandlerImpl
-      cGroupsCpuResourceHandler;
+  private static volatile MemoryResourceHandler cGroupsMemoryResourceHandler;
+  private static volatile CpuResourceHandler cGroupsCpuResourceHandler;
+  private static volatile int cgroupsVersion = 0;
 
   /**
    * Returns an initialized, thread-safe CGroupsHandler instance.
@@ -82,8 +81,17 @@ public class ResourceHandlerModule {
     if (cGroupsHandler == null) {
       synchronized (CGroupsHandler.class) {
         if (cGroupsHandler == null) {
-          cGroupsHandler = new CGroupsHandlerImpl(conf,
-              PrivilegedOperationExecutor.getInstance(conf));
+          try {
+            cgroupsVersion = CGroupsHandlerImpl.cgroupsVersion();
+            if (cgroupsVersion == 1) {
+              cGroupsHandler = new CGroupsHandlerImpl(conf,
+                  PrivilegedOperationExecutor.getInstance(conf));
+            } else {
+              cGroupsHandler = new CGroups2HandlerImpl(conf);
+            }
+          } catch (IOException ex) {
+            throw new ResourceHandlerException("Failed to identify cgroups version", ex);
+          }
         }
       }
     }
@@ -136,7 +144,7 @@ public class ResourceHandlerModule {
     return cGroupsCpuResourceHandler;
   }
 
-  private static CGroupsCpuResourceHandlerImpl initCGroupsCpuResourceHandler(
+  private static CpuResourceHandler initCGroupsCpuResourceHandler(
       Configuration conf) throws ResourceHandlerException {
     boolean cgroupsCpuEnabled =
         conf.getBoolean(YarnConfiguration.NM_CPU_RESOURCE_ENABLED,
@@ -150,9 +158,13 @@ public class ResourceHandlerModule {
         synchronized (CpuResourceHandler.class) {
           if (cGroupsCpuResourceHandler == null) {
             LOG.debug("Creating new cgroups cpu handler");
-            cGroupsCpuResourceHandler =
-                new CGroupsCpuResourceHandlerImpl(
-                    getInitializedCGroupsHandler(conf));
+
+            final CGroupsHandler cgroupsHandler = getInitializedCGroupsHandler(conf);
+            if (cgroupsVersion == 1) {
+              cGroupsCpuResourceHandler = new CGroupsCpuResourceHandlerImpl(cgroupsHandler);
+            } else if (cgroupsVersion == 2) {
+              cGroupsCpuResourceHandler = new CGroups2CpuResourceHandlerImpl(cgroupsHandler);
+            }
             return cGroupsCpuResourceHandler;
           }
         }
@@ -254,15 +266,19 @@ public class ResourceHandlerModule {
     return null;
   }
 
-  private static CGroupsMemoryResourceHandlerImpl
+  private static MemoryResourceHandler
       getCgroupsMemoryResourceHandler(
       Configuration conf) throws ResourceHandlerException {
     if (cGroupsMemoryResourceHandler == null) {
       synchronized (MemoryResourceHandler.class) {
         if (cGroupsMemoryResourceHandler == null) {
-          cGroupsMemoryResourceHandler =
-              new CGroupsMemoryResourceHandlerImpl(
-                  getInitializedCGroupsHandler(conf));
+          final CGroupsHandler cgroupsHandler = getInitializedCGroupsHandler(conf);
+          if (cgroupsVersion == 1) {
+            cGroupsMemoryResourceHandler =
+                new CGroupsMemoryResourceHandlerImpl(cgroupsHandler);
+          } else if (cgroupsVersion == 2) {
+            cGroupsMemoryResourceHandler = new CGroups2MemoryResourceHandlerImpl(cgroupsHandler);
+          }
         }
       }
     }
@@ -364,7 +380,7 @@ public class ResourceHandlerModule {
 
     Map<String, Set<String>> pathSubsystemMappings = new HashMap<>();
     Set<String> validCGroups =
-        CGroupsHandler.CGroupController.getValidCGroups();
+        CGroupsHandler.CGroupController.getValidCGroups(CGroupsHandler.CGroupController.V1_CGROUP_FILTER);
     for (File candidate: list) {
       Set<String> cgroupList =
           new HashSet<>(Arrays.asList(candidate.getName().split(",")));
