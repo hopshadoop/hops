@@ -28,18 +28,15 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileged.PrivilegedOperation;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileged.PrivilegedOperationException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileged.PrivilegedOperationExecutor;
-import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.SystemClock;
 
 import java.io.*;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -57,24 +54,16 @@ import java.util.regex.Pattern;
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-class CGroupsHandlerImpl implements CGroupsHandler {
-
-  private static final Logger LOG =
-       LoggerFactory.getLogger(CGroupsHandlerImpl.class);
+class CGroupsHandlerImpl extends BaseCGroupsHandler implements CGroupsHandler {
+  private static final Logger cgroup1Logger = LoggerFactory.getLogger(CGroupsHandlerImpl.class);
   private static final String MTAB_FILE = "/proc/mounts";
-  private static final String CGROUPS_FSTYPE = "cgroup";
 
   private String mtabFile;
-  private final String cGroupPrefix;
   private final boolean enableCGroupMount;
-  private final String cGroupMountPath;
-  private final long deleteCGroupTimeout;
-  private final long deleteCGroupDelay;
   private Map<CGroupController, String> controllerPaths;
   private Map<String, Set<String>> parsedMtab;
   private final ReadWriteLock rwLock;
   private final PrivilegedOperationExecutor privilegedOperationExecutor;
-  private final Clock clock;
 
   /**
    * Create cgroup handler object.
@@ -87,26 +76,13 @@ class CGroupsHandlerImpl implements CGroupsHandler {
   CGroupsHandlerImpl(Configuration conf, PrivilegedOperationExecutor
       privilegedOperationExecutor, String mtab)
       throws ResourceHandlerException {
-    this.cGroupPrefix = conf.get(YarnConfiguration.
-        NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn")
-        .replaceAll("^/", "").replaceAll("$/", "");
+    super(conf);
     this.enableCGroupMount = conf.getBoolean(YarnConfiguration.
         NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
-    this.cGroupMountPath = conf.get(YarnConfiguration.
-        NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, null);
-    this.deleteCGroupTimeout = conf.getLong(
-        YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,
-        YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT) +
-        conf.getLong(YarnConfiguration.NM_SLEEP_DELAY_BEFORE_SIGKILL_MS,
-            YarnConfiguration.DEFAULT_NM_SLEEP_DELAY_BEFORE_SIGKILL_MS) + 1000;
-    this.deleteCGroupDelay =
-        conf.getLong(YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_DELAY,
-            YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_DELAY);
     this.controllerPaths = new HashMap<>();
     this.parsedMtab = new HashMap<>();
     this.rwLock = new ReentrantReadWriteLock();
     this.privilegedOperationExecutor = privilegedOperationExecutor;
-    this.clock = SystemClock.getInstance();
     mtabFile = mtab;
     init();
   }
@@ -128,6 +104,11 @@ class CGroupsHandlerImpl implements CGroupsHandler {
   }
 
   @Override
+  String getProcessesFilename() {
+    return "tasks";
+  }
+
+  @Override
   public String getControllerPath(CGroupController controller) {
     try {
       rwLock.readLock().lock();
@@ -136,6 +117,12 @@ class CGroupsHandlerImpl implements CGroupsHandler {
       rwLock.readLock().unlock();
     }
   }
+
+  @Override
+  public String getPathForCGroup(CGroupController controller, String cGroupId) {
+    return Paths.get(getControllerPath(controller), cGroupPrefix, cGroupId).toString();
+  }
+
 
   private void initializeControllerPaths() throws ResourceHandlerException {
     // Cluster admins may have some subsystems mounted in specific locations
@@ -214,12 +201,13 @@ class CGroupsHandlerImpl implements CGroupsHandler {
       throws IOException {
     Map<String, Set<String>> ret = new HashMap<>();
     BufferedReader in = null;
+    // cgroup2 has a single hierarchy tree so we don't need to parse the different controllers from mtab
     Set<String> validCgroups =
-        CGroupsHandler.CGroupController.getValidCGroups();
+        CGroupsHandler.CGroupController.getValidCGroups(CGroupController.V1_CGROUP_FILTER);
 
     try {
       FileInputStream fis = new FileInputStream(new File(mtab));
-      in = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+      in = new BufferedReader(new InputStreamReader(fis, StandardCharsets.UTF_8));
 
       for (String str = in.readLine(); str != null;
            str = in.readLine()) {
@@ -236,6 +224,8 @@ class CGroupsHandlerImpl implements CGroupsHandler {
             // Collect the valid subsystem names
             cgroupList.retainAll(validCgroups);
             ret.put(path, cgroupList);
+          } else if (type.equals(CGROUPS2_FSTYPE)) {
+            ret.put(path, new HashSet<>(Arrays.asList(CGROUPS2_FSTYPE)));
           }
         }
       }
@@ -244,13 +234,27 @@ class CGroupsHandlerImpl implements CGroupsHandler {
         throw new IOException("Error while reading " + mtab, e);
       } else {
         // Ignore the error, if we are running on an os other than Linux
-        LOG.warn("Error while reading " + mtab, e);
+        cgroup1Logger.warn("Error while reading " + mtab, e);
       }
     } finally {
-      IOUtils.cleanupWithLogger(LOG, in);
+      IOUtils.cleanupWithLogger(cgroup1Logger, in);
     }
 
     return ret;
+  }
+
+  static int cgroupsVersion() throws IOException {
+    return cgroupsVersion(MTAB_FILE);
+  }
+
+  static int cgroupsVersion(String mtabFile) throws IOException {
+    Map<String, Set<String>> parsedMtab = parseMtab(mtabFile);
+    for (Set<String> v : parsedMtab.values()) {
+      if (v.contains(CGROUPS2_FSTYPE) && parsedMtab.size() == 1) {
+        return 2;
+      }
+    }
+    return 1;
   }
 
   /**
@@ -270,7 +274,7 @@ class CGroupsHandlerImpl implements CGroupsHandler {
         if (new File(e.getKey()).canRead()) {
           return e.getKey();
         } else {
-          LOG.warn(String.format(
+          cgroup1Logger.warn(String.format(
               "Skipping inaccessible cgroup mount point %s", e.getKey()));
         }
       }
@@ -330,32 +334,6 @@ class CGroupsHandlerImpl implements CGroupsHandler {
     } else {
       LOG.info("CGroup controller already mounted at: " + existingMountPath);
     }
-  }
-
-  @Override
-  public String getRelativePathForCGroup(String cGroupId) {
-    return cGroupPrefix + Path.SEPARATOR + cGroupId;
-  }
-
-  @Override
-  public String getPathForCGroup(CGroupController controller, String cGroupId) {
-    return getControllerPath(controller) + Path.SEPARATOR + cGroupPrefix
-        + Path.SEPARATOR + cGroupId;
-  }
-
-  @Override
-  public String getPathForCGroupTasks(CGroupController controller,
-      String cGroupId) {
-    return getPathForCGroup(controller, cGroupId)
-        + Path.SEPARATOR + CGROUP_FILE_TASKS;
-  }
-
-  @Override
-  public String getPathForCGroupParam(CGroupController controller,
-      String cGroupId, String param) {
-    return getPathForCGroup(controller, cGroupId)
-        + Path.SEPARATOR + controller.getName()
-        + "." + param;
   }
 
   /**
@@ -458,167 +436,5 @@ class CGroupsHandlerImpl implements CGroupsHandler {
     return String.format("%s Subsystem:%s Mount points:%s User:%s Path:%s ",
         errorMessage, subsystemName, mtabFile, System.getProperty("user.name"),
         yarnCgroupPath);
-  }
-
-  @Override
-  public String createCGroup(CGroupController controller, String cGroupId)
-      throws ResourceHandlerException {
-    String path = getPathForCGroup(controller, cGroupId);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("createCgroup: " + path);
-    }
-
-    if (!new File(path).mkdir()) {
-      throw new ResourceHandlerException("Failed to create cgroup at " + path);
-    }
-
-    return path;
-  }
-
-  /*
-  * Utility routine to print first line from cgroup tasks file
-  */
-  private void logLineFromTasksFile(File cgf) {
-    String str;
-    if (LOG.isDebugEnabled()) {
-      try (BufferedReader inl =
-          new BufferedReader(new InputStreamReader(new FileInputStream(cgf
-              + "/tasks"), "UTF-8"))) {
-        str = inl.readLine();
-        if (str != null) {
-          LOG.debug("First line in cgroup tasks file: " + cgf + " " + str);
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to read cgroup tasks file. ", e);
-      }
-    }
-  }
-
-  /**
-   * If tasks file is empty, delete the cgroup.
-   *
-   * @param cgf object referring to the cgroup to be deleted
-   * @return Boolean indicating whether cgroup was deleted
-   */
-  private boolean checkAndDeleteCgroup(File cgf) throws InterruptedException {
-    boolean deleted = false;
-    // FileInputStream in = null;
-    if ( cgf.exists() ) {
-      try (FileInputStream in = new FileInputStream(cgf + "/tasks")) {
-        if (in.read() == -1) {
-        /*
-         * "tasks" file is empty, sleep a bit more and then try to delete the
-         * cgroup. Some versions of linux will occasionally panic due to a race
-         * condition in this area, hence the paranoia.
-         */
-          Thread.sleep(deleteCGroupDelay);
-          deleted = cgf.delete();
-          if (!deleted) {
-            LOG.warn("Failed attempt to delete cgroup: " + cgf);
-          }
-        } else{
-          logLineFromTasksFile(cgf);
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to read cgroup tasks file. ", e);
-      }
-    } else {
-      LOG.info("Parent Cgroups directory {} does not exist. Skipping "
-          + "deletion", cgf.getPath());
-      deleted = true;
-    }
-    return deleted;
-  }
-
-  @Override
-  public void deleteCGroup(CGroupController controller, String cGroupId)
-      throws ResourceHandlerException {
-    boolean deleted = false;
-    String cGroupPath = getPathForCGroup(controller, cGroupId);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("deleteCGroup: " + cGroupPath);
-    }
-
-    long start = clock.getTime();
-
-    do {
-      try {
-        deleted = checkAndDeleteCgroup(new File(cGroupPath));
-        if (!deleted) {
-          Thread.sleep(deleteCGroupDelay);
-        }
-      } catch (InterruptedException ex) {
-        // NOP
-      }
-    } while (!deleted && (clock.getTime() - start) < deleteCGroupTimeout);
-
-    if (!deleted) {
-      LOG.warn(String.format("Unable to delete  %s, tried to delete for %d ms",
-          cGroupPath, deleteCGroupTimeout));
-    }
-  }
-
-  @Override
-  public void updateCGroupParam(CGroupController controller, String cGroupId,
-      String param, String value) throws ResourceHandlerException {
-    String cGroupParamPath = getPathForCGroupParam(controller, cGroupId, param);
-    PrintWriter pw = null;
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          String.format("updateCGroupParam for path: %s with value %s",
-              cGroupParamPath, value));
-    }
-
-    try {
-      File file = new File(cGroupParamPath);
-      Writer w = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
-      pw = new PrintWriter(w);
-      pw.write(value);
-    } catch (IOException e) {
-      throw new ResourceHandlerException(
-          String.format("Unable to write to %s with value: %s",
-              cGroupParamPath, value), e);
-    } finally {
-      if (pw != null) {
-        boolean hasError = pw.checkError();
-        pw.close();
-        if (hasError) {
-          throw new ResourceHandlerException(
-              String.format("PrintWriter unable to write to %s with value: %s",
-                  cGroupParamPath, value));
-        }
-        if (pw.checkError()) {
-          throw new ResourceHandlerException(
-              String.format("Error while closing cgroup file %s",
-                  cGroupParamPath));
-        }
-      }
-    }
-  }
-
-  @Override
-  public String getCGroupParam(CGroupController controller, String cGroupId,
-      String param) throws ResourceHandlerException {
-    String cGroupParamPath =
-        param.equals(CGROUP_FILE_TASKS) ?
-            getPathForCGroup(controller, cGroupId)
-                + Path.SEPARATOR + param :
-        getPathForCGroupParam(controller, cGroupId, param);
-
-    try {
-      byte[] contents = Files.readAllBytes(Paths.get(cGroupParamPath));
-      return new String(contents, "UTF-8").trim();
-    } catch (IOException e) {
-      throw new ResourceHandlerException(
-          "Unable to read from " + cGroupParamPath);
-    }
-  }
-
-  @Override
-  public String getCGroupMountPath() {
-    return cGroupMountPath;
   }
 }

@@ -25,6 +25,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Provides CGroups functionality. Implementations are expected to be
@@ -35,37 +36,55 @@ import java.util.Set;
 @InterfaceStability.Unstable
 public interface CGroupsHandler {
 
+  enum CGroupVersion {
+    V1,
+    V2,
+    V1V2
+  }
+
   /**
    * List of supported cgroup subsystem types.
    */
   enum CGroupController {
-    CPU("cpu"),
-    NET_CLS("net_cls"),
-    BLKIO("blkio"),
-    MEMORY("memory"),
-    CPUACCT("cpuacct"),
-    CPUSET("cpuset"),
-    FREEZER("freezer"),
-    DEVICES("devices");
+    CPU("cpu", CGroupVersion.V1V2),
+    NET_CLS("net_cls", CGroupVersion.V1),
+    BLKIO("blkio", CGroupVersion.V1),
+    MEMORY("memory", CGroupVersion.V1V2),
+    CPUACCT("cpuacct", CGroupVersion.V1),
+    CPUSET("cpuset", CGroupVersion.V1V2),
+    FREEZER("freezer", CGroupVersion.V1),
+    DEVICES("devices", CGroupVersion.V1);
 
     private final String name;
+    private final CGroupVersion cGroupVersion;
 
-    CGroupController(String name) {
+    CGroupController(String name, CGroupVersion cGroupVersion) {
       this.name = name;
+      this.cGroupVersion = cGroupVersion;
     }
 
     public String getName() {
       return name;
     }
 
+    public CGroupVersion getcGroupVersion() {
+      return cGroupVersion;
+    }
+
+    public static final Function<CGroupController, Boolean> NO_CGROUP_FILTER = (t) -> true;
+    public static final Function<CGroupController, Boolean> V1_CGROUP_FILTER =
+        (t) -> t.getcGroupVersion().equals(CGroupVersion.V1) || t.getcGroupVersion().equals(CGroupVersion.V1V2);
+
     /**
      * Get the list of valid cgroup names.
      * @return The set of cgroup name strings
      */
-    public static Set<String> getValidCGroups() {
+    public static Set<String> getValidCGroups(Function<CGroupController, Boolean> filter) {
       HashSet<String> validCgroups = new HashSet<>();
       for (CGroupController controller : CGroupController.values()) {
-        validCgroups.add(controller.getName());
+        if (filter.apply(controller)) {
+          validCgroups.add(controller.getName());
+        }
       }
       return validCgroups;
     }
@@ -75,20 +94,52 @@ public interface CGroupsHandler {
   String CGROUP_PARAM_CLASSID = "classid";
   String CGROUP_PARAM_BLKIO_WEIGHT = "weight";
 
-  String CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES = "limit_in_bytes";
   String CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES = "memsw.limit_in_bytes";
-  String CGROUP_PARAM_MEMORY_SOFT_LIMIT_BYTES = "soft_limit_in_bytes";
-  String CGROUP_PARAM_MEMORY_OOM_CONTROL = "oom_control";
-  String CGROUP_PARAM_MEMORY_SWAPPINESS = "swappiness";
   String CGROUP_PARAM_MEMORY_USAGE_BYTES = "usage_in_bytes";
   String CGROUP_PARAM_MEMORY_MEMSW_USAGE_BYTES = "memsw.usage_in_bytes";
   String CGROUP_NO_LIMIT = "-1";
-  String UNDER_OOM = "under_oom 1";
 
+  enum CpuParameters {
+    // cgroup1
+    PERIOD_US("cfs_period_us"),
+    QUOTA_US("cfs_quota_us"),
+    SHARES("shares"),
 
-  String CGROUP_CPU_PERIOD_US = "cfs_period_us";
-  String CGROUP_CPU_QUOTA_US = "cfs_quota_us";
-  String CGROUP_CPU_SHARES = "shares";
+    // cgroup2
+    MAX("max"),
+    WEIGHT("weight");
+
+    private final String name;
+    CpuParameters(String name) {
+      this.name = name;
+    }
+
+    String getName() {
+      return this.name;
+    }
+  }
+
+  enum MemoryParameters {
+    // cgroup1
+    HARD_LIMIT_BYTES("limit_in_bytes"),
+    SOFT_LIMIT_BYTES("soft_limit_in_bytes"),
+    SWAPPINESS("swappiness"),
+    OOM_CONTROL("oom_control"),
+
+    // cgroup2
+    MEMORY_MAX("max"),
+    MEMORY_HIGH("high"),
+    EVENTS_LOCAL("events.local");
+
+    private final String name;
+    MemoryParameters(String name) {
+      this.name = name;
+    }
+
+    String getName() {
+      return this.name;
+    }
+  }
 
   /**
    * Mounts or initializes a cgroup controller.

@@ -26,30 +26,53 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileged.PrivilegedOperation;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.Assert;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_OOM_CONTROL;
 import static org.mockito.Mockito.*;
+import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGroupVersion.*;
 
 /**
- * Unit test for CGroupsMemoryResourceHandlerImpl.
+ * Unit test for CGroupsMemoryResourceHandlerImpl and CGroups2MemoryResourceHandlerImpl.
  */
+@RunWith(Parameterized.class)
 public class TestCGroupsMemoryResourceHandlerImpl {
 
   private CGroupsHandler mockCGroupsHandler;
-  private CGroupsMemoryResourceHandlerImpl cGroupsMemoryResourceHandler;
+  private MemoryResourceHandler cGroupsMemoryResourceHandler;
+
+  private CGroupsHandler.CGroupVersion cGroupVersion;
+
+  @Parameterized.Parameters
+  public static Collection<Object> params() {
+    return TestCGroupsCpuResourceHandlerImpl.params();
+  }
+
+  public TestCGroupsMemoryResourceHandlerImpl(CGroupsHandler.CGroupVersion cGroupVersion) {
+    this.cGroupVersion = cGroupVersion;
+  }
 
   @Before
   public void setup() {
     mockCGroupsHandler = mock(CGroupsHandler.class);
     when(mockCGroupsHandler.getPathForCGroup(any(), any())).thenReturn(".");
-    cGroupsMemoryResourceHandler =
-        new CGroupsMemoryResourceHandlerImpl(mockCGroupsHandler);
+    if (cGroupVersion.equals(V1)) {
+      cGroupsMemoryResourceHandler =
+          new CGroupsMemoryResourceHandlerImpl(mockCGroupsHandler);
+    } else if (cGroupVersion.equals(V2)) {
+      cGroupsMemoryResourceHandler =
+          new CGroups2MemoryResourceHandlerImpl(mockCGroupsHandler);
+    } else {
+      throw new RuntimeException("Unsupported cgroup version " + cGroupVersion);
+    }
   }
 
   @Test
@@ -62,8 +85,12 @@ public class TestCGroupsMemoryResourceHandlerImpl {
     verify(mockCGroupsHandler, times(1))
         .initializeCGroupController(CGroupsHandler.CGroupController.MEMORY);
     Assert.assertNull(ret);
-    Assert.assertEquals("Default swappiness value incorrect", 0,
-        cGroupsMemoryResourceHandler.getSwappiness());
+    // cgroup2 does not support per cgroup swappiness
+    if (cGroupVersion.equals(V1)) {
+      Assert.assertEquals("Default swappiness value incorrect", 0,
+          ((CGroupsMemoryResourceHandlerImpl) cGroupsMemoryResourceHandler).getSwappiness());
+    }
+
     conf.setBoolean(YarnConfiguration.NM_PMEM_CHECK_ENABLED, true);
     try {
       cGroupsMemoryResourceHandler.bootstrap(conf);
@@ -81,6 +108,7 @@ public class TestCGroupsMemoryResourceHandlerImpl {
 
   @Test
   public void testSwappinessValues() throws Exception {
+    Assume.assumeTrue("Per group swappiness is supported only in cgroup1", cGroupVersion.equals(V1));
     Configuration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.NM_PMEM_CHECK_ENABLED, false);
     conf.setBoolean(YarnConfiguration.NM_VMEM_CHECK_ENABLED, false);
@@ -102,7 +130,7 @@ public class TestCGroupsMemoryResourceHandlerImpl {
     conf.setInt(YarnConfiguration.NM_MEMORY_RESOURCE_CGROUPS_SWAPPINESS, 60);
     cGroupsMemoryResourceHandler.bootstrap(conf);
     Assert.assertEquals("Swappiness value incorrect", 60,
-        cGroupsMemoryResourceHandler.getSwappiness());
+        ((CGroupsMemoryResourceHandlerImpl) cGroupsMemoryResourceHandler).getSwappiness());
   }
 
   @Test
@@ -127,17 +155,32 @@ public class TestCGroupsMemoryResourceHandlerImpl {
         cGroupsMemoryResourceHandler.preStart(mockContainer);
     verify(mockCGroupsHandler, times(1))
         .createCGroup(CGroupsHandler.CGroupController.MEMORY, id);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES,
-            String.valueOf(memory) + "M");
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_SOFT_LIMIT_BYTES,
-            String.valueOf((int) (memory * 0.9)) + "M");
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_SWAPPINESS, String.valueOf(0));
+
+    if (cGroupVersion.equals(V1)) {
+     verify(mockCGroupsHandler, times(1))
+         .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+             CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(),
+             String.valueOf(memory) + "M");
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.SOFT_LIMIT_BYTES.getName(),
+              String.valueOf((int) (memory * 0.9)) + "M");
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.SWAPPINESS.getName(), String.valueOf(0));
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.MEMORY_MAX.getName(),
+              String.valueOf(memory) + "M");
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.MEMORY_HIGH.getName(),
+              String.valueOf((int) (memory * 0.9)) + "M");
+      verify(mockCGroupsHandler, never())
+          .updateCGroupParam(eq(CGroupsHandler.CGroupController.MEMORY), eq(id),
+              eq(CGroupsHandler.MemoryParameters.SWAPPINESS.getName()), anyString());
+    }
     Assert.assertNotNull(ret);
     Assert.assertEquals(1, ret.size());
     PrivilegedOperation op = ret.get(0);
@@ -172,17 +215,33 @@ public class TestCGroupsMemoryResourceHandlerImpl {
         cGroupsMemoryResourceHandler.preStart(mockContainer);
     verify(mockCGroupsHandler, times(1))
         .createCGroup(CGroupsHandler.CGroupController.MEMORY, id);
-    verify(mockCGroupsHandler, times(0))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES,
-            String.valueOf(memory) + "M");
-    verify(mockCGroupsHandler, times(0))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_SOFT_LIMIT_BYTES,
-            String.valueOf((int) (memory * 0.9)) + "M");
-    verify(mockCGroupsHandler, times(0))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_SWAPPINESS, String.valueOf(0));
+
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(0))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(),
+              String.valueOf(memory) + "M");
+      verify(mockCGroupsHandler, times(0))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.SOFT_LIMIT_BYTES.getName(),
+              String.valueOf((int) (memory * 0.9)) + "M");
+      verify(mockCGroupsHandler, times(0))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.SWAPPINESS.getName(), String.valueOf(0));
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(0))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.MEMORY_MAX.getName(),
+              String.valueOf(memory) + "M");
+      verify(mockCGroupsHandler, times(0))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.MEMORY_HIGH.getName(),
+              String.valueOf((int) (memory * 0.9)) + "M");
+      verify(mockCGroupsHandler, never())
+          .updateCGroupParam(eq(CGroupsHandler.CGroupController.MEMORY), eq(id),
+              eq(CGroupsHandler.MemoryParameters.SWAPPINESS.getName()), anyString());
+    }
+
     Assert.assertNotNull(ret);
     Assert.assertEquals(1, ret.size());
     PrivilegedOperation op = ret.get(0);
@@ -234,15 +293,28 @@ public class TestCGroupsMemoryResourceHandlerImpl {
     when(container.getContainerTokenIdentifier()).thenReturn(tokenId);
     when(container.getResource()).thenReturn(Resource.newInstance(1024, 2));
     cGroupsMemoryResourceHandler.preStart(container);
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_SOFT_LIMIT_BYTES, "0M");
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_SWAPPINESS, "100");
-    verify(mockCGroupsHandler, times(1))
-        .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
-            CGroupsHandler.CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, "1024M");
+
+    if (cGroupVersion.equals(V1)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.SOFT_LIMIT_BYTES.getName(), "0M");
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.SWAPPINESS.getName(), "100");
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(), "1024M");
+    } else if (cGroupVersion.equals(V2)) {
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.MEMORY_HIGH.getName(), "0M");
+      verify(mockCGroupsHandler, never())
+          .updateCGroupParam(eq(CGroupsHandler.CGroupController.MEMORY), eq(id),
+              eq(CGroupsHandler.MemoryParameters.SWAPPINESS.getName()), anyString());
+      verify(mockCGroupsHandler, times(1))
+          .updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, id,
+              CGroupsHandler.MemoryParameters.MEMORY_MAX.getName(), "1024M");
+    }
   }
 
   @Test
@@ -256,29 +328,53 @@ public class TestCGroupsMemoryResourceHandlerImpl {
     ContainerId containerId = mock(ContainerId.class);
     when(containerId.toString()).thenReturn("container_01_01");
 
-    when(mockCGroupsHandler.getCGroupParam(
-        CGroupsHandler.CGroupController.MEMORY,
-        containerId.toString(),
-        CGROUP_PARAM_MEMORY_OOM_CONTROL)).thenReturn(CGroupsHandler.UNDER_OOM);
+    if (cGroupVersion.equals(V1)) {
+      when(mockCGroupsHandler.getCGroupParam(
+          CGroupsHandler.CGroupController.MEMORY,
+          containerId.toString(),
+          CGroupsHandler.MemoryParameters.OOM_CONTROL.getName())).thenReturn("under_oom 1");
+    } else if (cGroupVersion.equals(V2)) {
+      when(mockCGroupsHandler.getCGroupParam(
+          CGroupsHandler.CGroupController.MEMORY,
+          containerId.toString(),
+          CGroupsHandler.MemoryParameters.EVENTS_LOCAL.getName()))
+          .thenReturn("low 0\nhigh 0\nmax 0\noom 0\noom_kill 1");
+    }
     Optional<Boolean> outOfOom =
         cGroupsMemoryResourceHandler.isUnderOOM(containerId);
     Assert.assertTrue("The container should be reported to run under oom",
         outOfOom.isPresent() && outOfOom.get().equals(true));
 
-    when(mockCGroupsHandler.getCGroupParam(
-        CGroupsHandler.CGroupController.MEMORY,
-        containerId.toString(),
-        CGROUP_PARAM_MEMORY_OOM_CONTROL)).thenReturn("");
+    if (cGroupVersion.equals(V1)) {
+      when(mockCGroupsHandler.getCGroupParam(
+          CGroupsHandler.CGroupController.MEMORY,
+          containerId.toString(),
+          CGroupsHandler.MemoryParameters.OOM_CONTROL.getName())).thenReturn("");
+    } else if (cGroupVersion.equals(V2)) {
+      when(mockCGroupsHandler.getCGroupParam(
+          CGroupsHandler.CGroupController.MEMORY,
+          containerId.toString(),
+          CGroupsHandler.MemoryParameters.EVENTS_LOCAL.getName()))
+          .thenReturn("low 0\nhigh 0\nmax 0\noom 0\noom_kill 0");
+    }
     outOfOom = cGroupsMemoryResourceHandler.isUnderOOM(containerId);
     Assert.assertTrue(
         "The container should not be reported to run under oom",
         outOfOom.isPresent() && outOfOom.get().equals(false));
 
-    when(mockCGroupsHandler.getCGroupParam(
-        CGroupsHandler.CGroupController.MEMORY,
-        containerId.toString(),
-        CGROUP_PARAM_MEMORY_OOM_CONTROL)).
-        thenThrow(new ResourceHandlerException());
+    if (cGroupVersion.equals(V1)) {
+      when(mockCGroupsHandler.getCGroupParam(
+          CGroupsHandler.CGroupController.MEMORY,
+          containerId.toString(),
+          CGroupsHandler.MemoryParameters.OOM_CONTROL.getName())).
+          thenThrow(new ResourceHandlerException());
+    } else if (cGroupVersion.equals(V2)) {
+      when(mockCGroupsHandler.getCGroupParam(
+          CGroupsHandler.CGroupController.MEMORY,
+          containerId.toString(),
+          CGroupsHandler.MemoryParameters.EVENTS_LOCAL.getName())).
+          thenThrow(new ResourceHandlerException());
+    }
     outOfOom = cGroupsMemoryResourceHandler.isUnderOOM(containerId);
     Assert.assertFalse(
         "No report of the oom status should be available.",

@@ -45,8 +45,6 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_ELASTIC_MEMORY_CO
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_ELASTIC_MEMORY_CONTROL_OOM_TIMEOUT_SEC;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_PMEM_CHECK_ENABLED;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_VMEM_CHECK_ENABLED;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_OOM_CONTROL;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_NO_LIMIT;
 
@@ -368,8 +366,8 @@ public class CGroupElasticMemoryController extends Thread {
         String underOOM = cgroups.getCGroupParam(
             CGroupsHandler.CGroupController.MEMORY,
             "",
-            CGROUP_PARAM_MEMORY_OOM_CONTROL);
-        if (underOOM.contains(CGroupsHandler.UNDER_OOM)) {
+            CGroupsHandler.MemoryParameters.OOM_CONTROL.getName());
+        if (underOOM.contains(CGroupsMemoryResourceHandlerImpl.UNDER_OOM)) {
           if (end - lastLog > 1000) {
             LOG.warn(String.format(
                 "OOM not resolved in %d ms", end - start));
@@ -403,7 +401,7 @@ public class CGroupElasticMemoryController extends Thread {
   private void setCGroupParameters() throws ResourceHandlerException {
     // Disable the OOM killer
     cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
-        CGROUP_PARAM_MEMORY_OOM_CONTROL, "1");
+        CGroupsHandler.MemoryParameters.OOM_CONTROL.getName(), "1");
     if (controlPhysicalMemory && !controlVirtualMemory) {
       try {
         // Ignore virtual memory limits, since we do not know what it is set to
@@ -414,14 +412,14 @@ public class CGroupElasticMemoryController extends Thread {
       }
       // Set physical memory limits
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
-          CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, Long.toString(limit));
+          CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(), Long.toString(limit));
     } else if (controlVirtualMemory && !controlPhysicalMemory) {
       // Ignore virtual memory limits, since we do not know what it is set to
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
           CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
       // Set physical limits to no more than virtual limits
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
-          CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, Long.toString(limit));
+          CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(), Long.toString(limit));
       // Set virtual memory limits
       // Important: it has to be set after physical limit is set
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
@@ -448,11 +446,11 @@ public class CGroupElasticMemoryController extends Thread {
       }
       cgroups.updateCGroupParam(
           CGroupsHandler.CGroupController.MEMORY, "",
-          CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
+          CGroupsHandler.MemoryParameters.HARD_LIMIT_BYTES.getName(), CGROUP_NO_LIMIT);
       // Enable the OOM killer
       cgroups.updateCGroupParam(
           CGroupsHandler.CGroupController.MEMORY, "",
-          CGROUP_PARAM_MEMORY_OOM_CONTROL, "0");
+          CGroupsHandler.MemoryParameters.OOM_CONTROL.getName(), "0");
     } catch (ResourceHandlerException ex) {
       LOG.warn("Error in cleanup", ex);
     }

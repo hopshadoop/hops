@@ -36,7 +36,6 @@ import java.util.Collections;
 
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_FILE_TASKS;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_MEMSW_USAGE_BYTES;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_OOM_CONTROL;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_USAGE_BYTES;
 
 /**
@@ -180,8 +179,8 @@ public class DefaultOOMHandler implements Runnable {
         String status = cgroups.getCGroupParam(
             CGroupsHandler.CGroupController.MEMORY,
             "",
-            CGROUP_PARAM_MEMORY_OOM_CONTROL);
-        if (!status.contains(CGroupsHandler.UNDER_OOM)) {
+            CGroupsHandler.MemoryParameters.OOM_CONTROL.getName());
+        if (!status.contains(CGroupsMemoryResourceHandlerImpl.UNDER_OOM)) {
           break;
         }
 
