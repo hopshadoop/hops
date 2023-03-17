@@ -56,12 +56,13 @@ public class CGroupsCpuResourceHandlerImpl extends BaseCGroupsCpuResourceHandler
 
   @Override
   void updateCpuBandwidthParams(String groupId, String cpuQuotaUs, String cpuPeriodUs) throws ResourceHandlerException {
-    cGroupsHandler
-        .updateCGroupParam(CPU, groupId, CGroupsHandler.CpuParameters.QUOTA_US.getName(), cpuQuotaUs);
+    // Order is important, we should first set the PERIOD and then the QUOTA
     if (!cpuPeriodUs.isEmpty()) {
       cGroupsHandler
           .updateCGroupParam(CPU, groupId, CGroupsHandler.CpuParameters.PERIOD_US.getName(), cpuPeriodUs);
     }
+    cGroupsHandler
+        .updateCGroupParam(CPU, groupId, CGroupsHandler.CpuParameters.QUOTA_US.getName(), cpuQuotaUs);
   }
 
   @Override

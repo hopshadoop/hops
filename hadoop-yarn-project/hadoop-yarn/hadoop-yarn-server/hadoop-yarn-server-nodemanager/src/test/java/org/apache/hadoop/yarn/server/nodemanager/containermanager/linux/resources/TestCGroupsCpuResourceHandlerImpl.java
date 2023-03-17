@@ -33,6 +33,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.InOrder;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -254,6 +255,12 @@ public class TestCGroupsCpuResourceHandlerImpl {
     verify(mockCGroupsHandler, times(1))
         .createCGroup(CGroupsHandler.CGroupController.CPU, id);
     if (cGroupVersion.equals(V1)) {
+      // Order is important, we should first set the PERIOD and then the QUOTA
+      InOrder inOrder = inOrder(mockCGroupsHandler);
+      inOrder.verify(mockCGroupsHandler).updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
+          eq(CGroupsHandler.CpuParameters.PERIOD_US.getName()), any());
+      inOrder.verify(mockCGroupsHandler).updateCGroupParam(eq(CGroupsHandler.CGroupController.CPU), eq(id),
+          eq(CGroupsHandler.CpuParameters.QUOTA_US.getName()), any());
       verify(mockCGroupsHandler, times(1))
           .updateCGroupParam(CGroupsHandler.CGroupController.CPU, id,
               CGroupsHandler.CpuParameters.SHARES.getName(),
