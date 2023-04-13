@@ -17,10 +17,10 @@
   <parent>
     <artifactId>hadoop-yarn-server</artifactId>
     <groupId>io.hops</groupId>
-    <version>3.2.0.9-SNAPSHOT</version>
+    <version>3.2.0.9-RC0</version>
   </parent>
   <artifactId>hadoop-yarn-server-sharedcachemanager</artifactId>
-  <version>3.2.0.9-SNAPSHOT</version>
+  <version>3.2.0.9-RC0</version>
   <name>Apache Hadoop YARN SharedCacheManager</name>
 
   <properties>
