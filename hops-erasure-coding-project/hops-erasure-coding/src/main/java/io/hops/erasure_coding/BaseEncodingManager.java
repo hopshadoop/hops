@@ -35,8 +35,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.StringUtils;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.simple.JSONObject;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -351,25 +350,21 @@ public abstract class BaseEncodingManager extends EncodingManager {
   }
   
   static public void logRaidEncodingMetrics(String result, Codec codec,
-      long delay, long numReadBytes, long numReadBlocks, long metaBlocks,
-      long metaBytes, long savingBytes, Path srcPath, LOGTYPES type,
-      FileSystem fs) {
-    try {
-      JSONObject json = new JSONObject();
-      json.put("result", result);
-      json.put("code", codec.id);
-      json.put("delay", delay);
-      json.put("readbytes", numReadBytes);
-      json.put("readblocks", numReadBlocks);
-      json.put("metablocks", metaBlocks);
-      json.put("metabytes", metaBytes);
-      json.put("savingbytes", savingBytes);
-      json.put("path", srcPath.toString());
-      json.put("type", type.name());
-      json.put("cluster", fs.getUri().getAuthority());
-      ENCODER_METRICS_LOG.info(json.toString());
-    } catch (JSONException e) {
-      LOG.warn("Exception when logging the Raid metrics: " + e.getMessage(), e);
-    }
+          long delay, long numReadBytes, long numReadBlocks, long metaBlocks,
+          long metaBytes, long savingBytes, Path srcPath, LOGTYPES type,
+          FileSystem fs) {
+    JSONObject json = new JSONObject();
+    json.put("result", result);
+    json.put("code", codec.id);
+    json.put("delay", delay);
+    json.put("readbytes", numReadBytes);
+    json.put("readblocks", numReadBlocks);
+    json.put("metablocks", metaBlocks);
+    json.put("metabytes", metaBytes);
+    json.put("savingbytes", savingBytes);
+    json.put("path", srcPath.toString());
+    json.put("type", type.name());
+    json.put("cluster", fs.getUri().getAuthority());
+    ENCODER_METRICS_LOG.info(json.toString());
   }
 }

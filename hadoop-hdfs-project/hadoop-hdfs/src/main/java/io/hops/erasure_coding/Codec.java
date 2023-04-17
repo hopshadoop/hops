@@ -24,9 +24,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -36,6 +35,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 /**
  * A class with the information of a raid codec.
@@ -141,11 +142,11 @@ public class Codec implements Serializable {
         }
         return;
       }
-      JSONArray jsonArray = new JSONArray(source);
+      JSONArray jsonArray = (JSONArray) new JSONParser().parse(source);
       List<Codec> localCodecs = new ArrayList<>();
       Map<String, Codec> localIdToCodec = new HashMap<>();
-      for (int i = 0; i < jsonArray.length(); ++i) {
-        Codec codec = new Codec(jsonArray.getJSONObject(i));
+      for (int i = 0; i < jsonArray.size(); ++i) {
+        Codec codec = new Codec((JSONObject)jsonArray.get(i));
         localIdToCodec.put(codec.id, codec);
         localCodecs.add(codec);
       }
@@ -158,19 +159,19 @@ public class Codec implements Serializable {
       });
       codecs = Collections.unmodifiableList(localCodecs);
       idToCodec = Collections.unmodifiableMap(localIdToCodec);
-    } catch (JSONException e) {
+    } catch (ParseException e) {
       throw new IOException(e);
     }
   }
 
-  public Codec(JSONObject json) throws JSONException {
+  public Codec(JSONObject json) {
     this.json = json;
-    this.id = json.getString("id");
-    this.parityLength = json.getInt("parity_length");
-    this.stripeLength = json.getInt("stripe_length");
-    this.erasureCodeClass = json.getString("erasure_code");
-    this.parityDirectory = json.getString("parity_dir");
-    this.priority = json.getInt("priority");
+    this.id = (String) json.get("id");
+    this.parityLength = ((Long) json.get("parity_length")).intValue();
+    this.stripeLength = ((Long) json.get("stripe_length")).intValue();
+    this.erasureCodeClass = (String) json.get("erasure_code");
+    this.parityDirectory = (String) json.get("parity_dir");
+    this.priority = ((Long) json.get("priority")).intValue();
     this.description = getJSONString(json, "description", "");
     checkDirectory(parityDirectory);
   }
@@ -190,10 +191,7 @@ public class Codec implements Serializable {
   static private String getJSONString(JSONObject json, String key,
       String defaultResult) {
     String result = defaultResult;
-    try {
-      result = json.getString(key);
-    } catch (JSONException e) {
-    }
+    result = (String) json.get(key);
     return result;
   }
 

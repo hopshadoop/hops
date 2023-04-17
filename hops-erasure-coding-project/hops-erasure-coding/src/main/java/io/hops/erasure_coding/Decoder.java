@@ -32,8 +32,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.util.Progressable;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.simple.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -436,26 +435,22 @@ public class Decoder {
   }
   
   public void logRaidReconstructionMetrics(String result, long bytes,
-      Codec codec, long delay, int numMissingBlocks, long numReadBytes,
-      Path srcFile, long errorOffset, LOGTYPES type, FileSystem fs) {
+          Codec codec, long delay, int numMissingBlocks, long numReadBytes,
+          Path srcFile, long errorOffset, LOGTYPES type, FileSystem fs) {
 
-    try {
-      JSONObject json = new JSONObject();
-      json.put("result", result);
-      json.put("constructedbytes", bytes);
-      json.put("code", codec.id);
-      json.put("delay", delay);
-      json.put("missingblocks", numMissingBlocks);
-      json.put("readbytes", numReadBytes);
-      json.put("file", srcFile.toString());
-      json.put("offset", errorOffset);
-      json.put("type", type.name());
-      json.put("cluster", fs.getUri().getAuthority());
-      DECODER_METRICS_LOG.info(json.toString());
+    JSONObject json = new JSONObject();
+    json.put("result", result);
+    json.put("constructedbytes", bytes);
+    json.put("code", codec.id);
+    json.put("delay", delay);
+    json.put("missingblocks", numMissingBlocks);
+    json.put("readbytes", numReadBytes);
+    json.put("file", srcFile.toString());
+    json.put("offset", errorOffset);
+    json.put("type", type.name());
+    json.put("cluster", fs.getUri().getAuthority());
+    DECODER_METRICS_LOG.info(json.toString());
 
-    } catch (JSONException e) {
-      LOG.warn("Exception when logging the Raid metrics: " + e.getMessage(), e);
-    }
   }
   
   public class DecoderInputStream extends InputStream {
