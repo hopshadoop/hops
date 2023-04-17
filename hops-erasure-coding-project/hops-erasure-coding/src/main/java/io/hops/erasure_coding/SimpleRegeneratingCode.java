@@ -20,7 +20,6 @@ package io.hops.erasure_coding;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,11 +50,7 @@ public class SimpleRegeneratingCode extends ErasureCode {
 
   @Override
   public void init(Codec codec) {
-    try {
-      this.paritySizeSRC = codec.json.getInt("parity_length_src");
-    } catch (JSONException e) {
-      LOG.error("Exception", e);
-    }
+      this.paritySizeSRC = ((Long) codec.json.get("parity_length_src")).intValue();
     init(codec.stripeLength, codec.parityLength);
     LOG.info(" Initialized " + SimpleRegeneratingCode.class +
         " stripeLength:" + codec.stripeLength +

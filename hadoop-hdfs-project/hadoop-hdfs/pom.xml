@@ -43,9 +43,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hops-leader-election</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20140107</version>
+      <groupId>com.googlecode.json-simple</groupId>
+      <artifactId>json-simple</artifactId>
     </dependency>
     <dependency>
       <groupId>io.hops</groupId>

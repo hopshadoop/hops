@@ -20,10 +20,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.json.JSONArray;
+import org.json.simple.JSONArray;
 
 import java.io.IOException;
 import java.util.Random;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 public class Util {
 
@@ -116,7 +119,13 @@ public class Util {
   }
 
   public static Codec getCodec(Codecs codec) {
-    JSONArray jsonArray = new JSONArray(JSON_CODEC_ARRAY);
-    return new Codec(jsonArray.getJSONObject(codec.ordinal()));
+    
+    try {
+      JSONArray jsonArray = (JSONArray)new JSONParser().parse(JSON_CODEC_ARRAY);
+      return new Codec((JSONObject) jsonArray.get(codec.ordinal()));
+    } catch (ParseException ex) {
+      //should not happen we know that the codect arry is corect
+    }
+    return null;
   }
 }

@@ -72,6 +72,10 @@
           <groupId>io.kubernetes</groupId>
           <artifactId>client-java</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.googlecode.json-simple</groupId>
+          <artifactId>json-simple</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 

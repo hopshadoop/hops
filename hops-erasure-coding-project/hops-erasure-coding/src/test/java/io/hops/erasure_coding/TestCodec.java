@@ -107,7 +107,7 @@ public class TestCodec extends TestCase {
         assertEquals(1, codecs.get(2).parityLength);
         assertEquals(100, codecs.get(2).priority);
         assertEquals("/raid", codecs.get(2).parityDirectory);
-        assertEquals("", codecs.get(2).description);
+        assertEquals(null, codecs.get(2).description);
 
         assertEquals("nrs", codecs.get(3).id);
         assertEquals(10, codecs.get(3).stripeLength);
