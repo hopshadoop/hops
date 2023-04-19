@@ -722,7 +722,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <dependency>
           <groupId>com.mysql.ndb</groupId>
           <artifactId>clusterj-native</artifactId>
-          <version>21.04.12</version>
+          <version>21.04.13</version>
           <classifier>natives-linux</classifier>
         </dependency>
       </dependencies>
