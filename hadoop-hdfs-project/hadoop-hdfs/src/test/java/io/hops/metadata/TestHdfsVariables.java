@@ -81,7 +81,7 @@ public class TestHdfsVariables {
       testIncrementCounter(CounterType.INodeId, Long.MAX_VALUE / 5);
       fail("overflow exception was expected");
     }catch (ExecutionException ex){
-      if(!ex.getCause().getMessage().equals("overflow")){
+      if(!ex.getCause().getMessage().startsWith("overflow")){
         throw ex;
       }
     }

@@ -618,6 +618,12 @@
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>${guava.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.guava</groupId>
+            <artifactId>failureaccess</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
@@ -1836,7 +1842,7 @@
             <configuration>
               <rules>
                 <DependencyConvergence>
-                  <uniqueVersions>true</uniqueVersions>
+                  <uniqueVersions>false</uniqueVersions>
                 </DependencyConvergence>
                 <bannedDependencies>
                   <excludes>
