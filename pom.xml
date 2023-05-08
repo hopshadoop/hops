@@ -729,18 +729,27 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <build>
         <plugins>
           <plugin>
-            <groupId>com.googlecode.mavennatives</groupId>
-            <artifactId>maven-nativedependencies-plugin</artifactId>
-            <version>0.0.7</version>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
             <executions>
               <execution>
-                <id>unpacknatives</id>
+                <id>unpack</id>
+                <phase>compile</phase>
                 <goals>
-                  <goal>copy</goal>
+                  <goal>unpack</goal>
                 </goals>
                 <configuration>
-                  <nativesTargetDir>${session.executionRootDirectory}/target/lib</nativesTargetDir>
-                  <separateDirs>false</separateDirs>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>com.mysql.ndb</groupId>
+                      <artifactId>clusterj-native</artifactId>
+                      <version>21.04.12</version>
+                      <classifier>natives-linux</classifier>
+                      <type>jar</type>
+                      <overWrite>true</overWrite>
+                      <outputDirectory>${project.build.directory}/native/target/usr/local/lib</outputDirectory>
+                    </artifactItem>
+                  </artifactItems>
                 </configuration>
               </execution>
             </executions>
