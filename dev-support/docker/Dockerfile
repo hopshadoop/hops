@@ -83,6 +83,7 @@ RUN apt-get -q update \
         sudo \
         valgrind \
         zlib1g-dev \
+	isal \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
