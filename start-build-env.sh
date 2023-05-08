@@ -22,7 +22,7 @@ cd "$(dirname "$0")" # connect to root
 docker build -t hadoop-build dev-support/docker
 
 if [ "$(uname -s)" = "Linux" ]; then
-  USER_NAME=${SUDO_USER:=$USER}
+  USER_NAME=${USER}
   USER_ID=$(id -u "${USER_NAME}")
   GROUP_ID=$(id -g "${USER_NAME}")
   # man docker-run
@@ -70,6 +70,8 @@ UserSpecificDocker
 # in non interactive mode
 DOCKER_INTERACTIVE_RUN=${DOCKER_INTERACTIVE_RUN-"-i -t"}
 
+MAVEN_REPO=${MAVEN_REPO:="${HOME}/.m2"}
+
 # By mapping the .m2 directory you can do an mvn install from
 # within the container and use the result on your normal
 # system.  And this also is a significant speedup in subsequent
@@ -77,6 +79,7 @@ DOCKER_INTERACTIVE_RUN=${DOCKER_INTERACTIVE_RUN-"-i -t"}
 docker run --rm=true $DOCKER_INTERACTIVE_RUN \
   -v "${PWD}:/home/${USER_NAME}/hadoop${V_OPTS:-}" \
   -w "/home/${USER_NAME}/hadoop" \
-  -v "${HOME}/.m2:/home/${USER_NAME}/.m2${V_OPTS:-}" \
+  -v "${MAVEN_REPO}:/home/${USER_NAME}/.m2${V_OPTS:-}" \
   -u "${USER_ID}" \
+  $NETWORK \
   "hadoop-build-${USER_ID}" "$@"
