@@ -1,0 +1,227 @@
+pipeline {
+    agent {
+        node {
+            label 'local'
+        }
+    }
+    environment {
+        EXPOSE_MYSQLD_PORTS_STARTING_AT="${16000+(100*Integer.parseInt(env.EXECUTOR_NUMBER))}"
+        MYSQL_USER="mysql"
+        MYSQL_PASSWORD="Abc123?e"
+        SUFFIX="test${env.EXECUTOR_NUMBER}"
+    }
+    stages {
+        stage ('check and fix local maven repo'){
+            steps {
+                dir("${WORKSPACE}/../hops_testing"){
+                    script {
+                        if(!fileExists(".m2_${SUFFIX}"))
+                        {
+                            sh """
+                                mkdir ".m2_${SUFFIX}"
+                                cp ~/.m2/settings.xml .m2_${SUFFIX}/
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        stage ('preclean') {
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}"){
+                    deleteDir()
+                }
+            }
+        }
+        stage ('build dal') {
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}"){
+                    sh """
+                        pwd
+                        git clone git@github.com:hopshadoop/hops-metadata-dal.git
+                    """
+                }
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}/hops-metadata-dal"){
+                    sh """
+                        pwd
+                        git fetch
+                        git checkout master
+                        git pull
+                        ${params.GIT_PULL_DAL_COMMAND}
+                        mvn clean install -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}
+                    """
+	            }
+            }
+        }
+        stage('configure dal impl'){
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}"){
+                    sh """
+                        pwd
+                        git clone git@github.com:hopshadoop/hops-metadata-dal-impl-ndb.git
+                    """
+                }
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}/hops-metadata-dal-impl-ndb"){
+                    sh """
+                        pwd
+                        git fetch
+                        git checkout master
+                        git pull
+                        ${params.GIT_PULL_DAL_IMPL_COMMAND}
+                    """
+                    script{
+                        def config = """
+                            com.mysql.clusterj.connectstring=mgmd_1_${SUFFIX}
+                            com.mysql.clusterj.database=hops
+                            com.mysql.clusterj.connection.pool.size=1
+                            com.mysql.clusterj.max.transactions=1024
+                            #com.mysql.clusterj.connection.pool.nodeids=
+
+                            io.hops.metadata.ndb.mysqlserver.data_source_class_name = com.mysql.cj.jdbc.MysqlDataSource
+                            io.hops.metadata.ndb.mysqlserver.useSSL=false
+                            io.hops.metadata.ndb.mysqlserver.host=mysqld_1_${SUFFIX}
+                            io.hops.metadata.ndb.mysqlserver.port=3306
+                            io.hops.metadata.ndb.mysqlserver.username=$MYSQL_USER
+                            io.hops.metadata.ndb.mysqlserver.password=$MYSQL_PASSWORD
+                            io.hops.metadata.ndb.mysqlserver.connection_pool_size=1
+
+                            io.hops.enable.clusterj.dto.cache=false
+                            io.hops.enable.clusterj.session.cache=false
+
+                            com.mysql.clusterj.max.cached.instances=0
+                            com.mysql.clusterj.max.cached.sessions=0
+                            com.mysql.clusterj.warmup.cached.sessions=0
+
+
+                            #size of the session pool. should be altreat as big as the number of active RPC handling Threads in the system
+                            io.hops.session.pool.size=1000
+
+                            #Session is reused Random.getNextInt(0,io.hops.session.reuse.count) times and then it is GCed
+                            #use smaller values if using java 6.
+                            #if you use java 7 or higer then use G1GC and there is no need to close sessions. use Int.MAX_VALUE
+                            io.hops.session.reuse.count=2147483647
+                        """
+                        writeFile(file: 'src/main/resources/ndb-config.properties', text: config)
+                    }
+
+                    script {
+                        RONDB_VERSION = sh (
+                            script: 'mvn -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX} dependency:tree | grep "com\\.mysql\\.ndb\\:clusterj-rondb" | cut -d":" -f 4 | uniq',
+                            returnStdout: true
+                        ).trim()
+                        RONDB_VERSION_NO_DOT = RONDB_VERSION.replaceAll("\\.","")
+                        echo "RONDB_VERSION: ${RONDB_VERSION}"
+                        echo "RONDB_VERSION_NO_DOT: ${RONDB_VERSION_NO_DOT}"
+                    }
+                }
+            }
+        }
+        stage('start RonDB Docker'){
+            steps {
+                dir('../../rondb-docker'){
+                    sh """
+                        ./build_run_docker.sh --rondb-version ${RONDB_VERSION} --size small --volumes-in-local-dir  --num-mgm-nodes 1 --node-groups 1 --replication-factor 1 --num-mysql-nodes 1 --num-rest-api-nodes 0 --num-benchmarking-nodes 1 --suffix ${SUFFIX} -d
+                    """
+                }
+            }
+        }
+        stage('initialize database'){
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}/hops-metadata-dal-impl-ndb/schema"){
+                    //Eventhoug RonDB Docker returned the mysql server is not alway working imeditatly so retry for 5min until it works
+                    timeout(5) {
+                        waitUntil {
+                            script {
+                                def r = sh returnStatus: true, script: """
+                                    mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP DATABASE IF EXISTS hops"
+                                    mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE hops"
+
+                                    mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "ALTER TABLESPACE ts_1 drop datafile \"ts_1_data_file_0.dat\" ENGINE ndbcluster" | true
+                                    mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP TABLESPACE ts_1 ENGINE ndbcluster" | true
+                                    mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP LOGFILE GROUP lg_1 ENGINE ndbcluster"| true
+
+                                    ./create-tables.sh 127.0.0.1 $EXPOSE_MYSQLD_PORTS_STARTING_AT $MYSQL_USER $MYSQL_PASSWORD hops
+                                """
+                                return r == 0
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('build dal impl'){
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}/hops-metadata-dal-impl-ndb"){
+                    sh """
+                        # set to empty to run in non interactive mode
+                        export DOCKER_INTERACTIVE_RUN=
+                        export NETWORK='--network rondb_v${RONDB_VERSION_NO_DOT}_m1_g1_r1_my1_ra0_bn1_${SUFFIX}_default'
+                        export MAVEN_REPO=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}
+                        ./start-build-env.sh mvn clean install
+                    """
+                }
+            }
+            post {
+                always{
+                     dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}/hops-metadata-dal-impl-ndb"){
+                        junit(testResults: '**/target/surefire-reports/*.xml', allowEmptyResults : true)
+                     }
+                }
+            }
+        }
+        stage('build hops'){
+            steps{
+                sh """
+                    ${params.GIT_PULL_HOPS_COMMAND}
+                """
+                // this is only needed because our test machine disk is to full, this should be removed when the machine has been fixed
+                sh """
+                    sed -i "s/90\\.0F/99.0F/g" hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/java/org/apache/hadoop/yarn/conf/YarnConfiguration.java
+                    sed -i "s/90\\.0/99.0/g" hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/resources/yarn-default.xml
+                """
+                // this step is here to fail fast if the code doesn't build. Otherwise the -fn in the run tests command make that we have to wail until 
+                // the end of the test to find out that the code does not compile
+                sh """
+                    # set to empty to run in non interactive mode
+                    export DOCKER_INTERACTIVE_RUN=
+                    export MAVEN_REPO=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}
+                    ./start-build-env.sh mvn clean generate-resources install -Pnative,dist -Dmaven.javadoc.skip=true -nsu -DskipTests -Drequire.isal
+                """
+            }
+        }
+        stage('run hops tests'){
+            steps {
+                sh """
+                    # set to empty to run in non interactive mode
+                    export DOCKER_INTERACTIVE_RUN=
+                    export NETWORK='--network rondb_v${RONDB_VERSION_NO_DOT}_m1_g1_r1_my1_ra0_bn1_${SUFFIX}_default'
+                    export MAVEN_REPO=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}
+                    ./start-build-env.sh mvn clean install -Pndb,native -nsu -fn -Drequire.isal 
+                """
+            }
+            post {
+                always{
+                    junit(testResults: '**/target/surefire-reports/*.xml', allowEmptyResults : true)
+                }
+            }
+        }
+    }
+    post {
+        always{
+            script{
+                if(!params.KEEP_DB_AFTER_RUN)
+                {
+                    dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}"){
+                        deleteDir()
+                    }
+                    sh """
+                        git reset --hard origin/master
+                    """
+                    sh """
+                        docker-compose -f ../../rondb-docker/autogenerated_files/v${RONDB_VERSION_NO_DOT}_m1_g1_r1_my1_ra0_bn1_${SUFFIX}/docker_compose.yml -p rondb_v${RONDB_VERSION_NO_DOT}_m1_g1_r1_my1_ra0_bn1_${SUFFIX} down -v
+                    """
+                }
+            }
+        }
+    }
+}
