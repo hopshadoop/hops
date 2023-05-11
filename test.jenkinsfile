@@ -47,7 +47,7 @@ pipeline {
                         git fetch
                         git checkout master
                         git pull
-                        ${params.GIT_PULL_DAL_COMMAND}
+                        ${params.GIT_PULL_DAL_COMMAND!=null?params.GIT_PULL_DAL_COMMAND:""}
                         mvn clean install -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}
                     """
 	            }
@@ -67,7 +67,7 @@ pipeline {
                         git fetch
                         git checkout master
                         git pull
-                        ${params.GIT_PULL_DAL_IMPL_COMMAND}
+                        ${params.GIT_PULL_DAL_IMPL_COMMAND!=null?params.GIT_PULL_DAL_IMPL_COMMAND:""}
                     """
                     script{
                         def config = """
@@ -172,7 +172,7 @@ pipeline {
         stage('build hops'){
             steps{
                 sh """
-                    ${params.GIT_PULL_HOPS_COMMAND}
+                    ${params.GIT_PULL_HOPS_COMMAND!=null?params.GIT_PULL_HOPS_COMMAND:""}
                 """
                 // this is only needed because our test machine disk is to full, this should be removed when the machine has been fixed
                 sh """
@@ -209,7 +209,7 @@ pipeline {
     post {
         always{
             script{
-                if(!params.KEEP_DB_AFTER_RUN)
+                if(params.KEEP_DB_AFTER_RUN==null || !params.KEEP_DB_AFTER_RUN)
                 {
                     dir("${WORKSPACE}/../hops_testing/dal-${SUFFIX}"){
                         deleteDir()
