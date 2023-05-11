@@ -1,0 +1,93 @@
+pipeline {
+    agent {
+        node {
+            label 'hops-master-local'
+        }
+    }
+    stages {
+        stage ('build dal') {
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal"){
+                    sh """
+                        pwd
+                        git clone git@github.com:hopshadoop/hops-metadata-dal.git
+                    """
+                }
+                dir("${WORKSPACE}/../hops_testing/dal/hops-metadata-dal"){
+                    sh """
+                        pwd
+                        git fetch
+                        git checkout ${params.BRANCH}
+                        git pull
+                        mvn clean install deploy -DskipTests
+                    """
+	            }
+            }
+        }
+        stage('build and deploy dal impl'){
+            steps {
+                dir("${WORKSPACE}/../hops_testing/dal"){
+                    sh """
+                        pwd
+                        git clone git@github.com:hopshadoop/hops-metadata-dal-impl-ndb.git
+                    """
+                }
+                dir("${WORKSPACE}/../hops_testing/dal/hops-metadata-dal-impl-ndb"){
+                    sh """
+                        pwd
+                        git fetch
+                        git checkout ${params.BRANCH}
+                        git pull
+                        # set to empty to run in non interactive mode
+                        export DOCKER_INTERACTIVE_RUN=
+                        ./start-build-env.sh mvn clean install deploy assembly:assembly -DskipTests
+                    """
+                    script {
+                        RONDB_VERSION = sh (
+                                script: 'mvn -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX} dependency:tree | grep "com\\.mysql\\.ndb\\:clusterj-rondb" | cut -d":" -f 4 | uniq',
+                                returnStdout: true
+                        ).trim()
+                        echo "RONDB_VERSION: ${RONDB_VERSION}"
+                        HOPS_VERSION = sh (
+                                script: 'mvn -q -Dexec.executable="echo" -Dexec.args=\'${project.version}\' --non-recursive exec:exec',
+                                returnStdout: true
+                        ).trim()
+                        echo "HOPS_VERSION: ${HOPS_VERSION}"
+
+                        echo "Deploying Hops - NDB connector...."
+                        sh """
+                            scp -i ~/.ssh/id_rsa3 target/hops-metadata-dal-impl-ndb-${HOPS_VERSION}-jar-with-dependencies.jar repo@jenkins.hops.works:/opt/repository/master//ndb-dal-${HOPS_VERSION}-${RONDB_VERSION}.jar                            
+                        """
+
+                        echo "Deploying Hops Schema...."
+                        sh """
+                            scp -i ~/.ssh/id_rsa3 schema/update-schema* repo@jenkins.hops.works:/opt/repository/master//hops-schemas/
+                        """
+                    }
+                }
+            }
+        }
+        stage('build and deploy hops'){
+            steps{
+                sh """
+                    # set to empty to run in non interactive mode
+                    export DOCKER_INTERACTIVE_RUN=
+                    ./start-build-env.sh mvn clean generate-sources install deploy -Pdist,native -Dtar -DskipTests -Dmaven.javadoc.skip=true -nsu
+                    scp -i ~/.ssh/id_rsa3 ./hadoop-dist/target/hadoop-${HOPS_VERSION}.tar.gz repo@jenkins.hops.works:/opt/repository/master/hops-${HOPS_VERSION}.tgz
+                """
+            }
+        }
+    }
+    post {
+        always{
+            script{
+                sh """
+                        git reset --hard origin/${params.BRANCH}
+                """
+                dir("${WORKSPACE}/../hops_testing/dal"){
+                    deleteDir()
+                }
+            }
+        }
+    }
+}
