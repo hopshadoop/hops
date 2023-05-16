@@ -46,7 +46,7 @@ pipeline {
                         RONDB_VERSION = sh (
                                 script: 'mvn -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX} dependency:tree | grep "com\\.mysql\\.ndb\\:clusterj-rondb" | cut -d":" -f 4 | uniq',
                                 returnStdout: true
-                        ).trim()
+                        ).trim().replaceAll("-SNAPSHOT", "")
                         echo "RONDB_VERSION: ${RONDB_VERSION}"
                         HOPS_VERSION = sh (
                                 script: 'mvn -q -Dexec.executable="echo" -Dexec.args=\'${project.version}\' --non-recursive exec:exec',
