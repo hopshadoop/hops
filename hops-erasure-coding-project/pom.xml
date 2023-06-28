@@ -20,12 +20,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>3.2.0.10-SNAPSHOT</version>
+    <version>3.2.0.11-SNAPSHOT</version>
     <relativePath>../hadoop-project</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hops-erasure-coding-project</artifactId>
-  <version>3.2.0.10-SNAPSHOT</version>
+  <version>3.2.0.11-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>hops-erasure-coding-project</name>
 
