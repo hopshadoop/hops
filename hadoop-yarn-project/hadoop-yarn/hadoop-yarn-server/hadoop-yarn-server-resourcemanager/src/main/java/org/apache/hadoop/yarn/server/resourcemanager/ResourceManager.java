@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.spi.container.servlet.ServletContainer;
+import io.hops.leader_election.watchdog.AliveWatchdogService;
 import io.hops.util.GroupMembershipService;
 import io.hops.util.RMStorageFactory;
 import io.hops.util.YarnAPIStorageFactory;
@@ -30,6 +31,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.http.HttpServer2;
@@ -198,6 +200,7 @@ public class ResourceManager extends CompositeService
   protected ResourceScheduler scheduler;
   protected CertificateLocalizationService certificateLocalizationService;
   protected RevocationListFetcherService revocationListFetcherService;
+  private AliveWatchdogService aliveWatchdogService;
   protected ReservationSystem reservationSystem;
   private ClientRMService clientRM;
   protected ApplicationMasterService masterService;
@@ -282,6 +285,7 @@ public class ResourceManager extends CompositeService
 
     validateConfigs(this.conf);
 
+    createAndInitAliveWatchdogService();
     createAndInitCRLFetcherService();
     
     // Set HA configuration should be done before login
@@ -1338,6 +1342,7 @@ public class ResourceManager extends CompositeService
 
   @Override
   protected void serviceStart() throws Exception {
+    startAliveWatchdogService();
     startCRLFetcherService();
     if (this.rmContext.isHAEnabled()) {
       transitionToStandby(false);
@@ -1389,6 +1394,7 @@ public class ResourceManager extends CompositeService
     }
     transitionToStandby(false);
     stopCRLFetcherService();
+    stopAliveWatchdogService();
     rmContext.setHAServiceState(HAServiceState.STOPPING);
   }
   
@@ -1467,16 +1473,36 @@ public class ResourceManager extends CompositeService
       }
     }
   }
-  
+
+  private void createAndInitAliveWatchdogService() {
+    if (conf.getBoolean(CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED,
+        CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED_DEFAULT)) {
+      aliveWatchdogService = new AliveWatchdogService();
+      aliveWatchdogService.init(conf);
+    }
+  }
+
   private void startCRLFetcherService() {
     if (revocationListFetcherService != null) {
       revocationListFetcherService.start();
     }
   }
-  
+
+  private void startAliveWatchdogService() {
+    if (aliveWatchdogService != null) {
+      aliveWatchdogService.start();
+    }
+  }
+
   private void stopCRLFetcherService() {
     if (revocationListFetcherService != null) {
       revocationListFetcherService.stop();
+    }
+  }
+
+  private void stopAliveWatchdogService() {
+    if (aliveWatchdogService != null) {
+      aliveWatchdogService.stop();
     }
   }
   

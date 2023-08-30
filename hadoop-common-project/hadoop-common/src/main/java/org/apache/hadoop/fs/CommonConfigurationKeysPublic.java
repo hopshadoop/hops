@@ -493,7 +493,17 @@ public class CommonConfigurationKeysPublic {
   public static final String HOPS_CRL_FETCHER_INTERVAL_KEY = HOPS_CRL_PREFIX + "fetcher.interval";
   // 720 Minutes - 12 hours
   public static final long HOPS_CRL_FETCHER_INTERVAL_DEFAULT = 720;
-  
+
+  /**
+   * Alive Watchdog service configuration
+   */
+  public static final String ALIVE_WATCHDOG_PREFIX = HOPS_PREFIX + "alive-watchdog.";
+  public static final String ALIVE_WATCHDOG_ENABLED = ALIVE_WATCHDOG_PREFIX + "enabled";
+  public static final Boolean ALIVE_WATCHDOG_ENABLED_DEFAULT = false;
+  public static final String ALIVE_WATCHDOG_POLL_INTERVAL = ALIVE_WATCHDOG_PREFIX + "interval";
+  public static final String ALIVE_WATCHDOG_POLL_INTERVAL_DEFAULT = "5s";
+  public static final String ALIVE_WATCHDOG_POLLER_CLASS = ALIVE_WATCHDOG_PREFIX + "poller-class";
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">

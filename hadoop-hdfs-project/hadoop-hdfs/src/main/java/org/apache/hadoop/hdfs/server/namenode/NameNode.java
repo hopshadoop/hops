@@ -22,6 +22,7 @@ import io.hops.leaderElection.HdfsLeDescriptorFactory;
 import io.hops.leaderElection.LeaderElection;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.leader_election.node.SortedActiveNodeList;
+import io.hops.leader_election.watchdog.AliveWatchdogService;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
 import io.hops.metadata.hdfs.dal.LeaseCreationLocksDataAccess;
@@ -33,6 +34,7 @@ import io.hops.transaction.handler.RequestHandler;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Trash;
@@ -272,6 +274,8 @@ public class NameNode implements NameNodeStatusMXBean {
   protected LeaderElection leaderElection;
   
   protected RevocationListFetcherService revocationListFetcherService;
+  private AliveWatchdogService aliveWatchdogService;
+
   /**
    * for block report load balancing
    */
@@ -558,6 +562,13 @@ public class NameNode implements NameNodeStatusMXBean {
           intervals);
       }
     }
+
+    try {
+      createAndStartAliveWatchdogService(conf);
+    } catch (Exception ex) {
+      LOG.error("Could not start Alive watchdog service", ex);
+      throw new IOException(ex);
+    }
     
     UserGroupInformation.setConfiguration(conf);
     loginAsNameNodeUser(conf);
@@ -737,6 +748,14 @@ public class NameNode implements NameNodeStatusMXBean {
         revocationListFetcherService.serviceStop();
       } catch (Exception ex) {
         LOG.warn("Exception while stopping CRL fetcher service, but we are shutting down anyway");
+      }
+    }
+
+    if (aliveWatchdogService != null) {
+      try {
+        aliveWatchdogService.serviceStop();
+      } catch (Exception ex) {
+        LOG.warn("Error while stopping Alive watchdog service, continue with shutdown");
       }
     }
     
@@ -1459,6 +1478,15 @@ public class NameNode implements NameNodeStatusMXBean {
       } else {
         LOG.warn("RPC TLS is enabled but CRL validation is disabled");
       }
+    }
+  }
+
+  private void createAndStartAliveWatchdogService(Configuration conf) throws Exception {
+    if (conf.getBoolean(CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED,
+        CommonConfigurationKeys.ALIVE_WATCHDOG_ENABLED_DEFAULT)) {
+      aliveWatchdogService = new AliveWatchdogService();
+      aliveWatchdogService.serviceInit(conf);
+      aliveWatchdogService.serviceStart();
     }
   }
  
