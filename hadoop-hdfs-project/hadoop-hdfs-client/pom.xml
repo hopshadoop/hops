@@ -20,12 +20,12 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project-dist</artifactId>
-    <version>3.2.0.11-SNAPSHOT</version>
+    <version>3.2.0.12-SNAPSHOT</version>
     <relativePath>../../hadoop-project-dist</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-hdfs-client</artifactId>
-  <version>3.2.0.11-SNAPSHOT</version>
+  <version>3.2.0.12-SNAPSHOT</version>
   <description>Apache Hadoop HDFS Client</description>
   <name>Apache Hadoop HDFS Client</name>
   <packaging>jar</packaging>

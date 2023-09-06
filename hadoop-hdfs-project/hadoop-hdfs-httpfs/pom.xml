@@ -22,12 +22,12 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>3.2.0.11-SNAPSHOT</version>
+    <version>3.2.0.12-SNAPSHOT</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
   <groupId>io.hops</groupId>
   <artifactId>hadoop-hdfs-httpfs</artifactId>
-  <version>3.2.0.11-SNAPSHOT</version>
+  <version>3.2.0.12-SNAPSHOT</version>
   <packaging>war</packaging>
 
   <name>Apache Hadoop HttpFS</name>
