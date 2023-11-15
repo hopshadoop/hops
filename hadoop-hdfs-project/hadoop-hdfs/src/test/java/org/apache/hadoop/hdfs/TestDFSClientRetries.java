@@ -17,8 +17,17 @@
  */
 package org.apache.hadoop.hdfs;
 
+import io.hops.metadata.HdfsStorageFactory;
+import io.hops.metadata.LEStorageFactory;
+import io.hops.metadata.election.dal.LeDescriptorDataAccess;
+import io.hops.metadata.election.entity.LeDescriptor;
 import io.hops.metadata.hdfs.entity.EncodingPolicy;
 
+import io.hops.transaction.EntityManager;
+import io.hops.transaction.handler.HDFSOperationType;
+import io.hops.transaction.handler.HopsTransactionalRequestHandler;
+import io.hops.transaction.handler.LightWeightRequestHandler;
+import io.hops.transaction.lock.TransactionLocks;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -77,10 +86,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.CreateFlag;
 
@@ -967,6 +973,7 @@ public class TestDFSClientRetries {
       });
       thread.start();
 
+      deleteLeDescriptors();
       //restart namenode in a new thread
       new Thread(new Runnable() {
         @Override
@@ -1057,6 +1064,26 @@ public class TestDFSClientRetries {
     } finally {
       cluster.shutdown();
     }
+  }
+
+
+  private static void deleteLeDescriptors() throws IOException {
+    HopsTransactionalRequestHandler handler = (HopsTransactionalRequestHandler) new HopsTransactionalRequestHandler( HDFSOperationType.GET_BLOCK_LOCATIONS) {
+      Collection <LeDescriptor> leds;
+      @Override
+      public void acquireLock(TransactionLocks locks) throws IOException {
+        leds = EntityManager.findList(LeDescriptor.HdfsLeDescriptor.Finder.All);
+      }
+
+      @Override
+      public Object performTask() throws IOException {
+        for(LeDescriptor led : leds) {
+          EntityManager.remove(led);
+        }
+        return null;
+      }
+    };
+    handler.handle();
   }
 
   static void assertEmpty(final List<Exception> exceptions) {

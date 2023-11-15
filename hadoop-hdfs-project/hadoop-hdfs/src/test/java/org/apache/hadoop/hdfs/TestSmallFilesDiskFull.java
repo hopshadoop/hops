@@ -91,7 +91,7 @@ public class TestSmallFilesDiskFull {
       }
 
       int dbFiles = countDBFiles();
-      assertTrue("Count of db file should be more than 0 and less than " + count,
+      assertTrue("Count of db file should be more than 0 and less than " + count + " Got: " + count,
               dbFiles > 0 && dbFiles < count);
 
     } catch (Exception e) {
