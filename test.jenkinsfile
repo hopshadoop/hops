@@ -144,11 +144,6 @@ pipeline {
                                 def r = sh returnStatus: true, script: """
                                     mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP DATABASE IF EXISTS hops"
                                     mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE hops"
-
-                                    #mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "ALTER TABLESPACE ts_1 drop datafile \"ts_1_data_file_0.dat\" ENGINE ndbcluster" | true
-                                    #mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP TABLESPACE ts_1 ENGINE ndbcluster" | true
-                                    #mysql --host=127.0.0.1 --port=$EXPOSE_MYSQLD_PORTS_STARTING_AT -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP LOGFILE GROUP lg_1 ENGINE ndbcluster"| true
-
                                     ./create-tables.sh 127.0.0.1 $EXPOSE_MYSQLD_PORTS_STARTING_AT $MYSQL_USER $MYSQL_PASSWORD hops
                                 """
                                 return r == 0
