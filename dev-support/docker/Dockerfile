@@ -147,6 +147,23 @@ RUN curl -L -s -S \
         awk '$1!="734e37c1f6619cbbd86b9b249e69c9af8ee1ea87a2b1ff71dccda412e9dac35e63425225a95d71572091a3f0a11e9a04c2fc25d9e91b840530c26af32b9891ca" {exit(1)}'
 
 ###
+# install open ssl 3
+###
+RUN mkdir -p /opt/openssl-src \
+    && apt-get -q update \
+    && apt-get install -y build-essential checkinstall zlib1g-dev \
+    && curl -L -s -S \
+        https://www.openssl.org/source/openssl-3.0.11.tar.gz -o /opt/openssl.tar.gz \
+    && tar xzf /opt/openssl.tar.gz --strip-components 1 -C /opt/openssl-src \
+    && cd /opt/openssl-src \
+    && ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib \
+    && make -j$(nproc) \
+    && make install \
+    && echo "/usr/local/ssl/lib64" >  /etc/ld.so.conf.d/openssl.conf \
+    && ldconfig -v 
+
+
+###
 # Avoid out of memory errors in builds
 ###
 ENV MAVEN_OPTS -Xms256m -Xmx1536m
