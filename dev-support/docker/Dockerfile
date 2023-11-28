@@ -83,6 +83,7 @@ RUN apt-get -q update \
         sudo \
         valgrind \
         zlib1g-dev \
+        xmlstarlet \
 	isal \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -146,6 +147,12 @@ RUN curl -L -s -S \
    && shasum -a 512 /bin/hadolint | \
         awk '$1!="734e37c1f6619cbbd86b9b249e69c9af8ee1ea87a2b1ff71dccda412e9dac35e63425225a95d71572091a3f0a11e9a04c2fc25d9e91b840530c26af32b9891ca" {exit(1)}'
 
+RUN  curl -L -s -S https://go.dev/dl/go1.19.1.linux-amd64.tar.gz -o go1.19.1.linux-amd64.tar.gz; \
+ rm -rf /usr/local/go; \
+ tar -C /usr/local -xzf go1.19.1.linux-amd64.tar.gz; \
+ rm go1.19.1.linux-amd64.tar.gz;
+ENV PATH=$PATH:/usr/local/go/bin
+
 ###
 # install open ssl 3
 ###
@@ -182,3 +189,5 @@ COPY hadoop_env_checks.sh /root/hadoop_env_checks.sh
 RUN chmod 755 /root/hadoop_env_checks.sh
 # hadolint ignore=SC2016
 RUN echo '${HOME}/hadoop_env_checks.sh' >> /root/.bashrc
+
+

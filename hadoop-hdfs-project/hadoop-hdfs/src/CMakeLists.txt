@@ -231,6 +231,14 @@ target_link_libraries(test_htable
     ${OS_LINK_LIBRARIES}
 )
 
+
+set(LIBHDFSGO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/target/usr/local/lib/libhdfs-golang)
+add_custom_target(libhdfs-go ALL
+                   COMMAND ${CMAKE_MAKE_PROGRAM} LIBHDFSGO_OUTPUT_DIR=${LIBHDFSGO_OUTPUT_DIR}
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/main/native/libhdfs-golang
+                   COMMENT "Building libhdfs-go")
+
+
 # Skip vecsum on Windows.  This could be made to work in the future by
 # introducing an abstraction layer over the sys/mman.h functions.
 if (NOT WIN32)
