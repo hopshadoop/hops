@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.spi.container.servlet.ServletContainer;
+import io.hops.exception.StorageInitializtionException;
 import io.hops.leader_election.watchdog.AliveWatchdogService;
 import io.hops.util.GroupMembershipService;
 import io.hops.util.RMStorageFactory;
@@ -1343,6 +1344,8 @@ public class ResourceManager extends CompositeService
   @Override
   protected void serviceStart() throws Exception {
     startAliveWatchdogService();
+    // It is important that we setup the storage factory after the AliveWatchdogService has allowed to proceed
+    setupStorageFactory(getConfig());
     startCRLFetcherService();
     if (this.rmContext.isHAEnabled()) {
       transitionToStandby(false);
@@ -1582,16 +1585,16 @@ public class ResourceManager extends CompositeService
     StringUtils.startupShutdownMessage(ResourceManager.class, argv, LOG);
     try {
       Configuration conf = new YarnConfiguration();
-      YarnAPIStorageFactory.setConfiguration(conf);
-      RMStorageFactory.setConfiguration(conf);
       GenericOptionsParser hParser = new GenericOptionsParser(conf, argv);
       argv = hParser.getRemainingArgs();
       // If -format-state-store, then delete RMStateStore; else startup normally
       if (argv.length >= 1) {
         if (argv[0].equals("-format-state-store")) {
+          setupStorageFactory(conf);
           deleteRMStateStore(conf);
         } else if (argv[0].equals("-remove-application-from-state-store")
             && argv.length == 2) {
+          setupStorageFactory(conf);
           removeApplication(conf, argv[1]);
         } else {
           printUsage(System.err);
@@ -1608,6 +1611,11 @@ public class ResourceManager extends CompositeService
       LOG.fatal("Error starting ResourceManager", t);
       System.exit(-1);
     }
+  }
+
+  private static void setupStorageFactory(Configuration conf) throws StorageInitializtionException, IOException {
+    YarnAPIStorageFactory.setConfiguration(conf);
+    RMStorageFactory.setConfiguration(conf);
   }
 
   /**
