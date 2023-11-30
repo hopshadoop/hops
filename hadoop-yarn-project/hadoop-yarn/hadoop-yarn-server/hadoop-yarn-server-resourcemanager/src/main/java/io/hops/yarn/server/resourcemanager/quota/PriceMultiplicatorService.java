@@ -82,18 +82,17 @@ public class PriceMultiplicatorService extends AbstractService {
         YarnConfiguration.DEFAULT_QUOTA_VARIABLE_PRICE_ENABLED);
 
     if (isVariablePrice) {
-      // Initialize DataAccesses
-      this.priceMultiplicatorDA = (PriceMultiplicatorDataAccess) RMStorageFactory.
-          getDataAccess(PriceMultiplicatorDataAccess.class);
       for (PriceMultiplicator.MultiplicatorType type : PriceMultiplicator.MultiplicatorType.values()) {
         currentMultiplicators.put(type, new Float(1));
       }
-      recover();
     }
     super.serviceInit(conf);
   }
 
   private void recover() throws IOException {
+    // Initialize DataAccesses
+    this.priceMultiplicatorDA = (PriceMultiplicatorDataAccess) RMStorageFactory.
+        getDataAccess(PriceMultiplicatorDataAccess.class);
     Map<PriceMultiplicator.MultiplicatorType, PriceMultiplicator> currentMultiplicators = getCurrentMultiplicator();
     for (PriceMultiplicator.MultiplicatorType type : PriceMultiplicator.MultiplicatorType.values()) {
       if (currentMultiplicators.get(type) != null) {
@@ -128,6 +127,7 @@ public class PriceMultiplicatorService extends AbstractService {
     assert !stopped : "starting when already stopped";
     LOG.info("Starting a new price estimation service.");
     if (isVariablePrice) {
+      recover();
       priceCalculationThread = new Thread(new WorkingThread());
       priceCalculationThread.setName("Price estimation service");
       priceCalculationThread.setDaemon(true);
