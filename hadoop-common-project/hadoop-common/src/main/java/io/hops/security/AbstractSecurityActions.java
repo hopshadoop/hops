@@ -24,6 +24,7 @@ import com.google.gson.GsonBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpHost;
@@ -42,29 +43,27 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 public abstract class AbstractSecurityActions extends CompositeService {
-  public static final Pattern JWT_PATTERN = Pattern.compile("^Bearer\\s(.+)");
-  
   protected static final int MAX_CONNECTIONS_PER_ROUTE = 50;
   
-  public static final String BEARER_AUTH_HEADER_CONTENT = "Bearer %s";
+  public static final String API_KEY_AUTH_HEADER_CONTENT = "ApiKey %s";
+
+  public static final String HOPSWORKS_API_kEY_PROP = CommonConfigurationKeys.HOPS_PREFIX + "hopsworks-api-key";
   private static final Set<Integer> ACCEPTABLE_HTTP_RESPONSES = new HashSet<>(2);
   static {
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_OK);
     ACCEPTABLE_HTTP_RESPONSES.add(HttpStatus.SC_NO_CONTENT);
   }
-  
-  protected final ServiceJWTManager serviceJWTManager;
-  
+
   protected CloseableHttpClient httpClient;
   protected HttpHost remoteHost;
   protected Gson parser;
   
   private PoolingHttpClientConnectionManager httpConnectionManager;
+  private String apiKey;
+
   
   public AbstractSecurityActions(String name) {
     super(name);
-    serviceJWTManager = createJWTManager();
-    addIfService(serviceJWTManager);
     parser = new GsonBuilder()
         .setFieldNamingPolicy(FieldNamingPolicy.IDENTITY)
         // Super important. Do NOT EVER change the date format
@@ -72,14 +71,16 @@ public abstract class AbstractSecurityActions extends CompositeService {
         .create();
   }
   
-  @VisibleForTesting
-  @InterfaceAudience.Private
-  protected ServiceJWTManager createJWTManager() {
-    return new ServiceJWTManager("JWT Manager");
-  }
-  
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    Configuration sslConf = new Configuration(false);
+    String sslServer = conf.get(SSLFactory.SSL_SERVER_CONF_KEY, "ssl-server.xml");
+    sslConf.addResource(sslServer);
+    apiKey = sslConf.get(HOPSWORKS_API_kEY_PROP);
+    if (apiKey == null) {
+      throw new IllegalArgumentException("Hopsworks API key is empty. Have you set " + HOPSWORKS_API_kEY_PROP
+        + " at " + sslServer);
+    }
     remoteHost = HttpHost.create(conf.get(CommonConfigurationKeys.HOPS_HOPSWORKS_HOST_KEY,
         "https://127.0.0.1"));
     super.serviceInit(conf);
@@ -95,9 +96,6 @@ public abstract class AbstractSecurityActions extends CompositeService {
   protected void serviceStart() throws Exception {
     httpConnectionManager = createHTTPConnectionManager();
     httpClient = HttpClients.custom().setConnectionManager(httpConnectionManager).build();
-    if (serviceJWTManager != null) {
-      serviceJWTManager.setHTTPClient(httpClient);
-    }
     super.serviceStart();
   }
   
@@ -116,10 +114,10 @@ public abstract class AbstractSecurityActions extends CompositeService {
           .getReasonPhrase() + " Message: " + extraMessage);
     }
   }
-  
-  protected void addJWTAuthHeader(HttpRequest request, String token) {
-    String authHeaderContent = String.format(BEARER_AUTH_HEADER_CONTENT, token);
-    request.addHeader(HttpHeaders.AUTHORIZATION, authHeaderContent);
+
+  protected void setAuthenticationHeader(HttpRequest request) {
+    String authHeader = String.format(API_KEY_AUTH_HEADER_CONTENT, apiKey);
+    request.addHeader(HttpHeaders.AUTHORIZATION, authHeader);
   }
   
   protected void addJSONContentType(HttpRequest request) {
