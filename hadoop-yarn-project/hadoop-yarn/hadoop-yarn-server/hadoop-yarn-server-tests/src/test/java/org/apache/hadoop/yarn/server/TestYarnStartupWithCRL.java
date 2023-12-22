@@ -79,9 +79,6 @@ public class TestYarnStartupWithCRL {
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_FIXED_PORTS, true);
     conf.setBoolean(YarnConfiguration.YARN_MINICLUSTER_USE_RPC, true);
     
-    conf.set(YarnConfiguration.HOPS_RM_SECURITY_ACTOR_KEY,
-        MockHopsworksRMAppSecurityActions.class.getName());
-    
     CRLValidatorFactory.getInstance().clearCache();
     CRLFetcherFactory.getInstance().clearFetcherCache();
   }

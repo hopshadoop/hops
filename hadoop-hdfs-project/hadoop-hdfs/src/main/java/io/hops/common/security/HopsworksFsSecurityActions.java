@@ -78,7 +78,7 @@ public class HopsworksFsSecurityActions extends AbstractSecurityActions implemen
         .addParameter("username", username)
         .build();
     HttpGet request = new HttpGet(requestURI);
-    addJWTAuthHeader(request, serviceJWTManager.getMasterToken());
+    setAuthenticationHeader(request);
     try {
       return httpClient.execute(remoteHost, request, new GetX509CredentialsHandler(username));
     } catch (ClientProtocolException ex) {

@@ -23,12 +23,16 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Unit test for testing the FsSecurityActions interface with Hopsworks
@@ -42,12 +46,18 @@ import org.junit.Test;
  *
  */
 @Ignore
-public class TestHopsworksFsSecurityActions extends BaseTestHopsworksSecurityActions {
+public class TestHopsworksFsSecurityActions {
   private static final String USERNAME = "PROJECT__USERNAME";
+  private String HOPSWORKS_ENDPOINT = "https://HOST:PORT";
   private static String classpath;
   
   private Configuration conf;
-  
+
+  /**
+   * You have to add your API key here before running the tests
+   */
+  private String HOPSWORKS_API_KEY = "";
+
   @BeforeClass
   public static void beforeClass() throws Exception {
     classpath = KeyStoreTestUtil.getClasspathDir(TestHopsworksFsSecurityActions.class);
@@ -61,7 +71,13 @@ public class TestHopsworksFsSecurityActions extends BaseTestHopsworksSecurityAct
     conf.setBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED, true);
     conf.set(DFSConfigKeys.FS_SECURITY_ACTIONS_ACTOR_KEY,
         "io.hops.common.security.DevHopsworksFsSecurityActions");
-    setupJWT(conf, classpath);
+    String sslConfFilename = super.getClass().getSimpleName() + ".ssl-server.xml";
+    Path sslServerPath = Paths.get(classpath, sslConfFilename);
+    Configuration sslServer = new Configuration(false);
+    sslServer.set(AbstractSecurityActions.HOPSWORKS_API_kEY_PROP, HOPSWORKS_API_KEY);
+    KeyStoreTestUtil.saveConfig(sslServerPath.toFile(), sslServer);
+    conf.set(SSLFactory.SSL_SERVER_CONF_KEY, sslConfFilename);
+    conf.set(CommonConfigurationKeys.HOPS_HOPSWORKS_HOST_KEY, HOPSWORKS_ENDPOINT);
   }
   
   @After
