@@ -3194,32 +3194,6 @@
   </property>
 
   <property>
-    <name>hops.jwt-manager.master-token-validity</name>
-    <value>432000s</value>
-    <description>
-      Validity period of master JWT.
-    </description>
-  </property>
-
-  <property>
-    <name>hops.jwt-manager.service-renew-path</name>
-    <value>/hopsworks-api/api/jwt/service</value>
-    <description>
-      HTTP path that is combined with hops.hopsworks.host to make REST calls to
-      renew master token.
-    </description>
-  </property>
-
-  <property>
-    <name>hops.jwt-manager.service-invalidate-path</name>
-    <value>/hopsworks-api/api/jwt/service</value>
-    <description>
-      HTTP path that is combined with hops.hopsworks.host to make REST calls to
-      invalidate master token.
-    </description>
-  </property>
-
-  <property>
     <name>hops.service-discovery.enabled</name>
     <value>false</value>
     <description>Flag to get NameNode RPC addresses from Service Discovery instead of configuration file.</description>

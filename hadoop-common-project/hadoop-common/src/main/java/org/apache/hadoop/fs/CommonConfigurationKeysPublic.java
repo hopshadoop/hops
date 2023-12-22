@@ -20,7 +20,6 @@ package org.apache.hadoop.fs;
 
 import java.nio.file.Paths;
 
-import io.hops.security.ServiceJWTManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.JceAesCtrCryptoCodec;
@@ -1020,17 +1019,6 @@ public class CommonConfigurationKeysPublic {
   public static final int HOPS_UG_CACHE_SIZE_DEFUALT = 10000;
   
   public static final String HOPS_HOPSWORKS_HOST_KEY = HOPS_PREFIX + "hopsworks.host";
-  
-  // 5 days
-  public static final long DEFAULT_JWT_MANAGER_MASTER_TOKEN_VALIDITY_PERIOD = 432000;
-  public static final String JWT_MANAGER_MASTER_TOKEN_VALIDITY_PERIOD = ServiceJWTManager.JWT_MANAGER_PREFIX
-      + "master-token-validity";
-  public static final String DEFAULT_JWT_MANAGER_SERVICE_RENEW_PATH = "/hopsworks-api/api/jwt/service";
-  public static final String JWT_MANAGER_SERVICE_RENEW_PATH = ServiceJWTManager.JWT_MANAGER_PREFIX + "service-renew-path";
-  
-  public static final String DEFAULT_JWT_MANAGER_SERVICE_INVALIDATE_PATH = "/hopsworks-api/api/jwt/service";
-  public static final String JWT_MANAGER_SERVICE_INVALIDATE_PATH = ServiceJWTManager.JWT_MANAGER_PREFIX
-      + "service-invalidate-path";
   
   // Service Discovery (Consul) properties
   private static final String SERVICE_DISCOVERY_PREFIX = HOPS_PREFIX + "service-discovery.";

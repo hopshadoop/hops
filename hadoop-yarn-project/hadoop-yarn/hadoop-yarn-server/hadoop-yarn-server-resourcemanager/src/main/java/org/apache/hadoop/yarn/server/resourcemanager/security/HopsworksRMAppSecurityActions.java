@@ -18,7 +18,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.security;
 
 import io.hops.security.AbstractSecurityActions;
-import io.hops.security.ServiceJWTManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -46,10 +45,87 @@ import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class HopsworksRMAppSecurityActions extends AbstractSecurityActions implements RMAppSecurityActions {
+
+  public static class JWTDTO {
+    private String token;
+    private String subject;
+    private String keyName;
+    private String audiences;
+    private Boolean renewable;
+    private Integer expLeeway;
+    private Date expiresAt;
+    private Date nbf;
+
+    public String getToken() {
+      return token;
+    }
+
+    public void setToken(String token) {
+      this.token = token;
+    }
+
+    public String getSubject() {
+      return subject;
+    }
+
+    public void setSubject(String subject) {
+      this.subject = subject;
+    }
+
+    public String getKeyName() {
+      return keyName;
+    }
+
+    public void setKeyName(String keyName) {
+      this.keyName = keyName;
+    }
+
+    public String getAudiences() {
+      return audiences;
+    }
+
+    public void setAudiences(String audiences) {
+      this.audiences = audiences;
+    }
+
+    public Boolean getRenewable() {
+      return renewable;
+    }
+
+    public void setRenewable(Boolean renewable) {
+      this.renewable = renewable;
+    }
+
+    public Integer getExpLeeway() {
+      return expLeeway;
+    }
+
+    public void setExpLeeway(Integer expLeeway) {
+      this.expLeeway = expLeeway;
+    }
+
+    public Date getExpiresAt() {
+      return expiresAt;
+    }
+
+    public void setExpiresAt(Date expiresAt) {
+      this.expiresAt = expiresAt;
+    }
+
+    public Date getNbf() {
+      return nbf;
+    }
+
+    public void setNbf(Date nbf) {
+      this.nbf = nbf;
+    }
+  }
+
   public static final String REVOKE_CERT_ID_PARAM = "certId";
   
   protected static final int MAX_CONNECTIONS_PER_ROUTE = 50;
@@ -211,7 +287,7 @@ public class HopsworksRMAppSecurityActions extends AbstractSecurityActions imple
       Matcher matcher = SUBJECT_USERNAME.matcher(jwtParameter.getAppUser());
       String username = matcher.matches() ? matcher.group(2) : jwtParameter.getAppUser();
       
-      ServiceJWTManager.JWTDTO payload = new ServiceJWTManager.JWTDTO();
+      JWTDTO payload = new JWTDTO();
       payload.setSubject(username);
       payload.setKeyName(jwtParameter.getApplicationId().toString());
       payload.setAudiences(String.join(",", jwtParameter.getAudiences()));
@@ -225,8 +301,7 @@ public class HopsworksRMAppSecurityActions extends AbstractSecurityActions imple
       response = doJSONCall(request, "Hopsworks could not generate JWT for " + jwtParameter.getAppUser()
           + "/" + jwtParameter.getApplicationId().toString());
       
-      ServiceJWTManager.JWTDTO jwtResponse = parser.fromJson(EntityUtils.toString(response.getEntity()),
-          ServiceJWTManager.JWTDTO.class);
+      JWTDTO jwtResponse = parser.fromJson(EntityUtils.toString(response.getEntity()), JWTDTO.class);
       return jwtResponse.getToken();
     } finally {
       if (response != null) {
@@ -243,7 +318,7 @@ public class HopsworksRMAppSecurityActions extends AbstractSecurityActions imple
     }
     CloseableHttpResponse response = null;
     try {
-      ServiceJWTManager.JWTDTO payload = new ServiceJWTManager.JWTDTO();
+      JWTDTO payload = new JWTDTO();
       payload.setToken(jwtParameter.getToken());
       payload.setExpiresAt(DateUtils.localDateTime2Date(jwtParameter.getExpirationDate()));
       payload.setNbf(DateUtils.localDateTime2Date(jwtParameter.getValidNotBefore()));
@@ -253,8 +328,7 @@ public class HopsworksRMAppSecurityActions extends AbstractSecurityActions imple
       response = doJSONCall(request, "Could not renew JWT for "
           + jwtParameter.getAppUser() + "/" + jwtParameter.getApplicationId());
       
-      ServiceJWTManager.JWTDTO jwtResponse = parser.fromJson(EntityUtils.toString(response.getEntity()),
-          ServiceJWTManager.JWTDTO.class);
+      JWTDTO jwtResponse = parser.fromJson(EntityUtils.toString(response.getEntity()), JWTDTO.class);
       return jwtResponse.getToken();
     } finally {
       if (response != null) {
@@ -292,7 +366,7 @@ public class HopsworksRMAppSecurityActions extends AbstractSecurityActions imple
   }
   
   private CloseableHttpResponse doCall(HttpRequest request, String errorMessage) throws IOException {
-    addJWTAuthHeader(request, serviceJWTManager.getMasterToken());
+    setAuthenticationHeader(request);
     CloseableHttpResponse response = httpClient.execute(remoteHost, request);
     checkHTTPResponseCode(response, errorMessage);
     return response;

@@ -20,9 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.security;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
 import io.hops.security.AbstractSecurityActions;
-import io.hops.security.BaseTestHopsworksSecurityActions;
 import io.hops.security.HopsSecurityActionsFactory;
-import io.hops.security.ServiceJWTManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.math3.util.Pair;
@@ -74,7 +72,7 @@ import java.util.concurrent.TimeUnit;
  *
  */
 @Ignore
-public class TestHopsworksRMAppSecurityActions extends BaseTestHopsworksSecurityActions {
+public class TestHopsworksRMAppSecurityActions {
   private final static Log LOG = LogFactory.getLog(TestHopsworksRMAppSecurityActions.class);
   
   private static final String O = "application_id";
@@ -84,12 +82,18 @@ public class TestHopsworksRMAppSecurityActions extends BaseTestHopsworksSecurity
   private static final String KEYSTORE_PASS = "12345";
   
   private static final String JWT_SUBJECT = "ProjectA1__Flock";
+  private String HOPSWORKS_ENDPOINT = "https://HOST:PORT";
   
   private static String classPath;
   
   private Path sslServerPath;
   private Configuration conf;
   private Configuration sslServer;
+
+  /**
+   * You have to add your API key here before running the tests
+   */
+  private String HOPSWORKS_API_KEY = "";
   
   @Rule
   public final ExpectedException rule = ExpectedException.none();
@@ -111,15 +115,10 @@ public class TestHopsworksRMAppSecurityActions extends BaseTestHopsworksSecurity
     String sslConfFilename = TestHopsworksRMAppSecurityActions.class.getSimpleName() + ".ssl-server.xml";
     sslServerPath = Paths.get(classPath, sslConfFilename);
     
-    Pair<String, String[]> jwtResponse = loginAndGetJWT();
-    
+
     sslServer = new Configuration(false);
-    sslServer.set(ServiceJWTManager.JWT_MANAGER_MASTER_TOKEN_KEY, jwtResponse.getFirst());
-    for (int i = 0; i < jwtResponse.getSecond().length; i++) {
-      String renewalConfKey = String.format(ServiceJWTManager.JWT_MANAGER_RENEW_TOKEN_PATTERN, i);
-      sslServer.set(renewalConfKey, jwtResponse.getSecond()[i]);
-    }
-    
+    sslServer.set(AbstractSecurityActions.HOPSWORKS_API_kEY_PROP, HOPSWORKS_API_KEY);
+
     sslServer.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
         FileBasedKeyStoresFactory.SSL_KEYSTORE_LOCATION_TPL_KEY), KEYSTORE_LOCATION);
     sslServer.set(FileBasedKeyStoresFactory.resolvePropertyName(SSLFactory.Mode.SERVER,
