@@ -274,7 +274,8 @@ message Rename2RequestProto {
   required string src = 1;
   required string dst = 2;
   required bool overwriteDest = 3;
-  optional bool keepEncodingStatus = 4;
+  optional bool moveToTrash = 4; // not implemented. added inorder to be consistent with the go client protoc defs
+  optional bool keepEncodingStatus = 5;
 }
 
 message Rename2ResponseProto { // void response
