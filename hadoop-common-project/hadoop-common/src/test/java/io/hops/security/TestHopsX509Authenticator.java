@@ -27,10 +27,14 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.Mockito;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
+import java.util.HashSet;
+import java.util.Set;
 
 
 public class TestHopsX509Authenticator {
@@ -121,6 +125,7 @@ public class TestHopsX509Authenticator {
     expectedException.expect(HopsX509AuthenticationException.class);
     authenticator.authenticateConnection(ugi, clientCertificate, remoteAddress);
   }
+
   @Test
   public void TestFQDNCache() throws Exception {
     InetAddress remoteAddress = InetAddress.getLocalHost();
@@ -135,7 +140,36 @@ public class TestHopsX509Authenticator {
     // Second time, is should have been cached
     Assert.assertTrue(authenticator.iscached);
   }
-  
+
+  @Test
+  public void TestMultipleResolvedAddresses() throws UnknownHostException, HopsX509AuthenticationException {
+    HopsX509Authenticator realAuth = new HopsX509Authenticator(null);
+    HopsX509Authenticator auth = Mockito.spy(realAuth);
+    String cn = "example.hopsworks.ai";
+    Set<InetAddress> mockAddresses = new HashSet<>();
+    byte[] ipAddr1 = new byte[]{10, 0, 1, 1};
+    InetAddress addr1 = InetAddress.getByAddress(ipAddr1);
+    mockAddresses.add(addr1);
+
+    byte[] ipAddr2 = new byte[]{10, 0, 1, 2};
+    InetAddress addr2 = InetAddress.getByAddress(ipAddr2);
+    mockAddresses.add(addr2);
+
+    byte[] ipAddr3 = new byte[]{10, 0, 1, 3};
+    InetAddress addr3 = InetAddress.getByAddress(ipAddr3);
+    mockAddresses.add(addr3);
+
+    Mockito.doReturn(mockAddresses).when(auth).getAllInetAddressesAsSet(Mockito.matches(cn));
+
+    boolean authResult = auth.isTrustedConnection(addr2, cn, "alice", "alice");
+    Assert.assertTrue(authResult);
+
+    byte[] wrongIpAddr = new byte[]{10, 0, 2, 1};
+    InetAddress wrongAddr = InetAddress.getByAddress(wrongIpAddr);
+    authResult = auth.isTrustedConnection(wrongAddr, cn, "alice", "alice");
+    Assert.assertFalse(authResult);
+  }
+
   private X509Certificate generateX509Certificate(String subjectDN) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     return KeyStoreTestUtil.generateCertificate(subjectDN, keyPair, 30, "SHA1withRSA");
@@ -150,10 +184,10 @@ public class TestHopsX509Authenticator {
     }
     
     @Override
-    protected InetAddress isTrustedFQDN(String fqdn) {
-      InetAddress address = super.isTrustedFQDN(fqdn);
-      iscached = address != null;
-      return address;
+    protected Set<InetAddress> isTrustedFQDN(String fqdn) {
+      Set<InetAddress> addresses = super.isTrustedFQDN(fqdn);
+      iscached = addresses != null;
+      return addresses;
     }
   }
 }

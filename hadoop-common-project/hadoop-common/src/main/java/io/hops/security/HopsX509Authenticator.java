@@ -31,13 +31,16 @@ import org.apache.hadoop.security.UserGroupInformation;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class HopsX509Authenticator {
   private static final Log LOG = LogFactory.getLog(HopsX509Authenticator.class);
   
   private final Configuration conf;
-  private final Cache<String, InetAddress> trustedHostnames;
+  private final Cache<String, Set<InetAddress>> trustedHostnames;
   
   public HopsX509Authenticator(Configuration conf) {
     this.conf = conf;
@@ -127,16 +130,16 @@ public class HopsX509Authenticator {
 
   public boolean isTrustedConnection(InetAddress remoteAddress, String cnFQDN, String username, String locality)
     throws HopsX509AuthenticationException {
-    InetAddress address = isTrustedFQDN(cnFQDN);
-    if (address != null && isTrustedConnectionInternal(remoteAddress, address, username, locality)) {
+    Set<InetAddress> addresses = isTrustedFQDN(cnFQDN);
+    if (addresses != null && isTrustedConnectionInternal(remoteAddress, addresses, username, locality)) {
       LOG.debug("CN " + cnFQDN + " is an FQDN and it has already been authenticated");
       return true;
     }
 
     try {
-      address = InetAddress.getByName(cnFQDN);
-      if (isTrustedConnectionInternal(remoteAddress, address, username, locality)) {
-        trustedHostnames.put(cnFQDN, address);
+      addresses = getAllInetAddressesAsSet(cnFQDN);
+      if (isTrustedConnectionInternal(remoteAddress, addresses, username, locality)) {
+        trustedHostnames.put(cnFQDN, addresses);
         LOG.debug("CN " + cnFQDN + " is an FQDN and we managed to resolve it and it matches the remote address");
         return true;
       }
@@ -148,33 +151,50 @@ public class HopsX509Authenticator {
     return false;
   }
 
+  @VisibleForTesting
+  protected Set<InetAddress> getAllInetAddressesAsSet(String commonName) throws UnknownHostException {
+    InetAddress[] addrs = InetAddress.getAllByName(commonName);
+    Set<InetAddress> addresses = new HashSet<>(addrs.length);
+    addresses.addAll(Arrays.asList(addrs));
+    return addresses;
+  }
+
   private boolean isHopsTLS() {
     return conf.getBoolean(CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED,
         CommonConfigurationKeys.IPC_SERVER_SSL_ENABLED_DEFAULT);
   }
 
-  private boolean isTrustedConnectionInternal(InetAddress expectedAddress, InetAddress actualAddress,
+  private boolean isTrustedConnectionInternal(InetAddress actualAddress, Set<InetAddress> expectedAddresses,
           String expectedUsername, String actualUsername) {
     if (expectedUsername == null && actualUsername == null) {
-      return doesAddressMatch(expectedAddress, actualAddress);
+      return doesAddressMatch(expectedAddresses, actualAddress);
     }
-    return doesAddressMatch(expectedAddress, actualAddress) && doesUsernameMatch(expectedUsername, actualUsername);
+    return doesAddressMatch(expectedAddresses, actualAddress) && doesUsernameMatch(expectedUsername, actualUsername);
   }
 
-  private boolean doesAddressMatch(InetAddress expected, InetAddress actual) {
+  private boolean doesAddressMatch(Set<InetAddress> expected, InetAddress actual) {
     // If both are loopback addresses skip comparing them, one might be 127.0.0.1 and another 127.0.1.1 depending
     // on hosts configuration
-    if (expected.isLoopbackAddress() && actual.isLoopbackAddress()) {
+    if (isAnyLoopback(expected) && actual.isLoopbackAddress()) {
       return true;
     }
-    return expected.equals(actual);
+    return expected.contains(actual);
+  }
+
+  private boolean isAnyLoopback(Set<InetAddress> addresses) {
+    for (InetAddress addr : addresses) {
+      if (addr.isLoopbackAddress()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean doesUsernameMatch(String expected, String actual) {
     return expected.equals(actual);
   }
   @VisibleForTesting
-  protected InetAddress isTrustedFQDN(String fqdn) {
+  protected Set<InetAddress> isTrustedFQDN(String fqdn) {
     return trustedHostnames.getIfPresent(fqdn);
   }
 }
