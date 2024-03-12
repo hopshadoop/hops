@@ -41,7 +41,12 @@ public class HopsX509Authenticator {
   
   private final Configuration conf;
   private final Cache<String, Set<InetAddress>> trustedHostnames;
-  
+
+  public enum AUTH_MODE {
+    SIMPLE,
+    STRICT
+  }
+
   public HopsX509Authenticator(Configuration conf) {
     this.conf = conf;
     trustedHostnames = CacheBuilder.newBuilder()
@@ -166,6 +171,9 @@ public class HopsX509Authenticator {
 
   private boolean isTrustedConnectionInternal(InetAddress actualAddress, Set<InetAddress> expectedAddresses,
           String expectedUsername, String actualUsername) {
+    if (getAuthenticationMode().equals(AUTH_MODE.SIMPLE)) {
+      return true;
+    }
     if (expectedUsername == null && actualUsername == null) {
       return doesAddressMatch(expectedAddresses, actualAddress);
     }
@@ -188,6 +196,10 @@ public class HopsX509Authenticator {
       }
     }
     return false;
+  }
+
+  private AUTH_MODE getAuthenticationMode() {
+    return conf.getEnum(CommonConfigurationKeys.HOPS_RPC_AUTH_MODE, AUTH_MODE.STRICT);
   }
 
   private boolean doesUsernameMatch(String expected, String actual) {

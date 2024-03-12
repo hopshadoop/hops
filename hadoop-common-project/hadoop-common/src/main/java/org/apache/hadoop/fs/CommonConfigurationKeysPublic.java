@@ -476,6 +476,8 @@ public class CommonConfigurationKeysPublic {
   
   private static final String HOPS_TLS_PREFIX = HOPS_PREFIX + "tls.";
   public static final String HOPS_TLS_SUPER_MATERIAL_DIRECTORY = HOPS_TLS_PREFIX + "superuser-material-directory";
+
+  public static final String HOPS_RPC_AUTH_MODE = HOPS_TLS_PREFIX + "rpc-acl-auth-mode";
   
   /**
    * Certificate Revocation List fetcher class

@@ -3152,6 +3152,13 @@
   </property>
 
   <property>
+    <name>hops.tls.rpc-acl-auth-mode</name>
+    <value>STRICT</value>
+    <description>In STRICT authentication mode, the resolved IP address of the client CN certificate must
+      match the incoming RPC IP address. In SIMPLE mode, the CN should just be resolvable</description>
+  </property>
+
+  <property>
     <name>hops.crl.validation.enabled</name>
     <value>false</value>
     <description>Enable CRL validation when HopsTLS is enabled</description>

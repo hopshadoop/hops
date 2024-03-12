@@ -143,7 +143,7 @@ public class TestHopsX509Authenticator {
 
   @Test
   public void TestMultipleResolvedAddresses() throws UnknownHostException, HopsX509AuthenticationException {
-    HopsX509Authenticator realAuth = new HopsX509Authenticator(null);
+    HopsX509Authenticator realAuth = new HopsX509Authenticator(conf);
     HopsX509Authenticator auth = Mockito.spy(realAuth);
     String cn = "example.hopsworks.ai";
     Set<InetAddress> mockAddresses = new HashSet<>();
@@ -168,6 +168,31 @@ public class TestHopsX509Authenticator {
     InetAddress wrongAddr = InetAddress.getByAddress(wrongIpAddr);
     authResult = auth.isTrustedConnection(wrongAddr, cn, "alice", "alice");
     Assert.assertFalse(authResult);
+  }
+
+  @Test
+  public void TestSimpleAuthentication() throws UnknownHostException, HopsX509AuthenticationException {
+    Configuration conf = new Configuration(true);
+    conf.set(CommonConfigurationKeys.HOPS_RPC_AUTH_MODE, "SIMPLE");
+    HopsX509Authenticator realAuth = new HopsX509Authenticator(conf);
+    HopsX509Authenticator auth = Mockito.spy(realAuth);
+    String cn = "example.hopsworks.ai";
+    String unresolvableDomainName = "unresolvable.domain.name";
+    Set<InetAddress> mockAddresses = new HashSet<>();
+    byte[] ipAddr1 = new byte[]{10, 0, 1, 1};
+    InetAddress addr1 = InetAddress.getByAddress(ipAddr1);
+    mockAddresses.add(addr1);
+
+    Mockito.doReturn(mockAddresses).when(auth).getAllInetAddressesAsSet(Mockito.matches(cn));
+    Mockito.doThrow(new UnknownHostException(cn))
+        .when(auth).getAllInetAddressesAsSet(unresolvableDomainName);
+
+    byte[] clientIP = new byte[]{10, 1, 0, 1};
+    boolean authResult = auth.isTrustedConnection(InetAddress.getByAddress(clientIP), cn, "alice", "alice");
+    Assert.assertTrue(authResult);
+
+    expectedException.expect(HopsX509AuthenticationException.class);
+    auth.isTrustedConnection(InetAddress.getByAddress(clientIP), unresolvableDomainName, "alice", "alice");
   }
 
   private X509Certificate generateX509Certificate(String subjectDN) throws Exception {
