@@ -582,6 +582,9 @@ public abstract class BaseINodeLock extends Lock {
 
         List<INode> inodesFound = find(getDefaultInodeLockType(), names, parentIds, partitionIds, true);
         for (INode inode : inodesFound) {
+          if (inode == null) {
+            continue;
+          }
           INodeIdentifier identifier = inodeIdentifiers.get(inode.getId());
           if (identifier != null && inode.getLocalName().equals(identifier.getName()) && inode.getParentId()
               == identifier.getPid()) {
