@@ -17,6 +17,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.hops.common.IDsGeneratorFactory;
+import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.metadata.HdfsStorageFactory;
@@ -215,7 +216,7 @@ public class QuotaUpdateManager {
       @Override
       public void setUp() throws IOException {
         super.setUp();
-        iNodeIdentifier = new INodeIdentifier(inodeID);
+        iNodeIdentifier = INodeUtil.resolveINodeFromId(inodeID);
       }
 
       @Override
