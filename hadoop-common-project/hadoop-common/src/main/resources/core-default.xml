@@ -863,6 +863,12 @@
 </property>
 
 <property>
+  <name>fs.AbstractFileSystem.hopsfs.impl</name>
+  <value>org.apache.hadoop.fs.Hdfs</value>
+  <description>The FileSystem for hopsfs: uris.</description>
+</property>
+
+<property>
   <name>fs.defaultFS.alternativeScheme</name>
   <value>hopsfs</value>
   <description>alternative scheme to hopsfs</description>
