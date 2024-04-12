@@ -8622,7 +8622,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
       @Override
       public void setUp() throws StorageException {
-        inodeIdentifier = new INodeIdentifier(inodeId);
+        inodeIdentifier = INodeUtil.resolveINodeFromId(inodeId);
       }
 
       @Override

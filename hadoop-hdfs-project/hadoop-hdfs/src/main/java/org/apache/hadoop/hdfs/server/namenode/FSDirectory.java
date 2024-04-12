@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import io.hops.common.IDsGeneratorFactory;
+import io.hops.common.INodeUtil;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
 import io.hops.resolvingcache.Cache;
@@ -1412,29 +1413,6 @@ public class FSDirectory implements Closeable {
     return path.toString();
   }
   
-//  @VisibleForTesting
-//  INode getInode(final int id) throws IOException {
-//    return (INode) (new HopsTransactionalRequestHandler(HDFSOperationType.GET_INODE) {
-//      INodeIdentifier inodeIdentifier;
-//
-//      @Override
-//      public void setUp() throws StorageException {
-//        inodeIdentifier = new INodeIdentifier(id);
-//      }
-//
-//      @Override
-//      public void acquireLock(TransactionLocks locks) throws IOException {
-//        LockFactory lf = LockFactory.getInstance();
-//        locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.READ_COMMITTED, inodeIdentifier));
-//      }
-//
-//      @Override
-//      public Object performTask() throws IOException {
-//        return EntityManager.find(INode.Finder.ByINodeIdFTIS, id);
-//      }
-//    }).handle();
-//  }
-  
   String getFullPathName(final long id, final String src) throws IOException {
     HopsTransactionalRequestHandler getFullPathNameHandler =
         new HopsTransactionalRequestHandler(
@@ -1443,7 +1421,7 @@ public class FSDirectory implements Closeable {
 
           @Override
           public void setUp() throws StorageException {
-            inodeIdentifier = new INodeIdentifier(id);
+            inodeIdentifier = INodeUtil.resolveINodeFromId(id);
           }
 
           @Override
@@ -1473,7 +1451,7 @@ public class FSDirectory implements Closeable {
 
           @Override
           public void setUp() throws StorageException {
-            inodeIdentifier = new INodeIdentifier(id);
+            inodeIdentifier = INodeUtil.resolveINodeFromId(id);
           }
 
           @Override
@@ -1552,7 +1530,7 @@ public class FSDirectory implements Closeable {
 
           @Override
           public void setUp() throws StorageException {
-            inodeIdentifier = new INodeIdentifier(id);
+            inodeIdentifier = INodeUtil.resolveINodeFromId(id);
           }
 
           @Override
