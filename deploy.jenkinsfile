@@ -83,7 +83,7 @@ pipeline {
             script{
                 sh """
                         git reset --hard origin/${params.BRANCH}
-                        rm -rf "${WORKSPACE}/../hops_testing/dal-ee"
+                        rm -rf "${WORKSPACE}/../hops_testing/dal"
                 """
             }
         }
