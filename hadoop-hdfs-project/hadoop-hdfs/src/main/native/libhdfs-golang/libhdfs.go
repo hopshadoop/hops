@@ -113,7 +113,7 @@ func hdfsNewBuilder() *C.hdfsBuilder {
  */
 //export hdfsBuilderSetNameNode
 func hdfsBuilderSetNameNode(bld *C.hdfsBuilder, nn *C.cchar_t) {
-	DEBUG("hdfsBuilderSetNameNode: %s", C.GoString(nn))
+	DEBUG("hdfsBuilderSetNameNode: NN: %s", C.GoString(nn))
 	bld.nn = nn
 }
 
@@ -130,7 +130,7 @@ func hdfsBuilderSetNameNode(bld *C.hdfsBuilder, nn *C.cchar_t) {
  */
 //export hdfsBuilderSetNameNodePort
 func hdfsBuilderSetNameNodePort(bld *C.hdfsBuilder, port C.tPort) {
-	DEBUG("hdfsBuilderSetNameNodePort")
+	DEBUG("hdfsBuilderSetNameNodePort. Port: %d", port)
 	bld.port = port
 }
 
@@ -147,7 +147,7 @@ func hdfsBuilderSetNameNodePort(bld *C.hdfsBuilder, port C.tPort) {
  */
 //export hdfsBuilderSetUserName
 func hdfsBuilderSetUserName(bld *C.hdfsBuilder, userName *C.cchar_t) {
-	DEBUG("hdfsBuilderSetUserName")
+	DEBUG("hdfsBuilderSetUserName. User: '%s'", C.GoString(userName))
 	bld.userName = userName
 }
 
@@ -285,7 +285,7 @@ func hdfsBuilderConnect(bld *C.hdfsBuilder) C.hdfsFS {
 			setCErrno(err)
 			return nil
 		}
-		bld.userName = C.CString(user.Name)
+		bld.userName = C.CString(user.Username)
 	}
 
 	hdfsOptions := hdfs.ClientOptions{
@@ -301,7 +301,7 @@ func hdfsBuilderConnect(bld *C.hdfsBuilder) C.hdfsFS {
 		err = setTLSFromHadoopConfigFiles(C.GoString(bld.userName), &hdfsOptions)
 		if err != nil {
 			ERROR("%v", err)
-			INFO("Connecting without SSL")
+			INFO("Connecting without SSL. User: '%s'", C.GoString(bld.userName))
 		}
 	}
 
