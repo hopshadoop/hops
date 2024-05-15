@@ -29,6 +29,8 @@ github.com/logicalclocks/hopsfs-go-client/v2 v2.5.2 h1:ET5vGt/z8E9FVYL8t2wpX4LjT
 github.com/logicalclocks/hopsfs-go-client/v2 v2.5.2/go.mod h1:nsyY1uyQOomU34KVQk9Qb/lDJobN1MQ/9WS6IqcVZno=
 github.com/logicalclocks/hopsfs-go-client/v2 v2.5.3 h1:zhSNkeMBA6FV06gPj9DoFz1LIMRSBn+zs7+HT69YawI=
 github.com/logicalclocks/hopsfs-go-client/v2 v2.5.3/go.mod h1:0NAO+/3knbMx6+5pCv+Hcbaz4xn/Zzbn9+WIib2rKVI=
+github.com/logicalclocks/hopsfs-go-client/v2 v2.5.4 h1:jAgT71ofkVlsh29HGDd0pAbPs5XgqgwKTUqv93SrLLU=
+github.com/logicalclocks/hopsfs-go-client/v2 v2.5.4/go.mod h1:0NAO+/3knbMx6+5pCv+Hcbaz4xn/Zzbn9+WIib2rKVI=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
