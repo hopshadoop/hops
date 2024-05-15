@@ -136,7 +136,7 @@ func connectToDefaultFS(t *testing.T) C.hdfsFS {
 
 func TestPathInternal(t *testing.T) {
 	fs := connectToLocalHopsFS(t)
-	fsWrapper := getHdfsClientWrapper(fs)
+	fsWrapper, _ := getHdfsClientWrapper(fs)
 
 	// /home/salman
 	input_path := "/home/salman"
