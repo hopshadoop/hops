@@ -14,6 +14,12 @@ var logger *zap.Logger
 
 //------------------------------------------------------------------------------
 
+func init() {
+	init_logger()
+}
+
+//------------------------------------------------------------------------------
+
 func DEBUG(msg string, args ...interface{}) {
 	new_msg := fmt.Sprintf(msg, args...)
 	if logger != nil {
@@ -84,6 +90,7 @@ func init_logger() {
 				syncer,
 				zap.DebugLevel,
 			))
+			DEBUG("logger init")
 		}
 	}
 }

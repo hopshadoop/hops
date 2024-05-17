@@ -69,8 +69,7 @@ func setTLSFromEnvVariables(opts *hdfs.ClientOptions) error {
 
 //------------------------------------------------------------------------------
 
-func setTLSFromHadoopConfigFiles(userName string, opts *hdfs.ClientOptions) error {
-
+func parseConfigFiles() (map[string]string, error) {
 	// HADOOP_HOME or HADOOP_CONF_DIR
 	confDir := os.Getenv("HADOOP_CONF_DIR")
 	if confDir == "" {
@@ -81,20 +80,39 @@ func setTLSFromHadoopConfigFiles(userName string, opts *hdfs.ClientOptions) erro
 	}
 
 	if confDir == "" {
-		return fmt.Errorf("Failed to find core-site.xml")
+		return nil, fmt.Errorf("Failed to find HADOOP_CONF_DIR")
 	}
 
-	confFile := filepath.Join(confDir, "core-site.xml")
+	coreSite, coreErr := parseConfigFile(confDir, "core-site.xml")
+	hdfsSite, hdfsErr := parseConfigFile(confDir, "hdfs-site.xml")
 
-	return parseCoreSite(confFile, userName, opts)
+	if coreErr != nil && hdfsErr != nil {
+		return nil, fmt.Errorf("failed to read core-site.xml and hdfs-site.xml. Errors: %v. %v", coreErr, hdfsErr)
+	}
+
+	if coreSite != nil && hdfsSite != nil {
+		// combine and return
+		for key, value := range hdfsSite {
+			coreSite[key] = value
+		}
+		return coreSite, nil
+	} else if coreSite != nil {
+		return coreSite, nil
+	} else if hdfsSite != nil {
+		return hdfsSite, nil
+	} else {
+		return nil, fmt.Errorf("Programming error. Report bug")
+	}
 }
 
-func parseCoreSite(path string, userName string, opts *hdfs.ClientOptions) error {
+func parseConfigFile(confDir, file string) (map[string]string, error) {
 
-	xmlFile, err := os.Open(path)
+	confFile := filepath.Join(confDir, file)
+
+	xmlFile, err := os.Open(confFile)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to read TLS config from core-site.xml. Err: %v ", err)
-		return errors.New(msg)
+		msg := fmt.Sprintf("Failed to read %s. Err: %v ", confFile, err)
+		return nil, errors.New(msg)
 	}
 	defer xmlFile.Close()
 
@@ -102,7 +120,7 @@ func parseCoreSite(path string, userName string, opts *hdfs.ClientOptions) error
 	var coreSiteProperties CoreSiteProperties
 	err = xml.Unmarshal(byteValue, &coreSiteProperties)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Failed to parse core-site.xml. Err: %v", err))
+		return nil, errors.New(fmt.Sprintf("Failed to parse %s. Err: %v", confFile, err))
 	}
 
 	var properties = make(map[string]string)
@@ -110,20 +128,34 @@ func parseCoreSite(path string, userName string, opts *hdfs.ClientOptions) error
 		properties[prop.Name] = prop.Value
 	}
 
+	INFO("Using %s", confFile)
+
+	return properties, nil
+}
+
+//------------------------------------------------------------------------------
+
+func setTLSFromHadoopConfigFiles(userName string, opts *hdfs.ClientOptions) error {
+
+	properties, err := parseConfigFiles()
+	if err != nil {
+		return err
+	}
+
 	ipcServerSslEnabledStr := properties["ipc.server.ssl.enabled"]
 	hopsTlsSuperuserMaterialDirStr := properties["hops.tls.superuser-material-directory"]
 
 	if ipcServerSslEnabledStr == "" {
-		return fmt.Errorf("SSL params are not set in %s ", path)
+		return fmt.Errorf("SSL params are not set in core-site.xml or hdfs-site.xml")
 	}
 
 	ipcServerSslEnabled, err := strconv.ParseBool(ipcServerSslEnabledStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse ipc.server.ssl.enabled in %s. Err: %v ", path, err)
+		return fmt.Errorf("failed to parse ipc.server.ssl.enabled. Err: %v ", err)
 	}
 
 	if !ipcServerSslEnabled {
-		return fmt.Errorf("SSL is not enabled in %s ", path)
+		return fmt.Errorf("SSL is not enabled in core-site.xml or hdfs-site.xml")
 	}
 
 	// replace ${USER} if preset
@@ -145,7 +177,7 @@ func parseCoreSite(path string, userName string, opts *hdfs.ClientOptions) error
 	_, err3 := os.Stat(libhdfsClientKey)
 
 	if err1 != nil || err2 != nil || err3 != nil {
-		msg := fmt.Sprintf("Failed to read TLS config from core-site.xml."+
+		msg := fmt.Sprintf("Failed to read TLS config from core-site.xml or hdfs-site.xml."+
 			" RootCABundle: %s, ClientCertificate: %s, ClientKey: %s",
 			libhdfsRootCABundle, libhdfsClientCertificate, libhdfsClientCertificate)
 		return errors.New(msg)
@@ -159,6 +191,25 @@ func parseCoreSite(path string, userName string, opts *hdfs.ClientOptions) error
 	}
 
 	return nil
+}
+
+//------------------------------------------------------------------------------
+
+func getNNURIFromConfigFiles() (string, error) {
+
+	properties, err := parseConfigFiles()
+	if err != nil {
+		return "", err
+	}
+
+	fsDefaultFS := properties["fs.defaultFS"]
+	if fsDefaultFS == "" {
+		return "", fmt.Errorf("failed to read fs.defaultFS from core-site.xml or hdfs-site.xml")
+
+	} else {
+		INFO("fs.defaultFS from hadoop config files %s", fsDefaultFS)
+		return fsDefaultFS, nil
+	}
 }
 
 //------------------------------------------------------------------------------

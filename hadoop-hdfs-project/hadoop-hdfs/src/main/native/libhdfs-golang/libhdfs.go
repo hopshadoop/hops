@@ -73,7 +73,9 @@ func libhdfs_version() *C.cchar_t {
  */
 //export hdfsNewBuilder
 func hdfsNewBuilder() *C.hdfsBuilder {
+
 	init_logger()
+
 	DEBUG("hdfsNewBuilder")
 	hdfsBuilder := (*C.hdfsBuilder)(C.calloc(1, C.size_t(C.sizeof_hdfsBuilder)))
 	if hdfsBuilder == nil {
@@ -248,11 +250,20 @@ func hdfsBuilderConnect(bld *C.hdfsBuilder) C.hdfsFS {
 	//store the client to prevent GC
 	hdfsClientWrapper := HdfsClientWrapper{}
 
+	// set NN URI
 	var nn = C.GoString(bld.nn)
 	if nn == "default" || nn == "" {
 		defaultFS := os.Getenv(LIBHDFS_DEFAULT_FS)
 		if defaultFS != "" {
 			nn = defaultFS
+		} else {
+			fsDefaultFS, err := getNNURIFromConfigFiles()
+			if err != nil {
+				ERROR("Bad NN URI: %v", err)
+				setCErrno(err)
+				return nil
+			}
+			nn = fsDefaultFS
 		}
 	}
 
@@ -280,12 +291,18 @@ func hdfsBuilderConnect(bld *C.hdfsBuilder) C.hdfsFS {
 
 	//if the user is not set then set the current user
 	if bld.userName == nil {
-		user, err := user.Current()
-		if err != nil {
-			setCErrno(err)
-			return nil
+
+		envUser := os.Getenv(LIBHDFS_DEFAULT_USER)
+		if envUser != "" {
+			bld.userName = C.CString(envUser)
+		} else {
+			user, err := user.Current()
+			if err != nil {
+				setCErrno(err)
+				return nil
+			}
+			bld.userName = C.CString(user.Username)
 		}
-		bld.userName = C.CString(user.Username)
 	}
 
 	hdfsOptions := hdfs.ClientOptions{
@@ -308,7 +325,7 @@ func hdfsBuilderConnect(bld *C.hdfsBuilder) C.hdfsFS {
 	hdfsClient, err := hdfs.NewClient(hdfsOptions)
 	if err != nil {
 		setCErrno(err)
-		ERROR("Failed to connect to hdfs. hdfsBuilderConnect ")
+		ERROR("Failed to connect to hdfs. hdfsBuilderConnect %v ", hdfsOptions)
 		return nil
 	} else {
 		hdfsClientWrapper.client = hdfsClient
@@ -318,12 +335,12 @@ func hdfsBuilderConnect(bld *C.hdfsBuilder) C.hdfsFS {
 	props, err := hdfsClient.ServerDefaults()
 	if err != nil {
 		setCErrno(err)
-		ERROR("Failed to get server defaults. hdfsBuilderConnect ")
+		ERROR("Failed to get server defaults. hdfsBuilderConnect. Hdfs Options: %#v", hdfsOptions)
 		return nil
-
+	} else {
+		INFO("Obtained server defaults")
+		hdfsClientWrapper.serverDefaults = props
 	}
-
-	hdfsClientWrapper.serverDefaults = props
 
 	var userName string
 	if bld.userName == nil || C.GoString(bld.userName) == "" {
@@ -387,12 +404,16 @@ func parseURL(urlStr string) (scheme, hostName, port string, err error) {
 func hdfsCreateDirectory(fs C.hdfsFS, path *C.cchar_t) C.int {
 	DEBUG("hdfsCreateDirectory. %s ", C.GoString(path))
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	parsedPath := parsePath(hdfsClientWrapper, C.GoString(path))
-	err := hdfsClientWrapper.client.MkdirAll(parsedPath, defaultDirPermissions)
+	err = hdfsClientWrapper.client.MkdirAll(parsedPath, defaultDirPermissions)
 	if err != nil {
 		setCErrno(err)
 		ERROR("Create dir failed, Error: %v\n", err)
@@ -419,13 +440,16 @@ func hdfsCreateDirectory(fs C.hdfsFS, path *C.cchar_t) C.int {
 func hdfsDelete(fs C.hdfsFS, path *C.cchar_t, recursive C.int) C.int {
 	DEBUG("hdfsDelete. Is recursive: %d", recursive)
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	parsedPath := parsePath(hdfsClientWrapper, C.GoString(path))
 
-	var err error
 	if recursive == 0 {
 		err = hdfsClientWrapper.client.Remove(parsedPath)
 	} else {
@@ -459,7 +483,11 @@ func hdfsDelete(fs C.hdfsFS, path *C.cchar_t, recursive C.int) C.int {
 func hdfsDisconnect(fs C.hdfsFS) C.int {
 	DEBUG("hdfsDisconnect")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -473,8 +501,6 @@ func hdfsDisconnect(fs C.hdfsFS) C.int {
 		delete(hdfsClients, hdfsClientWrapper.client)
 	}
 
-	shutdown_logger()
-
 	return 0
 }
 
@@ -486,7 +512,11 @@ func hdfsDisconnect(fs C.hdfsFS) C.int {
 func hdfsExists(fs C.hdfsFS, path *C.cchar_t) C.int {
 	DEBUG("hdfsExists")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -495,6 +525,7 @@ func hdfsExists(fs C.hdfsFS, path *C.cchar_t) C.int {
 	stat, err := hdfsClientWrapper.client.Stat(parsedPath)
 	if stat == nil || err != nil {
 		ERROR("hdfsExists failed. Path %s. Error: %v", C.GoString(path), err)
+		setCErrno(err)
 		return -1
 	}
 	return 0
@@ -543,7 +574,11 @@ func hdfsFreeFileInfo(hdfsFileInfoParam *C.hdfsFileInfo, numEntries C.int) {
 func hdfsGetCapacity(fs C.hdfsFS) C.tOffset {
 	DEBUG("hdfsGetCapacity")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -571,7 +606,11 @@ func hdfsGetCapacity(fs C.hdfsFS) C.tOffset {
 func hdfsGetUsed(fs C.hdfsFS) C.tOffset {
 	DEBUG("hdfsGetUsed")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -603,16 +642,15 @@ func hdfsGetUsed(fs C.hdfsFS) C.tOffset {
 func hdfsGetPathInfo(fs C.hdfsFS, path *C.cchar_t) *C.hdfsFileInfo {
 	DEBUG("hdfsGetPathInfo Path: %s", C.GoString(path))
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return nil
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	parsedPath := parsePath(hdfsClientWrapper, C.GoString(path))
-
-	if hdfsClientWrapper.client == nil {
-		ERROR("hdfsclient is null")
-		return nil
-	}
 
 	goFileInfo, err := hdfsClientWrapper.client.Stat(parsedPath)
 	if err != nil {
@@ -659,7 +697,11 @@ func hdfsListDirectory(fs C.hdfsFS, path *C.cchar_t,
 	numEntries *C.int) *C.hdfsFileInfo {
 	DEBUG("hdfsListDirectory. Path: %s", C.GoString(path))
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return nil
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -755,12 +797,16 @@ func hdfsChown(fs C.hdfsFS, path *C.cchar_t, owner *C.cchar_t,
 	group *C.cchar_t) C.int {
 	DEBUG("hdfsChown")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	parsedPath := parsePath(hdfsClientWrapper, C.GoString(path))
-	err := hdfsClientWrapper.client.Chown(
+	err = hdfsClientWrapper.client.Chown(
 		parsedPath,
 		C.GoString(owner),
 		C.GoString(group))
@@ -785,15 +831,20 @@ func hdfsChown(fs C.hdfsFS, path *C.cchar_t, owner *C.cchar_t,
  * @return 0 on success else -1
  */
 //export hdfsChmod
-func hdfsChmod(fs C.hdfsFS, path *C.cchar_t, mode *C.short) C.int {
+func hdfsChmod(fs C.hdfsFS, path *C.cchar_t, mode C.short) C.int {
 	DEBUG("hdfsChmod")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	parsedPath := parsePath(hdfsClientWrapper, C.GoString(path))
-	err := hdfsClientWrapper.client.Chmod(parsedPath, os.FileMode(*mode))
+
+	err = hdfsClientWrapper.client.Chmod(parsedPath, os.FileMode(mode))
 	if err != nil {
 		setCErrno(err)
 		ERROR("hdfsChmod. Error: %v", err)
@@ -819,18 +870,24 @@ func hdfsChmod(fs C.hdfsFS, path *C.cchar_t, mode *C.short) C.int {
  */
 //export hdfsCloseFile
 func hdfsCloseFile(fs C.hdfsFS, file C.hdfsFile) C.int {
-	if fs == nil || file == nil {
+
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
 		return -1
 	}
-
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
+
+	if file == nil {
+		ERROR("hdfsCloseFile bad descriptor")
+		setCErrno(syscall.EBADF)
+		return -1
+	}
 
 	DEBUG("hdfsCloseFile. type %d.", file._type)
 	var fileWriter *hdfs.FileWriter
 	var fileReader *hdfs.FileReader
-	var err error
 
 	hdfsReadersWriters[file.file].mutex.Lock()
 	defer hdfsReadersWriters[file.file].mutex.Unlock()
@@ -880,13 +937,19 @@ func hdfsCloseFile(fs C.hdfsFS, file C.hdfsFile) C.int {
 func hdfsFlush(fs C.hdfsFS, file C.hdfsFile) C.int {
 	DEBUG("hdfsFlush")
 
-	if fs == nil || file == nil {
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
 		return -1
 	}
-
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
+
+	if file == nil {
+		ERROR("hdfsFlush bad descriptor")
+		setCErrno(syscall.EBADF)
+		return -1
+	}
 
 	hdfsReadersWriters[file.file].mutex.Lock()
 	defer hdfsReadersWriters[file.file].mutex.Unlock()
@@ -900,7 +963,7 @@ func hdfsFlush(fs C.hdfsFS, file C.hdfsFile) C.int {
 		return -1
 	}
 
-	err := fileWriter.Flush()
+	err = fileWriter.Flush()
 	if err != nil {
 		setCErrno(err)
 		ERROR("ERROR: File flush failed. Error: %v", err)
@@ -948,7 +1011,11 @@ func hdfsOpenFile(fs C.hdfsFS, path *C.cchar_t, flags C.int,
 	DEBUG("hdfsOpenFile. Path: %s. Replication: %d, Blk Size: %d, Buff Size: %d,"+
 		" flag %d", C.GoString(path), replication, blockSize, bufferSize, flags)
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return nil
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -999,7 +1066,6 @@ func hdfsOpenFile(fs C.hdfsFS, path *C.cchar_t, flags C.int,
 	var method string
 	var fileWriter *hdfs.FileWriter
 	var fileReader *hdfs.FileReader
-	var err error
 	if accmode == os.O_RDONLY {
 		method = "open"
 		fileReader, err = hdfsClientWrapper.client.Open(parsePath)
@@ -1009,7 +1075,7 @@ func hdfsOpenFile(fs C.hdfsFS, path *C.cchar_t, flags C.int,
 	} else {
 		method = "create"
 		fileWriter, err = hdfsClientWrapper.client.CreateFile(parsePath,
-			int(replication), int64(blockSize), defaultFilePermissions, true)
+			int(replication), int64(blockSize), defaultFilePermissions, true, true)
 	}
 	INFO("hdfsOpenFile. Path: %s. method: %s, ", parsePath, method)
 
@@ -1068,7 +1134,11 @@ func hdfsRead(fs C.hdfsFS, file C.hdfsFile, buffer *C.void, length C.tSize) C.tS
 		return -1
 	}
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1122,7 +1192,11 @@ func hdfsSeek(fs C.hdfsFS, file C.hdfsFile, desiredPos C.tOffset) C.int {
 		return -1
 	}
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1138,7 +1212,7 @@ func hdfsSeek(fs C.hdfsFS, file C.hdfsFile, desiredPos C.tOffset) C.int {
 		return -1
 	}
 
-	_, err := fileReader.Seek(int64(desiredPos), 0)
+	_, err = fileReader.Seek(int64(desiredPos), 0)
 	if err != nil {
 		setCErrno(err)
 		ERROR("File seek failed. Error %v", err)
@@ -1166,7 +1240,11 @@ func hdfsTell(fs C.hdfsFS, file C.hdfsFile) C.tOffset {
 		return -1
 	}
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1213,7 +1291,11 @@ func hdfsWrite(fs C.hdfsFS, file C.hdfsFile, buffer *C.void, length C.tSize) C.t
 		return -1
 	}
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1262,14 +1344,18 @@ func hdfsWrite(fs C.hdfsFS, file C.hdfsFile, buffer *C.void, length C.tSize) C.t
 //export hdfsRename
 func hdfsRename(fs C.hdfsFS, oldPath *C.cchar_t, newPath *C.cchar_t) C.int {
 	DEBUG("hdfsRename")
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	oldPathParsed := parsePath(hdfsClientWrapper, C.GoString(oldPath))
 	newPathParsed := parsePath(hdfsClientWrapper, C.GoString(newPath))
 
-	err := hdfsClientWrapper.client.Rename(oldPathParsed, newPathParsed)
+	err = hdfsClientWrapper.client.Rename(oldPathParsed, newPathParsed)
 	if err != nil {
 		setCErrno(err)
 		ERROR("Rename failed. Error: %v", err)
@@ -1299,7 +1385,11 @@ func hdfsAvailable(fs C.hdfsFS, file C.hdfsFile) C.int {
 		return -1
 	}
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1385,7 +1475,11 @@ func hdfsFreeHosts(src ***C.char) {
 //export hdfsGetDefaultBlockSize
 func hdfsGetDefaultBlockSize(fs C.hdfsFS) C.tOffset {
 	ERROR("hdfsGetDefaultBlockSize")
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1407,7 +1501,11 @@ func hdfsGetDefaultBlockSize(fs C.hdfsFS) C.tOffset {
 //export hdfsSetWorkingDirectory
 func hdfsSetWorkingDirectory(fs C.hdfsFS, path *C.cchar_t) C.int {
 	DEBUG("hdfsSetWorkingDirectory")
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1433,7 +1531,11 @@ func hdfsSetWorkingDirectory(fs C.hdfsFS, path *C.cchar_t) C.int {
 func hdfsGetWorkingDirectory(fs C.hdfsFS, buffer *C.char,
 	bufferSize C.size_t) *C.char {
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return nil
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1493,12 +1595,17 @@ func hdfsMove(srcFS C.hdfsFS, src *C.cchar_t, dstFS C.hdfsFS, dst *C.cchar_t) C.
 	DEBUG("hdfsMove. src: %s, dst: %s", C.GoString(src), C.GoString(dst))
 	ret := hdfsCopyInternal(srcFS, src, dstFS, dst)
 	if ret == 0 {
-		srcHdfsClientWrapper := getHdfsClientWrapper(srcFS)
+
+		srcHdfsClientWrapper, err := getHdfsClientWrapper(srcFS)
+		if err != nil {
+			setCErrno(err)
+			return -1
+		}
 		srcHdfsClientWrapper.mutex.Lock()
 		defer srcHdfsClientWrapper.mutex.Unlock()
 
 		srcParsedPath := parsePath(srcHdfsClientWrapper, C.GoString(src))
-		err := srcHdfsClientWrapper.client.Remove(srcParsedPath)
+		err = srcHdfsClientWrapper.client.Remove(srcParsedPath)
 		if err != nil {
 			setCErrno(err)
 			ERROR("ERROR: Failed to remove src file. File: %s.  Error: %v",
@@ -1513,12 +1620,19 @@ func hdfsMove(srcFS C.hdfsFS, src *C.cchar_t, dstFS C.hdfsFS, dst *C.cchar_t) C.
 
 func hdfsCopyInternal(srcFS C.hdfsFS, src *C.cchar_t, dstFS C.hdfsFS,
 	dst *C.cchar_t) C.int {
-	srcHdfsClientWrapper := getHdfsClientWrapper(srcFS)
-	dstHdfsClientWrapper := getHdfsClientWrapper(dstFS)
-
+	srcHdfsClientWrapper, err := getHdfsClientWrapper(srcFS)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	srcHdfsClientWrapper.mutex.Lock()
 	defer srcHdfsClientWrapper.mutex.Unlock()
 
+	dstHdfsClientWrapper, err := getHdfsClientWrapper(dstFS)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	dstHdfsClientWrapper.mutex.Lock()
 	defer dstHdfsClientWrapper.mutex.Unlock()
 
@@ -1549,7 +1663,7 @@ func hdfsCopyInternal(srcFS C.hdfsFS, src *C.cchar_t, dstFS C.hdfsFS,
 
 	dstFileWriter, err := dstHdfsClientWrapper.client.CreateFile(dstParsedPath,
 		dstHdfsClientWrapper.serverDefaults.Replication,
-		dstHdfsClientWrapper.serverDefaults.BlockSize, defaultFilePermissions, true)
+		dstHdfsClientWrapper.serverDefaults.BlockSize, defaultFilePermissions, true, true)
 	if err != nil {
 		setCErrno(err)
 		ERROR("Failed to open dst file. File: %s.  Error: %v", srcParsedPath, err)
@@ -1616,7 +1730,11 @@ func hdfsPread(fs C.hdfsFS, file C.hdfsFile, position C.tOffset,
 		return -1
 	}
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1639,7 +1757,7 @@ func hdfsPread(fs C.hdfsFS, file C.hdfsFile, position C.tOffset,
 		return 0
 	}
 
-	_, err := fileReader.Seek(int64(position), 0)
+	_, err = fileReader.Seek(int64(position), 0)
 	if err != nil {
 		setCErrno(err)
 		ERROR("File pread failed. Faild to seek to position %d, "+
@@ -1683,7 +1801,11 @@ func getTId() int {
 func hdfsSetReplication(fs C.hdfsFS, path *C.cchar_t, replication C.int16_t) C.int {
 	DEBUG("hdfsSetReplication.")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
@@ -1719,12 +1841,16 @@ func hdfsSetReplication(fs C.hdfsFS, path *C.cchar_t, replication C.int16_t) C.i
 func hdfsUtime(fs C.hdfsFS, path *C.cchar_t, mtime C.tTime, atime C.tTime) C.int {
 	DEBUG("hdfsUtime.")
 
-	hdfsClientWrapper := getHdfsClientWrapper(fs)
+	hdfsClientWrapper, err := getHdfsClientWrapper(fs)
+	if err != nil {
+		setCErrno(err)
+		return -1
+	}
 	hdfsClientWrapper.mutex.Lock()
 	defer hdfsClientWrapper.mutex.Unlock()
 
 	parsedPath := parsePath(hdfsClientWrapper, C.GoString(path))
-	err := hdfsClientWrapper.client.Chtimes(parsedPath, time.Unix(int64(atime), 0),
+	err = hdfsClientWrapper.client.Chtimes(parsedPath, time.Unix(int64(atime), 0),
 		time.Unix(int64(mtime), 0))
 	if err != nil {
 		ERROR("Failed to set time for %s. Error %v", C.GoString(path), err)
@@ -1828,15 +1954,20 @@ func fixRelativePath(hdfsClientWrapper *HdfsClientWrapper, cpath string) string 
 
 //------------------------------------------------------------------------------
 
-func getHdfsClientWrapper(fs C.hdfsFS) *HdfsClientWrapper {
+func getHdfsClientWrapper(fs C.hdfsFS) (*HdfsClientWrapper, error) {
+	if fs == nil {
+		ERROR("hdfsclientwrapper bad descriptor")
+		return nil, syscall.EBADF
+	}
+
 	hdfsClientWrapper := hdfsClients[(*hdfs.Client)(unsafe.Pointer(fs))]
 	if hdfsClientWrapper == nil {
-		ERROR("hdfsclientwrapper is null")
+		ERROR("hdfsclientwrapper bad descriptor")
 		ERROR("%s", string(debug.Stack()))
-		return nil
+		return nil, syscall.EBADF
 		// os.Exit(1)
 	}
-	return hdfsClientWrapper
+	return hdfsClientWrapper, nil
 }
 
 //------------------------------------------------------------------------------
@@ -1849,12 +1980,14 @@ func getHdfsClientWrapper(fs C.hdfsFS) *HdfsClientWrapper {
  * @param file     The HDFS file
  * @return         1 if the file is open for read; 0 otherwise
  */
-// ENOSYS. NOT IMLEMENTED
 //export hdfsFileIsOpenForRead
 func hdfsFileIsOpenForRead(file C.hdfsFile) C.int {
-	ERROR("hdfsFileIsOpenForRead. NOT IMPLEMENTED")
-	setCErrno(syscall.ENOSYS)
-	return -1
+	INFO("hdfsFileIsOpenForRead.")
+	if file._type == C.HDFS_STREAM_INPUT {
+		return C.int(1)
+	} else {
+		return C.int(0)
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -1870,9 +2003,12 @@ func hdfsFileIsOpenForRead(file C.hdfsFile) C.int {
 // ENOSYS. NOT IMLEMENTED
 //export hdfsFileIsOpenForWrite
 func hdfsFileIsOpenForWrite(file C.hdfsFile) C.int {
-	ERROR("hdfsFileIsOpenForWrite. NOT IMPLEMENTED")
-	setCErrno(syscall.ENOSYS)
-	return -1
+	INFO("hdfsFileIsOpenForWrite")
+	if file._type == C.HDFS_STREAM_OUTPUT {
+		return C.int(1)
+	} else {
+		return C.int(0)
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -1975,9 +2111,16 @@ func hdfsFileFreeReadStatistics(stats *C.hdfsReadStatistics) {
 // ENOSYS. NOT IMLEMENTED
 //export hdfsConnectAsUser
 func hdfsConnectAsUser(nn *C.cchar_t, port C.tPort, user *C.cchar_t) C.hdfsFS {
-	ERROR("hdfsConnectAsUser. NOT IMPLEMENTED")
-	setCErrno(syscall.ENOSYS)
-	return nil
+	init_logger()
+	DEBUG("hdfsConnectAsUser NN: %s, Port: %d User: %s", C.GoString(nn), C.int(port), C.GoString(user))
+	bld := hdfsNewBuilder()
+	if bld == nil {
+		return nil
+	}
+	hdfsBuilderSetNameNode(bld, nn)
+	hdfsBuilderSetNameNodePort(bld, port)
+	hdfsBuilderSetUserName(bld, user)
+	return hdfsBuilderConnect(bld)
 }
 
 //------------------------------------------------------------------------------
@@ -1992,11 +2135,17 @@ func hdfsConnectAsUser(nn *C.cchar_t, port C.tPort, user *C.cchar_t) C.hdfsFS {
 * @return Returns a handle to the filesystem or NULL on error.
 * @deprecated Use hdfsBuilderConnect instead.
  */
-// ENOSYS. NOT IMLEMENTED
 //export hdfsConnect
-func hdfsConnect(nn *C.cchar_t, port C.tPort, user *C.cchar_t) {
-	ERROR("hdfsConnect. NOT IMPLEMENTED")
-	setCErrno(syscall.ENOSYS)
+func hdfsConnect(nn *C.cchar_t, port C.tPort) C.hdfsFS {
+	init_logger()
+	DEBUG("hdfsConnect NN: %s, Port: %d", C.GoString(nn), C.int(port))
+	bld := hdfsNewBuilder()
+	if bld == nil {
+		return nil
+	}
+	hdfsBuilderSetNameNode(bld, nn)
+	hdfsBuilderSetNameNodePort(bld, port)
+	return hdfsBuilderConnect(bld)
 }
 
 //------------------------------------------------------------------------------
