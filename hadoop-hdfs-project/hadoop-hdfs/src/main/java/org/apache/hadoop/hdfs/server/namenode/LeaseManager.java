@@ -179,7 +179,7 @@ public class LeaseManager {
               .setActiveNameNodes(fsnamesystem.getNameNode().getActiveNameNodes().getActiveNodes());
           locks.add(il).add(lf.getLeaseLockAllPaths(LockType.READ, holder,
                   fsnamesystem.getLeaseCreationLockRows()))
-              .add(lf.getLeasePathLock(LockType.READ)).add(lf.getBlockLock())
+              .add(lf.getLeasePathLock()).add(lf.getBlockLock())
               .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
         }
 
@@ -582,8 +582,12 @@ public class LeaseManager {
             locks.add(il).add(lf.getNameNodeLeaseLock(LockType.WRITE))
                 .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder,
                         fsnamesystem.getLeaseCreationLockRows()))
-                .add(lf.getLeasePathLock(LockType.WRITE, leasePaths.size()))
-                .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
+                .add(lf.getLeasePathLock(leasePaths.size()))
+                .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.IV, BLK.ER,
+                    BLK.UC, BLK.PE, BLK.UR));
+            if (fsnamesystem.isCloudEnabled()) {
+              locks.add(lf.getProvidedCacheLocLoc());
+            }
           }
 
           @Override

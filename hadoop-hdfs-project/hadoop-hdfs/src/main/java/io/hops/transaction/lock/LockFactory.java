@@ -233,18 +233,16 @@ public class LockFactory {
             null, leaseCreationLockRows);
   }
 
-  public Lock getLeasePathLock(TransactionLockTypes.LockType lockType,
-      int expectedCount) {
-    return new LeasePathLock(lockType, expectedCount);
+  public Lock getLeasePathLock(int expectedCount) {
+    return new LeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, expectedCount);
   }
 
-  public Lock getLeasePathLock(TransactionLockTypes.LockType lockType) {
-    return new LeasePathLock(lockType);
+  public Lock getLeasePathLock() {
+    return new LeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED);
   }
-  
-  public Lock getLeasePathLock(TransactionLockTypes.LockType lockType,
-          String src) {
-    return new LeasePathLock(lockType, src);
+
+  public Lock getLeasePathLock(String src) {
+    return new LeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED, src);
   }
 
   public Lock getNameNodeLeaseLock(TransactionLockTypes.LockType lockType) {

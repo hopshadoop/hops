@@ -117,7 +117,7 @@ public class TestLeaseManager {
         locks.add(lf.getINodeLock(TransactionLockTypes.INodeLockType.WRITE,
                 TransactionLockTypes.INodeResolveType.PATH, path));
         locks.add(lf.getLeaseLockAllSystemPathsTesting(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
-              .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE, path));
+              .add(lf.getLeasePathLock(path));
       }
 
       @Override

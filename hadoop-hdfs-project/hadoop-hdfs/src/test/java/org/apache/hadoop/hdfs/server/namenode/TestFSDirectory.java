@@ -137,7 +137,7 @@ public class TestFSDirectory {
                 .setNameNodeID(cluster.getNameNode().getId())
                 .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
-                .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+                .add(lf.getLeasePathLock())
                 .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC, LockFactory.BLK.UR, LockFactory.BLK.PE, LockFactory.BLK.IV));
       }
@@ -178,7 +178,7 @@ public class TestFSDirectory {
                 .setNameNodeID(cluster.getNameNode().getId())
                 .setActiveNameNodes(cluster.getNameNode().getActiveNameNodes().getActiveNodes());
         locks.add(il).add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
-                .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+                .add(lf.getLeasePathLock())
                 .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.UC,
                         LockFactory.BLK.UR, LockFactory.BLK.PE, LockFactory.BLK.IV));

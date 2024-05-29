@@ -188,7 +188,7 @@ public class TestBlockInfo {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
-            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+            .add(lf.getLeasePathLock())
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
                 LockFactory.BLK.UR));
@@ -216,7 +216,7 @@ public class TestBlockInfo {
         LockFactory lf = LockFactory.getInstance();
         locks.add(lf.getIndividualINodeLock(TransactionLockTypes.INodeLockType.WRITE, inodeIdentifier, true))
             .add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
-            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+            .add(lf.getLeasePathLock())
             .add(lf.getBlockLock(10, inodeIdentifier))
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC,
                 LockFactory.BLK.UR));

@@ -1554,7 +1554,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
                     .add(lf.getAllUsedHashBucketsLock());
         locks.add(lf.getLeaseLockAllPaths(LockType.WRITE, clientName, leaseCreationLockRows))
-              .add(lf.getLeasePathLock(LockType.WRITE));
+              .add(lf.getLeasePathLock());
         if (isErasureCodingEnabled()) {
           locks.add(lf.getEncodingStatusLock(LockType.WRITE.WRITE, src));
         }
@@ -1932,7 +1932,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         locks.add(il).add(lf.getBlockLock());
         LeaseLock leaseLock = (LeaseLock)lf.getLeaseLockSinglePath(LockType.WRITE, holder,
                 src, leaseCreationLockRows);
-        locks.add(leaseLock).add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(
+        locks.add(leaseLock).add(lf.getLeasePathLock()).add(
             lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR,
                 BLK.PE, BLK.IV));
 
@@ -2338,7 +2338,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                     .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
             locks.add(il)
                     .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder, leaseCreationLockRows))
-                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
+                    .add(lf.getLeasePathLock()).add(lf.getBlockLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR))
                     .add(lf.getAcesLock());
           }
@@ -2523,7 +2523,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                     .skipReadingQuotaAttr(!dir.isQuotaEnabled());
             locks.add(il).add(lf.getBlockLock())
                     .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder, leaseCreationLockRows))
-                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                    .add(lf.getLeasePathLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.IV, BLK.PE))
                     .add(lf.getLastBlockHashBucketsLock());
             if(isRetryCacheEnabled) {
@@ -2701,7 +2701,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
         //we have to lock all leasse for the client becuase the file could have been renamed
         locks.add(lf.getLeaseLockAllPaths(LockType.READ, clientName, leaseCreationLockRows))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+            .add(lf.getLeasePathLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC));
       }
 
@@ -3119,8 +3119,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                   .setActiveNameNodes(nameNode.getActiveNameNodes().getActiveNodes());
               locks.add(il);
             }
-            locks.add(lf.getLeaseLockAllPaths(LockType.READ, leaseCreationLockRows))
-                    .add(lf.getLeasePathLock(LockType.READ_COMMITTED, src))
+            locks.add(lf.getLeaseLockAllPaths(LockType.READ, holder, leaseCreationLockRows))
+                    .add(lf.getLeasePathLock(src))
                     .add(lf.getBlockLock())
                     .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.ER, BLK.IV));
             locks.add(lf.getAllUsedHashBucketsLock());
@@ -3251,7 +3251,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             //we have to lock all leasse for the client becuase the file could have been renamed
             LeaseLock leaseLock = (LeaseLock)lf.getLeaseLockAllPaths(LockType.WRITE, holder,
                     leaseCreationLockRows);
-            locks.add(leaseLock).add(lf.getLeasePathLock(LockType.WRITE))
+            locks.add(leaseLock).add(lf.getLeasePathLock())
                 .add(lf.getBlockLock());
 
             if (data == null) { // the data is stored on the datanodes.
@@ -3711,7 +3711,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           locks.add(il);
         }
         locks.add(lf.getLeaseLockAllPaths(LockType.READ, clientName, leaseCreationLockRows))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+            .add(lf.getLeasePathLock())
             .add(lf.getBlockLock());
       }
 
@@ -3984,7 +3984,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         LockFactory lf = getInstance();
         locks.add(lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
                 .add(lf.getLeaseLockAllPaths(LockType.WRITE, leaseCreationLockRows))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getLeasePathLock())
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR, BLK.PE, BLK.IV));
         if (isErasureCodingEnabled() && inodeIdentifier != null) {
@@ -5980,7 +5980,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         LockFactory lf = LockFactory.getInstance();
         locks.add( lf.getIndividualINodeLock(INodeLockType.WRITE, inodeIdentifier, true))
                 .add(lf.getLeaseLockAllPaths(LockType.READ, leaseCreationLockRows))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getLeasePathLock())
                 .add(lf.getBlockLock(oldBlock.getBlockId(), inodeIdentifier))
                 .add(lf.getBlockRelated(BLK.UC))
                 .add(lf.getLastBlockHashBucketsLock());

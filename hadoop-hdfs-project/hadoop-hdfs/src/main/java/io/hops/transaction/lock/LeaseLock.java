@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -85,8 +86,17 @@ public final class LeaseLock extends Lock {
       }
     }
 
+    class HoldersComparator implements Comparator<String> {
+      @Override
+      public int compare(String h0, String h1) {
+        int lockRow0 = Math.abs(Lease.getHolderId(h0)) % LEASE_CREATION_LOCK_ROWS;
+        int lockRow1 = Math.abs(Lease.getHolderId(h1)) % LEASE_CREATION_LOCK_ROWS;
+        return Integer.compare(lockRow0, lockRow1);
+      }
+    }
     List<String> holders = new ArrayList<>(hldrs);
-    Collections.sort(holders);
+    Collections.sort(holders, new HoldersComparator());
+
     if (holders.isEmpty() && !locks.containsLock(Type.INode)) {
       Collection<Lease> allLeases = acquireLockList(lockType, Lease.Finder.All);
       if (leases != null) {
