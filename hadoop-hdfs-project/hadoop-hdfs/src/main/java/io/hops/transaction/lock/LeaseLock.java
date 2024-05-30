@@ -86,16 +86,8 @@ public final class LeaseLock extends Lock {
       }
     }
 
-    class HoldersComparator implements Comparator<String> {
-      @Override
-      public int compare(String h0, String h1) {
-        int lockRow0 = Math.abs(Lease.getHolderId(h0)) % LEASE_CREATION_LOCK_ROWS;
-        int lockRow1 = Math.abs(Lease.getHolderId(h1)) % LEASE_CREATION_LOCK_ROWS;
-        return Integer.compare(lockRow0, lockRow1);
-      }
-    }
     List<String> holders = new ArrayList<>(hldrs);
-    Collections.sort(holders, new HoldersComparator());
+    Collections.sort(holders, new LeaseCreationLockComparator(LEASE_CREATION_LOCK_ROWS));
 
     if (holders.isEmpty() && !locks.containsLock(Type.INode)) {
       Collection<Lease> allLeases = acquireLockList(lockType, Lease.Finder.All);
