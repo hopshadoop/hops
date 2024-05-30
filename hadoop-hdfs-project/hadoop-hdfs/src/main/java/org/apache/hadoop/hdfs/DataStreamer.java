@@ -1977,7 +1977,7 @@ class DataStreamer extends Daemon {
     boolean success;
     do {
       hasError = false;
-      lastException.set(null);
+      lastException.clear();
       errorIndex = -1;
 
       block = lb.getBlock();
