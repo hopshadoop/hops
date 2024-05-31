@@ -577,7 +577,7 @@ public class TestFileTruncate {
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
         locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, leaseCreationLockRows))
-              .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
+              .add(lf.getLeasePathLock());
         
         locks.add(lf.getAcesLock());
       }
@@ -602,7 +602,7 @@ public class TestFileTruncate {
         locks.add(il).add(lf.getBlockLock()).add(
             lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.PE, LockFactory.BLK.UR, LockFactory.BLK.UC, LockFactory.BLK.IV));
         locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.WRITE, client, leaseCreationLockRows))
-              .add(lf.getLeasePathLock(TransactionLockTypes.LockType.WRITE));
+              .add(lf.getLeasePathLock());
         
         locks.add(lf.getAcesLock());
       }

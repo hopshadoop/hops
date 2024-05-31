@@ -276,7 +276,7 @@ class FSDirDeleteOp {
                 .setIgnoredSTOInodes(subTreeRootId);
             locks.add(il).add(lf.getLeaseLockAllPaths(LockType.WRITE,
                     fsn.getLeaseCreationLockRows()))
-                .add(lf.getLeasePathLock(LockType.READ_COMMITTED))
+                .add(lf.getLeasePathLock())
                 .add(lf.getBlockLock()).add(
                 lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR, BLK.PE, BLK.IV, BLK.ER));
 
@@ -326,7 +326,7 @@ class FSDirDeleteOp {
             .setActiveNameNodes(fsn.getNameNode().getActiveNameNodes().getActiveNodes())
             .skipReadingQuotaAttr(!fsd.isQuotaEnabled());
         locks.add(il).add(lf.getLeaseLockAllPaths(LockType.WRITE, fsn.getLeaseCreationLockRows()))
-            .add(lf.getLeasePathLock(LockType.READ_COMMITTED)).add(lf.getBlockLock())
+            .add(lf.getLeasePathLock()).add(lf.getBlockLock())
             .add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.UC, BLK.UR,BLK.PE, BLK.IV,BLK.ER));
         if (fsn.isRetryCacheEnabled()) {
           locks.add(lf.getRetryCacheEntryLock(Server.getClientId(),

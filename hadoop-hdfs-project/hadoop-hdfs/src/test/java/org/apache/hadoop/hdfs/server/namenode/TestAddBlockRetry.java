@@ -125,7 +125,7 @@ public class TestAddBlockRetry {
 
         locks.add(lf.getLeaseLockAllPaths(TransactionLockTypes.LockType.READ, "clientName",
                 ns.getLeaseCreationLockRows()))
-            .add(lf.getLeasePathLock(TransactionLockTypes.LockType.READ_COMMITTED))
+            .add(lf.getLeasePathLock())
             .add(lf.getBlockRelated(LockFactory.BLK.RE, LockFactory.BLK.CR, LockFactory.BLK.ER, LockFactory.BLK.UC));
       }
 
