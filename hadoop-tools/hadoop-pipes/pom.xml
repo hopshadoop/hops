@@ -20,11 +20,11 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>3.2.0.13-SNAPSHOT</version>
+    <version>3.2.0.14-SNAPSHOT</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
   <artifactId>hadoop-pipes</artifactId>
-  <version>3.2.0.13-SNAPSHOT</version>
+  <version>3.2.0.14-SNAPSHOT</version>
   <description>Apache Hadoop Pipes</description>
   <name>Apache Hadoop Pipes</name>
   <packaging>pom</packaging>
