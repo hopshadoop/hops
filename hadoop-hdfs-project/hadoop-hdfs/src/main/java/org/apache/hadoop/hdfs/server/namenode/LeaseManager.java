@@ -583,11 +583,7 @@ public class LeaseManager {
                 .add(lf.getLeaseLockAllPaths(LockType.WRITE, holder,
                         fsnamesystem.getLeaseCreationLockRows()))
                 .add(lf.getLeasePathLock(leasePaths.size()))
-                .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.IV, BLK.ER,
-                    BLK.UC, BLK.PE, BLK.UR));
-            if (fsnamesystem.isCloudEnabled()) {
-              locks.add(lf.getProvidedCacheLocLoc());
-            }
+                .add(lf.getBlockLock()).add(lf.getBlockRelated(BLK.RE, BLK.CR, BLK.ER, BLK.UC, BLK.UR));
           }
 
           @Override
