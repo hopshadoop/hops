@@ -66,8 +66,7 @@ public class XAttrPermissionFilter {
       throws AccessControlException {
     final boolean isSuperUser = pc.isSuperUser();
     if (xAttr.getNameSpace() == XAttr.NameSpace.USER ||
-        (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && isSuperUser) ||
-        (xAttr.getNameSpace() == XAttr.NameSpace.PROVENANCE)) {
+        (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && isSuperUser)) {
       return;
     }
     if (xAttr.getNameSpace() == XAttr.NameSpace.RAW &&
@@ -109,8 +108,7 @@ public class XAttrPermissionFilter {
     List<XAttr> filteredXAttrs = Lists.newArrayListWithCapacity(xAttrs.size());
     final boolean isSuperUser = pc.isSuperUser();
     for (XAttr xAttr : xAttrs) {
-      if (xAttr.getNameSpace() == XAttr.NameSpace.USER ||
-        xAttr.getNameSpace() == XAttr.NameSpace.PROVENANCE) {
+      if (xAttr.getNameSpace() == XAttr.NameSpace.USER) {
         filteredXAttrs.add(xAttr);
       } else if (xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED && 
           isSuperUser) {

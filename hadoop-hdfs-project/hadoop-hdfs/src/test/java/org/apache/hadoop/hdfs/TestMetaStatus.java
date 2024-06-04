@@ -55,7 +55,7 @@ public class TestMetaStatus {
         fs.create(new Path(basePath + "/file_" + i), (short) 3).close();
       }
 
-      dfs.setMetaStatus(new Path(basePath), MetaStatus.FULL_PROV_ENABLED);
+      dfs.setMetaStatus(new Path(basePath), MetaStatus.META_ENABLED);
 
 
       long count = (long) new LightWeightRequestHandler(HDFSOperationType.TEST) {

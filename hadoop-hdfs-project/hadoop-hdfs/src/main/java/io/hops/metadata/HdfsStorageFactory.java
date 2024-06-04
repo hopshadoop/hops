@@ -292,10 +292,6 @@ public class HdfsStorageFactory {
             new XAttrContext((XAttrDataAccess)getDataAccess(XAttrDataAccess.class)));
         entityContexts.put(EncryptionZone.class,
             new EncryptionZoneContext((EncryptionZoneDataAccess)getDataAccess(EncryptionZoneDataAccess.class)));
-        entityContexts.put(FileProvenanceEntry.class, new FileProvenanceContext(
-            (FileProvenanceDataAccess) getDataAccess(FileProvenanceDataAccess.class)));
-        entityContexts.put(FileProvXAttrBufferEntry.class, new FileProvXAttrBufferContext(
-            (FileProvXAttrBufferDataAccess) getDataAccess(FileProvXAttrBufferDataAccess.class)));
         return entityContexts;
       }
 

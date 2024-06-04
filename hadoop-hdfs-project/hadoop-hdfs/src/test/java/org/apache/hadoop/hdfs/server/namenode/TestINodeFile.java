@@ -222,11 +222,11 @@ public class TestINodeFile {
     assertEquals("f", inf.getFullPathName());
     assertEquals("", inf.getLocalParentDir());
 
-    dir.addChild(inf, false, -1L);
+    dir.addChild(inf, false);
     assertEquals("d" + Path.SEPARATOR + "f", inf.getFullPathName());
     assertEquals("d", inf.getLocalParentDir());
     
-    root.addChild(dir, false, -1L);
+    root.addChild(dir, false);
     assertEquals(Path.SEPARATOR + "d" + Path.SEPARATOR + "f",
         inf.getFullPathName());
     assertEquals(Path.SEPARATOR + "d", dir.getFullPathName());
@@ -893,7 +893,7 @@ public class TestINodeFile {
             INodeDirectory dir = new INodeDirectory(id, component, permstatus, 0);
             INodeDirectory prev = (INodeDirectory) EntityManager.find(INode.Finder.ByINodeIdFTIS, prevId);
             
-            prev.addChild(dir, false, -1L);
+            prev.addChild(dir, false);
             
             return dir;
           }
