@@ -68,8 +68,6 @@ public class XAttrHelper {
       ns = NameSpace.SECURITY;
     } else if (prefix.equals(NameSpace.RAW.toString().toLowerCase())) {
       ns = NameSpace.RAW;
-    } else if (prefix.equals(NameSpace.PROVENANCE.toString().toLowerCase())) {
-      ns = NameSpace.PROVENANCE;
     } else {
       throw new HadoopIllegalArgumentException("An XAttr name must be " +
           "prefixed with user/trusted/security/system/raw, followed by a '.'");

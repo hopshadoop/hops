@@ -20,13 +20,11 @@ package org.apache.hadoop.hdfs.server.namenode;
 import com.google.common.base.Preconditions;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
 import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
 import io.hops.security.GroupNotFoundException;
 import io.hops.security.UserNotFoundException;
 import io.hops.security.UsersGroups;
 import io.hops.transaction.EntityManager;
-import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -322,17 +320,6 @@ public abstract class INodeWithAdditionalFields extends INode {
           operation));
       save();
     }
-  }
-  
-  @Override
-  public void logProvenanceEvent(long namenodeId, FileProvenanceEntry.Operation operation) throws IOException {
-    FileProvenance.log(namenodeId, this, operation);
-  }
-  
-  @Override
-  public void logProvenanceEvent(long namenodeId, FileProvenanceEntry.Operation operation, XAttr xattr)
-    throws IOException {
-    FileProvenance.log(namenodeId, this, operation, xattr);
   }
   
   public final int getLogicalTime() {

@@ -430,11 +430,11 @@ public class INodeDirectory extends INodeWithAdditionalFields {
    *  @return false if the child with this name already exists; 
    *         otherwise, return true;
    */
-  boolean addChild(final INode node, final boolean setModTime, long namenodeId) throws IOException{
-    return addChild(node, setModTime, true, namenodeId);
+  boolean addChild(final INode node, final boolean setModTime) throws IOException{
+    return addChild(node, setModTime, true);
   }
   
-  boolean addChild(final INode node, final boolean setModTime, final boolean logMetadataEvent, long namenodeId)
+  boolean addChild(final INode node, final boolean setModTime, final boolean logMetadataEvent)
     throws IOException{
     INode existingInode = getChildINode(node.getLocalNameBytes());
     if (existingInode != null) {
@@ -475,8 +475,6 @@ public class INodeDirectory extends INodeWithAdditionalFields {
     if (logMetadataEvent) {
       node.logMetadataEvent(INodeMetadataLogEntry.Operation.Add);
     }
-    //FIXME - once rename operation is tracked in provenance - update code
-    node.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.create());
 
     return true;
   }
