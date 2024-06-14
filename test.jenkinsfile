@@ -48,7 +48,7 @@ pipeline {
                         git checkout master
                         git pull
                         ${params.GIT_PULL_DAL_COMMAND!=null?params.GIT_PULL_DAL_COMMAND:""}
-                        mvn clean install -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}
+                        mvn clean install -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX}/repository
                     """
 	            }
             }
