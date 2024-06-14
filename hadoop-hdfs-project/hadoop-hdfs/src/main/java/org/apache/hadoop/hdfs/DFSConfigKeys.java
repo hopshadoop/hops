@@ -625,6 +625,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean DFS_NAMENODE_ENABLE_RETRY_CACHE_DEFAULT = true;
   public static final String DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY = "dfs.namenode.retrycache.expirytime.millis";
   public static final long   DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT = 600000; // 10 minutes
+  public static final String DFS_NAMENODE_RETRY_CACHE_DELETE_BATCH_SIZE_KEY = "dfs.namenode.retrycache.delete.batch.size";
+  public static final int    DFS_NAMENODE_RETRY_CACHE_DELETE_BATCH_SIZE_DEFAULT = 5000;
 
   // Hidden configuration undocumented in hdfs-site. xml
   // Timeout to wait for block receiver and responder thread to stop
