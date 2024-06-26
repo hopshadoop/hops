@@ -8835,13 +8835,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                 cleanerLog.info("RetryCacheCleaner: not sleeping to catch up. Total Epochs to " +
                         "be cleaned " + ((expiryTime - 3) - toBeDeletedEpochSec));
                 continue;
-              } else {
-                Thread.sleep(1000);
               }
             }
-          } else {
-            Thread.sleep(1000);
           }
+          Thread.sleep(1000);
         } catch (Exception e) {
           if (e instanceof InterruptedException) {
             cleanerLog.warn("RetryCacheCleaner Interrupted");
