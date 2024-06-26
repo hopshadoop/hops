@@ -53,13 +53,12 @@ public class TestRetryCacheCleaner {
   Configuration conf;
   LeaderElection leaderElection;
   final int DELETE_BATCH_SIZE = 200;
-  final int ROWS_PER_EPOCH = 600;
-  final int TOTAL_EPOCHS = 10;
 
   @Test
   public void testRetryCleaner() throws Exception {
     try {
-
+      final int TOTAL_EPOCHS = 10;
+      final int ROWS_PER_EPOCH = 600;
       Logger.getRootLogger().setLevel(Level.INFO);
       Logger.getLogger(RetryCacheCleaner.class).setLevel(Level.ALL);
 
@@ -83,6 +82,53 @@ public class TestRetryCacheCleaner {
 
 
       Thread.sleep((TOTAL_EPOCHS + 10) * 1000);
+      ((RetryCacheCleaner) retryCacheCleanerThread.getRunnable()).stopMonitor();
+      retryCacheCleanerThread.interrupt();
+
+      //make sure all rows are deleted
+      assertTrue("Did not clean up all rows", countRows() == 0);
+      try {
+      } catch (Exception e) {
+        fail(e.getMessage());
+      }
+
+    } finally {
+      cleanup();
+    }
+  }
+
+  @Test
+  public void testRetryCleanerFastCleanup() throws Exception {
+    try {
+
+      final int TOTAL_EPOCHS_SEC = 100;
+      final int ROWS_PER_EPOCH = 600;
+      Logger.getRootLogger().setLevel(Level.INFO);
+      Logger.getLogger(RetryCacheCleaner.class).setLevel(Level.ALL);
+
+      // setup conf and leader election
+      setup();
+      long entryExpiryMillis = conf.getLong(DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY,
+              DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT);
+
+      // set last epoch
+      long epoch = (System.currentTimeMillis() - entryExpiryMillis - TOTAL_EPOCHS_SEC * 1000) / 1000;
+      HdfsVariables.setRetryCacheCleanerEpoch(epoch - 1);
+
+      for (int i = 0; i < TOTAL_EPOCHS_SEC; i++) {
+        insertTestData(epoch + i, ROWS_PER_EPOCH);
+      }
+
+      Thread.sleep(1000);
+      // all rows are expired now
+
+      Daemon retryCacheCleanerThread = new Daemon(new RetryCacheCleaner(conf, leaderElection));
+      retryCacheCleanerThread.setName("Retry Cache Cleaner");
+      retryCacheCleanerThread.start();
+
+
+      // delete TOTAL_EPOCHS_SEC (100) in 5 secs
+      Thread.sleep(5 * 1000);
       ((RetryCacheCleaner) retryCacheCleanerThread.getRunnable()).stopMonitor();
       retryCacheCleanerThread.interrupt();
 
