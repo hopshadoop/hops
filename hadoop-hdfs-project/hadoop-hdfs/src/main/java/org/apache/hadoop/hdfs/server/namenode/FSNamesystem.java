@@ -8826,7 +8826,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
                       " To be deleted epoch " + toBeDeletedEpochSec);
               int countDeleted = deleteAllForEpoch(toBeDeletedEpochSec);
               cleanerLog.info("RetryCacheCleaner: Total rows deleted from retry cache: " +
-                      countDeleted + " Epoch: " + toBeDeletedEpochSec);
+                      countDeleted + " Epoch: " + toBeDeletedEpochSec+" Total Epochs: "+ (currEpoch - toBeDeletedEpochSec -1));
               //save the epoch
               HdfsVariables.setRetryCacheCleanerEpoch(toBeDeletedEpochSec);
 
