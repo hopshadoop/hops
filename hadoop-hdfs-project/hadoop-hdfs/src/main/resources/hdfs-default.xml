@@ -1525,6 +1525,14 @@
   </property>
 
   <property>
+    <name>dfs.namenode.retrycache.delete.batch.size</name>
+    <value>5000</value>
+    <description>
+      Max deletion batch size for expired retry cache entries. 
+    </description>
+  </property>
+
+  <property>
     <name>dfs.client.mmap.enabled</name>
     <value>true</value>
     <description>
