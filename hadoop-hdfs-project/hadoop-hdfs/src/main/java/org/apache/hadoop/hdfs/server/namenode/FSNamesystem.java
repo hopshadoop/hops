@@ -28,6 +28,7 @@ import io.hops.common.INodeUtil;
 import io.hops.erasure_coding.Codec;
 import io.hops.erasure_coding.ErasureCodingManager;
 import io.hops.exception.*;
+import io.hops.leaderElection.LeaderElection;
 import io.hops.leader_election.node.ActiveNode;
 import io.hops.metadata.HdfsStorageFactory;
 import io.hops.metadata.HdfsVariables;
@@ -757,7 +758,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       nnrmthread.start();
 
       if(isRetryCacheEnabled) {
-        this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner());
+        this.retryCacheCleanerThread = new Daemon(new RetryCacheCleaner(conf, nameNode.leaderElection));
         this.retryCacheCleanerThread.setName("Retry Cache Cleaner");
         retryCacheCleanerThread.start();
       }
@@ -8766,52 +8767,78 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   }
 
-  class RetryCacheCleaner implements Runnable {
+  public static class RetryCacheCleaner implements Runnable {
 
     public final Log cleanerLog = LogFactory.getLog(RetryCacheCleaner.class);
 
     boolean shouldCacheCleanerRun = true;
     long entryExpiryMillis;
     Timer timer = new Timer();
+    Configuration conf;
+    LeaderElection le;
+    int deleteBatchSize;
 
-    public RetryCacheCleaner() {
+    public RetryCacheCleaner(Configuration conf, LeaderElection le) {
+      this.conf = conf;
+      this.le = le;
       entryExpiryMillis = conf.getLong(
-          DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY,
-          DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT);
+              DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_KEY,
+              DFS_NAMENODE_RETRY_CACHE_EXPIRYTIME_MILLIS_DEFAULT);
+      deleteBatchSize = conf.getInt(
+              DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_DELETE_BATCH_SIZE_KEY,
+              DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_DELETE_BATCH_SIZE_DEFAULT);
     }
 
     private int deleteAllForEpoch(final long epoch) throws IOException {
-      return (int)(new LightWeightRequestHandler(
+      return (int) (new LightWeightRequestHandler(
               HDFSOperationType.CLEAN_RETRY_CACHE) {
         @Override
         public Object performTask() throws IOException {
-
           RetryCacheEntryDataAccess da = (RetryCacheEntryDataAccess) HdfsStorageFactory
                   .getDataAccess(RetryCacheEntryDataAccess.class);
-          return da.removeOlds(epoch);
+
+          int totalDeleted = 0;
+          int deleted;
+          do {
+            deleted = da.removeOlds(epoch, deleteBatchSize);
+            totalDeleted += deleted;
+            cleanerLog.trace("Deleted " + deleted + " entries for epoch " + epoch);
+
+          } while (deleted > 0);
+
+          return totalDeleted;
         }
       }.handle());
     }
 
     @Override
     public void run() {
-      while (fsRunning && shouldCacheCleanerRun) {
+      while (shouldCacheCleanerRun) {
         try {
-          if (isLeader()) {
-            Thread.sleep(1000);
+          if (le.isLeader()) {
             long lastDeletedEpochSec = HdfsVariables.getRetryCacheCleanerEpoch();
             long toBeDeletedEpochSec = lastDeletedEpochSec + 1L;
-            if (toBeDeletedEpochSec < ((timer.now() - entryExpiryMillis) / 1000)) {
-              cleanerLog.debug("Current epoch " + (System.currentTimeMillis() / 1000) +
+            long expiryTime = (timer.now() - entryExpiryMillis) / 1000;
+            long currEpoch = System.currentTimeMillis() / 1000;
+            if (toBeDeletedEpochSec < expiryTime) {
+              cleanerLog.debug("RetryCacheCleaner: Current epoch " + currEpoch +
                       " Last deleted epoch is " + lastDeletedEpochSec +
                       " To be deleted epoch " + toBeDeletedEpochSec);
               int countDeleted = deleteAllForEpoch(toBeDeletedEpochSec);
+              cleanerLog.info("RetryCacheCleaner: Total rows deleted from retry cache: " +
+                      countDeleted + " Epoch: " + toBeDeletedEpochSec+" Total Epochs: "+ (currEpoch - toBeDeletedEpochSec -1));
               //save the epoch
               HdfsVariables.setRetryCacheCleanerEpoch(toBeDeletedEpochSec);
-              cleanerLog.debug("Deleted " + countDeleted + " entries for epoch " + toBeDeletedEpochSec);
-              continue;
+
+              if (toBeDeletedEpochSec < expiryTime - 3) {
+                // Do not sleep if we are lagging behind for more than 3 sec
+                cleanerLog.info("RetryCacheCleaner: not sleeping to catch up. Total Epochs to " +
+                        "be cleaned " + ((expiryTime - 3) - toBeDeletedEpochSec));
+                continue;
+              }
             }
           }
+          Thread.sleep(1000);
         } catch (Exception e) {
           if (e instanceof InterruptedException) {
             cleanerLog.warn("RetryCacheCleaner Interrupted");
