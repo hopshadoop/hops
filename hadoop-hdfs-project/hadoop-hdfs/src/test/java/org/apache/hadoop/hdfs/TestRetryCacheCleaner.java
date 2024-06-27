@@ -174,7 +174,7 @@ public class TestRetryCacheCleaner {
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_RETRY_CACHE_DELETE_BATCH_SIZE_KEY, DELETE_BATCH_SIZE);
 
     HdfsStorageFactory.setConfiguration(conf);
-    HdfsStorageFactory.formatHdfsStorageNonTransactional();
+    HdfsStorageFactory.formatStorage();
 
     long leadercheckInterval =
             conf.getInt(DFSConfigKeys.DFS_LEADER_CHECK_INTERVAL_IN_MS_KEY,
