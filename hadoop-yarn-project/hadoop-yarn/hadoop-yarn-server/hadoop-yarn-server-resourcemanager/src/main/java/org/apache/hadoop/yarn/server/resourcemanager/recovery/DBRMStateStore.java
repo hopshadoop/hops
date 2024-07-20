@@ -25,7 +25,6 @@ import io.hops.metadata.common.entity.IntVariable;
 import io.hops.metadata.common.entity.LongVariable;
 import io.hops.metadata.common.entity.Variable;
 import io.hops.metadata.hdfs.dal.VariableDataAccess;
-import io.hops.metadata.yarn.dal.AppProvenanceDataAccess;
 import io.hops.metadata.yarn.dal.ReservationStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
@@ -33,7 +32,6 @@ import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
 import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
 import io.hops.metadata.yarn.entity.rmstatestore.ReservationState;
-import io.hops.metadata.yarn.entity.AppProvenanceEntry;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
 import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
 import io.hops.metadata.yarn.entity.rmstatestore.DelegationToken;
@@ -467,9 +465,6 @@ public class DBRMStateStore extends RMStateStore {
       stateName = appStateDataPB.getState().toString();
     }
     final String stateN=stateName;
-    final long submitTime = appStateDataPB.getSubmitTime();
-    final long startTime = appStateDataPB.getStartTime();
-    final long finishTime = appStateDataPB.getFinishTime();
     LightWeightRequestHandler setApplicationStateHandler
             = new LightWeightRequestHandler(YARNOperationType.OTHER) {
       @Override
@@ -482,7 +477,6 @@ public class DBRMStateStore extends RMStateStore {
         ApplicationState state = new ApplicationState(appIdString, appState,
                 user, name, stateN);
         DA.add(state);
-        logProvenance(state, submitTime, startTime, finishTime);
         connector.commit();
         return null;
       }
@@ -490,18 +484,6 @@ public class DBRMStateStore extends RMStateStore {
     setApplicationStateHandler.handle();
   }
   
-  private void logProvenance(ApplicationState state, long submitTime, long startTime, long finishTime) 
-    throws StorageException {
-    long now = System.currentTimeMillis();
-    AppProvenanceDataAccess<AppProvenanceEntry> da
-      = (AppProvenanceDataAccess) RMStorageFactory.getDataAccess(AppProvenanceDataAccess.class);
-    AppProvenanceEntry provEntry = new AppProvenanceEntry(state, now, submitTime, startTime, finishTime);
-    if (state.getState() == null) {
-      provEntry.setState("null");
-    }
-    da.add(provEntry);
-  }
-
   @Override
   public synchronized void updateApplicationStateInternal(ApplicationId appId,
           ApplicationStateData appStateDataPB) throws Exception {
