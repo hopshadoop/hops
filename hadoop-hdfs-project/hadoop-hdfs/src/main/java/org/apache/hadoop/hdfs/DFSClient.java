@@ -1746,6 +1746,31 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   }
 
   /**
+   * Get the file info for a specific file or directory.
+   * @param src The string representation of the path to the file
+   * @param needBlockToken Include block tokens in {@link LocatedBlocks}.
+   *        When block tokens are included, this call is a superset of
+   *        {@link #getBlockLocations(String, long)}.
+   * @return object containing information regarding the file
+   *         or null if file not found
+   *
+   * @see DFSClient#open(HdfsPathHandle, int, boolean)
+   * @see ClientProtocol#getFileInfo(String) for description of
+   *      exceptions
+   */
+  public HdfsLocatedFileStatus getLocatedFileInfo(String src,
+                                                  boolean needBlockToken) throws IOException {
+    checkOpen();
+    try (TraceScope ignored = newPathTraceScope("getLocatedFileInfo", src)) {
+      return namenode.getLocatedFileInfo(src, needBlockToken);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+              FileNotFoundException.class,
+              UnresolvedPathException.class);
+    }
+  }
+
+  /**
    * Close status of a file
    * @return true if file is already closed
    */
@@ -2945,6 +2970,20 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       }
     }
   }
+
+  /**                                                                           
+   * A blocking call to wait for Observer NameNode state ID to reach to the     
+   * current client state ID. Current client state ID is given by the client    
+   * alignment context.                                                         
+   * An assumption is that client alignment context has the state ID set at this
+   * point. This is become ObserverReadProxyProvider sets up the initial state  
+   * ID when it is being created.                                               
+   *                                                                            
+   * @throws IOException                                                        
+   */                                                                           
+  public void msync() throws IOException {                                      
+    namenode.msync();                                                           
+  }                                                                             
   
   /**
    * Create hedged reads thread pool, HEDGED_READ_THREAD_POOL, if

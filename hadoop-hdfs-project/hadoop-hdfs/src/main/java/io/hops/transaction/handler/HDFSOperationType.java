@@ -47,6 +47,7 @@ public enum HDFSOperationType implements OperationType {
   RENAME,
   DELETE,
   GET_FILE_INFO,
+  IS_FILE_CLOSED,
   MKDIRS,
   GET_CONTENT_SUMMARY,
   SET_QUOTA,

@@ -2025,8 +2025,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final INodesInPath iip = dir.getINodesInPath4Write(src);
     startFileInternal(pc, iip, permissions, holder, clientMachine, create, overwrite,
         createParent, replication, blockSize, suite, version, edek);
-    final HdfsFileStatus stat = FSDirStatAndListingOp.
-        getFileInfo(dir, src, false, FSDirectory.isReservedRawName(srcArg), true);
+     HdfsFileStatus stat = FSDirStatAndListingOp.
+        getFileInfo(dir, src, false, FSDirectory.isReservedRawName(srcArg), true, false, false);
 
     logAuditEvent(true, "create", src, null,
         (isAuditEnabled() && isExternalInvocation()) ? stat : null);
@@ -2646,7 +2646,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final INodesInPath iip = dir.getINodesInPath4Write(src);
     lb = appendFileInternal(pc, iip, holder, clientMachine, newBlock);
     stat = FSDirStatAndListingOp.getFileInfo(dir, src, false,
-        FSDirectory.isReservedRawName(srcArg), true);
+        FSDirectory.isReservedRawName(srcArg), true, false, false);
     if (lb != null) {
       if (NameNode.stateChangeLog.isDebugEnabled()) {
         NameNode.stateChangeLog.debug(
@@ -3592,6 +3592,8 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @param resolveLink
    *     whether to throw UnresolvedLinkException
    *     if src refers to a symlink
+   * @param needLocation Include {@link LocatedBlocks} in result.
+   * @param needBlockToken Include block tokens in {@link LocatedBlocks}
    * @return object containing information regarding the file
    * or null if file not found
    * @throws AccessControlException
@@ -3599,16 +3601,21 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
    * @throws UnresolvedLinkException
    *     if a symlink is encountered.
    */
-  public HdfsFileStatus getFileInfo(final String src, final boolean resolveLink)
-      throws IOException {
+  public HdfsFileStatus getFileInfo(final String src, final boolean resolveLink,
+  boolean needLocation, boolean needBlockToken) throws IOException {
+  // if the client requests block tokens, then it can read data blocks
+  // and should appear in the audit log as if getBlockLocations had been
+  // called
+    final String operationName = needBlockToken ? "open" : "getfileinfo";
     HdfsFileStatus stat = null;
     try {
-      stat = FSDirStatAndListingOp.getFileInfo(dir, src, resolveLink);
+      stat = FSDirStatAndListingOp.getFileInfo(
+              dir, src, resolveLink, needLocation, needBlockToken);
     } catch (AccessControlException e) {
-      logAuditEvent(false, "getfileinfo", src);
+      logAuditEvent(false, operationName, src);
       throw e;
     } 
-    logAuditEvent(true, "getfileinfo", src);
+    logAuditEvent(true, operationName, src);
     return stat;
   }
 

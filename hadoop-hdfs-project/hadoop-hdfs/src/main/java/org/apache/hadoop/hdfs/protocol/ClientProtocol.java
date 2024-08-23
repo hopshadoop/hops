@@ -1084,6 +1084,20 @@ public interface ClientProtocol {
       UnresolvedLinkException, IOException;
 
   /**
+   * Get the file info for a specific file or directory with
+   * {@link LocatedBlocks}.
+   * @param src The string representation of the path to the file
+   * @param needBlockToken Generate block tokens for {@link LocatedBlocks}
+   * @return object containing information regarding the file
+   *         or null if file not found
+   * @throws org.apache.hadoop.security.AccessControlException permission denied
+   * @throws java.io.FileNotFoundException file <code>src</code> is not found
+   * @throws IOException If an I/O error occurred
+   */
+  @Idempotent
+  HdfsLocatedFileStatus getLocatedFileInfo(String src, boolean needBlockToken)
+          throws IOException;
+  /**
    * Get the close status of a file
    * @param src The string representation of the path to the file
    *
@@ -1634,7 +1648,17 @@ public interface ClientProtocol {
    */
   @AtMostOnce
   public void removeXAttr(String src, XAttr xAttr) throws IOException;
-  
+
+  /**
+   * Called by client to wait until the server has reached the state id of the
+   * client. The client and server state id are given by client side and server
+   * side alignment context respectively. This can be a blocking call.
+   *
+   * @throws IOException
+   */
+  @Idempotent
+  void msync() throws IOException;
+
   /**
    * Add a CacheDirective to the CacheManager.
    * 

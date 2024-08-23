@@ -433,6 +433,15 @@ message GetFileInfoResponseProto {
   optional HdfsFileStatusProto fs = 1;
 }
 
+message GetLocatedFileInfoRequestProto {
+  optional string src = 1;
+  optional bool needBlockToken = 2 [default = false];
+}
+
+message GetLocatedFileInfoResponseProto {
+  optional HdfsFileStatusProto fs = 1;
+}
+
 message IsFileClosedRequestProto {
   required string src = 1;
 }
@@ -759,6 +768,12 @@ message CheckAccessRequestProto {
 message CheckAccessResponseProto { // void response
 }
 
+message MsyncRequestProto {
+}
+
+message MsyncResponseProto {
+}
+
 // Add user
 message AddUserRequestProto {
   optional string userName = 1;
@@ -862,6 +877,8 @@ service ClientNamenodeProtocol {
       returns(RollingUpgradeResponseProto);
   rpc listCorruptFileBlocks (ListCorruptFileBlocksRequestProto) returns (ListCorruptFileBlocksResponseProto);
   rpc getFileInfo (GetFileInfoRequestProto) returns (GetFileInfoResponseProto);
+  rpc getLocatedFileInfo(GetLocatedFileInfoRequestProto)
+      returns(GetLocatedFileInfoResponseProto);
   rpc addCacheDirective(AddCacheDirectiveRequestProto)
       returns (AddCacheDirectiveResponseProto);
   rpc modifyCacheDirective(ModifyCacheDirectiveRequestProto)
@@ -928,6 +945,8 @@ service ClientNamenodeProtocol {
       returns(ListEncryptionZonesResponseProto);
   rpc getEZForPath(GetEZForPathRequestProto)
       returns(GetEZForPathResponseProto);
+  rpc msync(MsyncRequestProto)
+      returns(MsyncResponseProto);
   rpc getNNEpochMS(GetEpochMSRequestProto)
       returns (GetEpochMSResponseProto);
 }
