@@ -119,12 +119,14 @@ class FSDirStatAndListingOp {
    * @param srcArg The string representation of the path to the file
    * @param resolveLink whether to throw UnresolvedLinkException
    *        if src refers to a symlink
+   * @param needLocation Include {@link LocatedBlocks} in result.
+   * @param needBlockToken Include block tokens in {@link LocatedBlocks}.
    *
    * @return object containing information regarding the file
    *         or null if file not found
    */
-  static HdfsFileStatus getFileInfo(
-      final FSDirectory fsd, final String srcArg, final boolean resolveLink)
+  static HdfsFileStatus getFileInfo(FSDirectory fsd, String srcArg,
+      boolean resolveLink, boolean needLocation, boolean needBlockToken)
       throws IOException {
     if (!DFSUtil.isValidName(srcArg)) {
       throw new InvalidPathException("Invalid file name: " + srcArg);
@@ -145,6 +147,10 @@ class FSDirStatAndListingOp {
             locks.add(lf.getAcesLock());
             locks.add(lf.getEZLock());
             locks.add(lf.getXAttrLock(FSDirXAttrOp.XATTR_FILE_ENCRYPTION_INFO));
+            if (needLocation) {
+              locks.add(lf.getBlockLock());
+              locks.add(lf.getBlockRelated(BLK.RE, BLK.ER, BLK.CR, BLK.UC, BLK.CA));
+            }
           }
 
           @Override
@@ -156,7 +162,8 @@ class FSDirStatAndListingOp {
               fsd.checkPermission(pc, iip, false, null, null, null, null, false);
               isSuperUser = pc.isSuperUser();
             }
-            return getFileInfo(fsd, src, resolveLink, FSDirectory.isReservedRawName(srcArg), isSuperUser);
+            return getFileInfo(fsd, src, resolveLink, FSDirectory.isReservedRawName(srcArg),
+                    isSuperUser, needLocation, needBlockToken);
           }
         }.handle();
   }
@@ -169,7 +176,7 @@ class FSDirStatAndListingOp {
     byte[][] pathComponents = FSDirectory.getPathComponentsForReservedPath(srcArg);
     final String src = fsd.resolvePath(pc, srcArg, pathComponents);
     return (boolean) new HopsTransactionalRequestHandler(
-        HDFSOperationType.GET_FILE_INFO,
+        HDFSOperationType.IS_FILE_CLOSED,
         src) {
       @Override
       public void acquireLock(TransactionLocks locks) throws IOException {
@@ -234,7 +241,7 @@ class FSDirStatAndListingOp {
       if (!targetNode.isDirectory()) {
         return new DirectoryListing(
             new HdfsFileStatus[]{createFileStatus(fsd,
-                HdfsFileStatus.EMPTY_NAME, targetNode, needLocation, 
+                HdfsFileStatus.EMPTY_NAME, targetNode, needLocation, false,
                 parentStoragePolicy, isRawPath, iip)}, 0);
       }
 
@@ -253,7 +260,8 @@ class FSDirStatAndListingOp {
             cur.getLocalStoragePolicyID():
             HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
         listing[i] = createFileStatus(fsd, cur.getLocalNameBytes(), cur,
-            needLocation, getStoragePolicyID(curPolicy, parentStoragePolicy), isRawPath, iip);
+            needLocation, false, getStoragePolicyID(curPolicy, parentStoragePolicy), isRawPath,
+                iip);
         listingCnt++;
         if (needLocation) {
             // Once we  hit lsLimit locations, stop.
@@ -282,24 +290,34 @@ class FSDirStatAndListingOp {
    */
   static HdfsFileStatus getFileInfo(
       FSDirectory fsd, INodesInPath src, boolean isRawPath,
-      boolean includeStoragePolicy)
+      boolean includeStoragePolicy, boolean needLocation, boolean needBlockToken)
       throws IOException {
 
     final INode i = src.getLastINode();
     byte policyId = includeStoragePolicy && i != null && !i.isSymlink() ? i.getStoragePolicyID()
         : HdfsConstantsClient.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
-    return i == null ? null : createFileStatus(
-        fsd, HdfsFileStatus.EMPTY_NAME, i, policyId, isRawPath,
-        src);
+    if (i == null) {
+      return null;
+    } else {
+      if (needLocation){
+        return createLocatedFileStatus(
+                fsd, HdfsFileStatus.EMPTY_NAME, i, policyId, isRawPath,
+                src, needBlockToken);
+      } else {
+        return createFileStatus(
+                fsd, HdfsFileStatus.EMPTY_NAME, i, policyId, isRawPath,
+                src);
+      }
+    }
   }
-  
+
   static HdfsFileStatus getFileInfo(
       FSDirectory fsd, String src, boolean resolveLink, boolean isRawPath,
-      boolean includeStoragePolicy)
+      boolean includeStoragePolicy, boolean needLocation, boolean needBlockToken)
     throws IOException {
     String srcs = FSDirectory.normalizePath(src);
     final INodesInPath iip = fsd.getINodesInPath(srcs, resolveLink);
-    return getFileInfo(fsd, iip, isRawPath, includeStoragePolicy);
+    return getFileInfo(fsd, iip, isRawPath, includeStoragePolicy, needLocation, needBlockToken);
   }
 
   /**
@@ -315,11 +333,11 @@ class FSDirStatAndListingOp {
    * @throws java.io.IOException if any error occurs
    */
   static HdfsFileStatus createFileStatus(
-      FSDirectory fsd, byte[] path, INode node, boolean needLocation,
+      FSDirectory fsd, byte[] path, INode node, boolean needLocation, boolean needBlockToken,
       byte storagePolicy, boolean isRawPath, INodesInPath iip)
       throws IOException {
     if (needLocation) {
-      return createLocatedFileStatus(fsd, path, node, storagePolicy, isRawPath, iip);
+      return createLocatedFileStatus(fsd, path, node, storagePolicy, isRawPath, iip, needBlockToken);
     } else {
       return createFileStatus(fsd, path, node, storagePolicy, isRawPath, iip);
     }
@@ -329,8 +347,10 @@ class FSDirStatAndListingOp {
    * Create FileStatus by file INode
    */
   static HdfsFileStatus createFileStatus(
-      FSDirectory fsd, byte[] path, INode node, byte storagePolicy, boolean isRawPath, INodesInPath iip) throws
+      FSDirectory fsd, byte[] path, INode node, byte storagePolicy, boolean isRawPath,
+      INodesInPath iip) throws
       IOException {
+
      long size = 0;     // length is zero for directories
      short replication = 0;
      long blocksize = 0;
@@ -377,7 +397,7 @@ class FSDirStatAndListingOp {
    */
   private static HdfsLocatedFileStatus createLocatedFileStatus(
       FSDirectory fsd, byte[] path, INode node, byte storagePolicy, boolean isRawPath,
-      INodesInPath iip) throws IOException {
+      INodesInPath iip, boolean needBlockToken ) throws IOException {
     long size = 0; // length is zero for directories
     short replication = 0;
     long blocksize = 0;
@@ -405,7 +425,7 @@ class FSDirStatAndListingOp {
         loc = fsd.getFSNamesystem().getBlockManager().createPhantomLocatedBlocks(fileNode,null,isUc,false, feInfo);
       } else {
         loc = fsd.getFSNamesystem().getBlockManager().createLocatedBlocks(
-          fileNode.getBlocks(), fileSize, isUc, 0L, size, false, feInfo);
+          fileNode.getBlocks(), fileSize, isUc, 0L, size, needBlockToken, feInfo);
       }
       if (loc == null) {
         loc = new LocatedBlocks();

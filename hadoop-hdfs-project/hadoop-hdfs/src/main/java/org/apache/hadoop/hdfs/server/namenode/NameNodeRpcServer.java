@@ -803,9 +803,22 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public HdfsFileStatus getFileInfo(String src) throws IOException {
     checkNNStartup();
     metrics.incrFileInfoOps();
-    return namesystem.getFileInfo(src, true);
+    return namesystem.getFileInfo(src, true, false, false);
   }
-  
+
+  @Override // ClientProtocol
+  public HdfsLocatedFileStatus getLocatedFileInfo(String src,
+                                                  boolean needBlockToken) throws IOException {
+    checkNNStartup();
+    if (needBlockToken) {
+      metrics.incrGetBlockLocations();
+    } else {
+      metrics.incrFileInfoOps();
+    }
+    return (HdfsLocatedFileStatus)
+            namesystem.getFileInfo(src, true, true, needBlockToken);
+  }
+
   @Override // ClientProtocol
   public boolean isFileClosed(String src) throws IOException{
     checkNNStartup();
@@ -816,7 +829,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public HdfsFileStatus getFileLinkInfo(String src) throws IOException {
     checkNNStartup();
     metrics.incrFileInfoOps();
-    return namesystem.getFileInfo(src, false);
+    return namesystem.getFileInfo(src, false, false, false);
   }
   
   @Override // ClientProtocol
@@ -869,7 +882,12 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throw new UnsupportedActionException(action + " is not yet supported.");
     }
   }
-  
+
+  @Override // ClientProtocol
+  public void msync() throws IOException {
+    // no-op. needed for newer non-hopsfs clients that use msync
+  }
+
   @Override // ClientProtocol
   public CorruptFileBlocks listCorruptFileBlocks(String path, String cookie)
       throws IOException {
@@ -952,7 +970,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
     metrics.incrGetLinkTargetOps();
     HdfsFileStatus stat = null;
     try {
-      stat = namesystem.getFileInfo(path, false);
+      stat = namesystem.getFileInfo(path, false, false, false);
     } catch (UnresolvedPathException e) {
       return e.getResolvedPath().toString();
     } catch (UnresolvedLinkException e) {

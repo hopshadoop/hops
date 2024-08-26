@@ -1748,7 +1748,7 @@ public class FSDirectory implements Closeable {
   HdfsFileStatus getAuditFileInfo(INodesInPath iip)
     throws IOException {
     return (namesystem.isAuditEnabled() && namesystem.isExternalInvocation())
-      ? FSDirStatAndListingOp.getFileInfo(this, iip, false, false) : null;
+      ? FSDirStatAndListingOp.getFileInfo(this, iip, false, false, false, false) : null;
   }
   
   /**

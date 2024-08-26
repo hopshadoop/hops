@@ -629,7 +629,7 @@ public class ErasureCodingManager extends Configured {
     for (EncodingStatus status : markedAsRevoked) {
       LOG.info("Checking replication for revoked status: " + status);
       String path = namesystem.getPath(status.getInodeId(), status.isInTree());
-      int replication = namesystem.getFileInfo(path, true).getReplication();
+      int replication = namesystem.getFileInfo(path, true, false, false).getReplication();
       LocatedBlocks blocks = namesystem.getBlockLocations(path, 0,
           Long.MAX_VALUE, true, true).blocks;
       if (checkReplication(blocks, replication)) {

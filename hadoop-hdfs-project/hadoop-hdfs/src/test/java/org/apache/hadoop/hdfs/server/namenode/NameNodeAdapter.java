@@ -61,11 +61,11 @@ public class NameNodeAdapter {
   }
   
   public static HdfsFileStatus getFileInfo(NameNode namenode, String src,
-      boolean resolveLink)
+      boolean resolveLink, boolean needLocation, boolean needBlockToken)
       throws AccessControlException, UnresolvedLinkException, StandbyException,
       IOException {
     return FSDirStatAndListingOp.getFileInfo(namenode.getNamesystem()
-            .getFSDirectory(), src, resolveLink);
+            .getFSDirectory(), src, resolveLink, needLocation, needBlockToken);
   }
   
   public static boolean mkdirs(NameNode namenode, String src,
