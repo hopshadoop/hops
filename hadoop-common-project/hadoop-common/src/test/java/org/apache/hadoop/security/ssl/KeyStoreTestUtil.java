@@ -58,6 +58,8 @@ import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
@@ -136,9 +138,14 @@ public class KeyStoreTestUtil {
       JcaX509ExtensionUtils extUtil = new JcaX509ExtensionUtils();
       ContentSigner sigGen = new JcaContentSignerBuilder(algorithm).setProvider("BC").build(caKey);
       X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer, sn, from, to, x500Name, pair.getPublic())
-          .addExtension(Extension.authorityKeyIdentifier, false, extUtil.createAuthorityKeyIdentifier(caCert
-              .getPublicKey()))
-          .addExtension(Extension.subjectKeyIdentifier, false, extUtil.createSubjectKeyIdentifier(pair.getPublic()));
+              .addExtension(Extension.authorityKeyIdentifier, false, extUtil.createAuthorityKeyIdentifier(caCert
+                      .getPublicKey()))
+              .addExtension(Extension.subjectKeyIdentifier, false, extUtil.createSubjectKeyIdentifier(pair.getPublic()));
+      GeneralName[] gn = new GeneralName[] {
+              new GeneralName(GeneralName.dNSName, "localhost")
+      };
+      certGen.addExtension(Extension.subjectAlternativeName, false, new GeneralNames(gn));
+
       return new JcaX509CertificateConverter().setProvider("BC").getCertificate(certGen.build(sigGen));
     } catch (OperatorCreationException | CertificateException | CertIOException ex) {
       throw new InvalidKeyException(ex);

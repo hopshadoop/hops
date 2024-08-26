@@ -357,6 +357,12 @@ public class TestUsersGroupsMultiNamenode {
     }
 
     @Override
+    public HdfsLocatedFileStatus getLocatedFileInfo(String src,
+         boolean needBlockToken) throws IOException {
+      return null;
+    }
+
+    @Override
     public boolean isFileClosed(String src)
         throws AccessControlException, FileNotFoundException,
         UnresolvedLinkException, IOException {
@@ -555,7 +561,12 @@ public class TestUsersGroupsMultiNamenode {
     public void removeXAttr(String src, XAttr xAttr) throws IOException {
     
     }
-  
+
+    @Override
+    public void msync() throws IOException {
+      
+    }
+
     @Override
     public long addCacheDirective(CacheDirectiveInfo directive,
         EnumSet<CacheFlag> flags) throws IOException {
