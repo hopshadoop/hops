@@ -67,8 +67,7 @@ public class XAttr {
     TRUSTED((byte)1),
     SECURITY((byte)2),
     SYSTEM((byte)3),
-    RAW((byte)4),
-    PROVENANCE((byte)5);
+    RAW((byte)4);
     
     private final byte ns;
     NameSpace(byte ns){

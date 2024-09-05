@@ -464,7 +464,7 @@ class FSDirDeleteOp {
     }
   
     // Add metadata log entry for all deleted childred.
-    addMetaDataLogForDirDeletion(targetNode, fsd.getFSNamesystem().getNamenodeId());
+    addMetaDataLogForDirDeletion(targetNode);
     
     // Remove the node from the namespace
     long removed = fsd.removeLastINode(iip);
@@ -490,19 +490,17 @@ class FSDirDeleteOp {
     return removed;
   }
   
-  private static void addMetaDataLogForDirDeletion(INode targetNode, long namenodeId) throws IOException {
+  private static void addMetaDataLogForDirDeletion(INode targetNode) throws IOException {
     if (targetNode.isDirectory()) {
       List<INode> children = ((INodeDirectory) targetNode).getChildrenList();
       for(INode child : children){
        if(child.isDirectory()){
-         addMetaDataLogForDirDeletion(child, namenodeId);
+         addMetaDataLogForDirDeletion(child);
        }else{
          child.logMetadataEvent(INodeMetadataLogEntry.Operation.Delete);
-         child.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.delete());
        }
       }
     }
     targetNode.logMetadataEvent(INodeMetadataLogEntry.Operation.Delete);
-    targetNode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.delete());
   }
 }
