@@ -24,11 +24,9 @@ import java.util.List;
 import com.google.common.collect.Lists;
 import io.hops.exception.StorageException;
 import io.hops.exception.TransactionContextException;
-import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
 import io.hops.metadata.hdfs.entity.StoredXAttr;
 import io.hops.metadata.hdfs.entity.XAttrMetadataLogEntry;
 import io.hops.transaction.EntityManager;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.XAttr;
 
@@ -75,17 +73,15 @@ public class XAttrStorage {
    * @param xAttr the xAttr to update.
    * @param xAttrExists
    */
-  public static void updateINodeXAttr(INode inode, XAttr xAttr, boolean xAttrExists, long namenodeId)
+  public static void updateINodeXAttr(INode inode, XAttr xAttr, boolean xAttrExists)
       throws IOException {
     XAttrFeature f = getXAttrFeature(inode);
     if(!xAttrExists) {
       f.addXAttr(xAttr);
       logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Add);
-      inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_ADD, xAttr);
     }else{
       f.updateXAttr(xAttr);
       logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Update);
-      inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_UPDATE, xAttr);
     }
   }
   
@@ -94,12 +90,11 @@ public class XAttrStorage {
    * @param inode Inode to update.
    * @param xAttr the xAttr to remove.
    */
-  public static void removeINodeXAttr(INode inode, XAttr xAttr, long namenodeId)
+  public static void removeINodeXAttr(INode inode, XAttr xAttr)
       throws IOException {
     XAttrFeature f = getXAttrFeature(inode);
     f.removeXAttr(xAttr);
     logMetadataEvent(inode, xAttr, XAttrMetadataLogEntry.Operation.Delete);
-    inode.logProvenanceEvent(namenodeId, FileProvenanceEntry.Operation.XATTR_DELETE, xAttr);
   }
   
   private static XAttrFeature getXAttrFeature(INode inode){

@@ -26,7 +26,6 @@ import io.hops.metadata.common.FinderType;
 import io.hops.metadata.hdfs.entity.EncodingStatus;
 import io.hops.metadata.hdfs.entity.INodeIdentifier;
 import io.hops.metadata.hdfs.entity.INodeMetadataLogEntry;
-import io.hops.metadata.hdfs.entity.FileProvenanceEntry;
 import io.hops.transaction.EntityManager;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
@@ -54,7 +53,6 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.hdfs.protocol.HdfsConstantsClient;
-import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.util.ChunkedArrayList;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
@@ -922,11 +920,6 @@ public abstract class INode implements Comparable<byte[]>, LinkedElement {
       INodeMetadataLogEntry.Operation operation)
       throws StorageException, TransactionContextException;
   
-  public abstract void logProvenanceEvent(long namenodeId, FileProvenanceEntry.Operation operation) throws IOException;
-
-  public abstract void logProvenanceEvent(long namenodeId, FileProvenanceEntry.Operation operation, XAttr xattr)
-    throws IOException;
-
   boolean isPathMetaEnabled() throws TransactionContextException, StorageException {
     return getMetaEnabledParent() != null;
   }

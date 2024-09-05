@@ -442,7 +442,7 @@ class FSDirXAttrOp {
             SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file.");
       }
       
-      XAttrStorage.updateINodeXAttr(inode, xAttr, exists, fsd.getFSNamesystem().getNamenodeId());
+      XAttrStorage.updateINodeXAttr(inode, xAttr, exists);
     }
   }
   
@@ -481,8 +481,7 @@ class FSDirXAttrOp {
   
   private static boolean isUserVisible(XAttr xAttr) {
     if (xAttr.getNameSpace() == XAttr.NameSpace.USER ||
-        xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED ||
-        xAttr.getNameSpace() == XAttr.NameSpace.PROVENANCE) {
+        xAttr.getNameSpace() == XAttr.NameSpace.TRUSTED) {
       return true;
     }
     return false;
@@ -527,7 +526,7 @@ class FSDirXAttrOp {
       }
     }
     for(XAttr xAttr : storedXAttrs){
-      XAttrStorage.removeINodeXAttr(inode, xAttr, fsd.getFSNamesystem().getNamenodeId());
+      XAttrStorage.removeINodeXAttr(inode, xAttr);
       decrementXAttrs(inode, xAttr);
     }
     
