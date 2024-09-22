@@ -295,7 +295,7 @@ public abstract class AbstractFileSystem {
   public AbstractFileSystem(final URI uri, final String supportedScheme,
       final boolean authorityNeeded, final int defaultPort, String alternativeScheme)
       throws URISyntaxException {
-    myUri = getUri(uri, supportedScheme, authorityNeeded, defaultPort);
+    myUri = getUri(uri, supportedScheme, authorityNeeded, defaultPort, alternativeScheme);
     statistics = getStatistics(uri); 
     this.alternativeScheme = alternativeScheme;
   }
@@ -305,14 +305,14 @@ public abstract class AbstractFileSystem {
    * @param uri
    * @param supportedScheme
    */
-  public void checkScheme(URI uri, String supportedScheme) {
+  public void checkScheme(URI uri, String supportedScheme, String alternativeScheme) {
     String scheme = uri.getScheme();
     if (scheme == null) {
       throw new HadoopIllegalArgumentException("Uri without scheme: " + uri);
     }
-    if (!scheme.equals(supportedScheme)) {
+    if (!scheme.equals(supportedScheme) && !scheme.equals(alternativeScheme) ) {
       throw new HadoopIllegalArgumentException("Uri scheme " + uri
-          + " does not match the scheme " + supportedScheme);
+          + " does not match the scheme " + supportedScheme+ " scheme: "+scheme+" alt : "+alternativeScheme);
     }
   }
 
@@ -331,8 +331,9 @@ public abstract class AbstractFileSystem {
    * @throws URISyntaxException <code>uri</code> has syntax error
    */
   private URI getUri(URI uri, String supportedScheme,
-      boolean authorityNeeded, int defaultPort) throws URISyntaxException {
-    checkScheme(uri, supportedScheme);
+      boolean authorityNeeded, int defaultPort,
+      String alternativeScheme) throws URISyntaxException {
+    checkScheme(uri, supportedScheme, alternativeScheme);
     // A file system implementation that requires authority must always
     // specify default port
     if (defaultPort < 0 && authorityNeeded) {
