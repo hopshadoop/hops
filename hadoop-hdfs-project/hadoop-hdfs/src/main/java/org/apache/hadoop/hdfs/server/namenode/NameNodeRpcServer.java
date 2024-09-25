@@ -420,6 +420,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public LocatedBlocks getBlockLocations(String src, long offset, long length)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     metrics.incrGetBlockLocations();
     return namesystem
         .getBlockLocations(getClientMachine(), src, offset, length);
@@ -437,6 +438,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       short replication, long blockSize,
           CryptoProtocolVersion[] supportedVersions) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     String clientMachine = getClientMachine();
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug(
@@ -461,6 +463,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public LastBlockWithStatus append(String src, String clientName,
       EnumSetWritable<CreateFlag> flag) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     String clientMachine = getClientMachine();
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.append: file "
@@ -475,6 +478,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public boolean recoverLease(String src, String clientName)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     String clientMachine = getClientMachine();
     return namesystem.recoverLease(src, clientName, clientMachine);
   }
@@ -483,6 +487,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public boolean setReplication(String src, short replication)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     return namesystem.setReplication(src, replication);
   }
 
@@ -490,6 +495,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void setStoragePolicy(String src, String policyName)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     namesystem.setStoragePolicy(src, policyName);
   }
 
@@ -508,6 +514,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void setMetaStatus(String src, MetaStatus metaStatus)
       throws AccessControlException, FileNotFoundException, SafeModeException,
       UnresolvedLinkException, IOException {
+    checkCollation(src);
     namesystem.setMetaStatus(src, metaStatus);
   }
 
@@ -515,6 +522,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void setPermission(String src, FsPermission permissions)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     namesystem.setPermission(src, permissions);
   }
 
@@ -522,6 +530,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void setOwner(String src, String username, String groupname)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     namesystem.setOwner(src, username, groupname);
   }
 
@@ -529,6 +538,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public LocatedBlock addBlock(String src, String clientName,
       ExtendedBlock previous, DatanodeInfo[] excludedNodes, long fileId, String[] favoredNodes) throws IOException {
   checkNNStartup();
+  checkCollation(src);
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug(
           "*BLOCK* NameNode.addBlock: file " + src + " fileId=" + fileId + " for " + clientName);
@@ -560,6 +570,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       final int numAdditionalNodes,
       final String clientName) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (LOG.isDebugEnabled()) {
       LOG.debug("getAdditionalDatanode: src=" + src
           + ", fileId=" + fileId
@@ -603,6 +614,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public boolean complete(String src, String clientName, ExtendedBlock last,  long fileId, final byte[] data)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog
           .debug("*DIR* NameNode.complete: " + src + " fileId=" + fileId +" for " + clientName);
@@ -652,6 +664,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public long getPreferredBlockSize(String filename) throws IOException {
     checkNNStartup();
+    checkCollation(filename);
     return namesystem.getPreferredBlockSize(filename);
   }
 
@@ -659,6 +672,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public boolean rename(String src, String dst) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.rename: " + src + " to " + dst);
     }
@@ -688,6 +702,10 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public void concat(String trg, String[] src) throws IOException {
     checkNNStartup();
+    checkCollation(trg);
+    for (String s : src) {
+      checkCollation(s);
+    }
     namesystem.concat(trg, src);
   }
   
@@ -695,6 +713,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void rename2(String src, String dst, Options.Rename... options)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.rename: " + src + " to " + dst);
     }
@@ -722,6 +741,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public boolean truncate(String src, long newLength, String clientName)
       throws IOException {
+    checkNNStartup();
+    checkCollation(src);
     if(stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.truncate: " + src + " to " +
           newLength);
@@ -738,6 +759,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public boolean delete(String src, boolean recursive) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug(
           "*DIR* Namenode.delete: src=" + src + ", recursive=" + recursive);
@@ -767,6 +789,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public boolean mkdirs(String src, FsPermission masked, boolean createParent)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (stateChangeLog.isDebugEnabled()) {
       stateChangeLog.debug("*DIR* NameNode.mkdirs: " + src);
     }
@@ -790,6 +813,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public DirectoryListing getListing(String src, byte[] startAfter,
       boolean needLocation) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     DirectoryListing files =
         namesystem.getListing(src, startAfter, needLocation);
     if (files != null) {
@@ -802,6 +826,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public HdfsFileStatus getFileInfo(String src) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     metrics.incrFileInfoOps();
     return namesystem.getFileInfo(src, true, false, false);
   }
@@ -810,6 +835,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public HdfsLocatedFileStatus getLocatedFileInfo(String src,
                                                   boolean needBlockToken) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     if (needBlockToken) {
       metrics.incrGetBlockLocations();
     } else {
@@ -822,12 +848,14 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public boolean isFileClosed(String src) throws IOException{
     checkNNStartup();
+    checkCollation(src);
     return namesystem.isFileClosed(src);
   }
 
   @Override // ClientProtocol
   public HdfsFileStatus getFileLinkInfo(String src) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     metrics.incrFileInfoOps();
     return namesystem.getFileInfo(src, false, false, false);
   }
@@ -921,6 +949,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public ContentSummary getContentSummary(String path) throws IOException {
     checkNNStartup();
+    checkCollation(path);
     return namesystem.getContentSummary(path);
   }
 
@@ -929,6 +958,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
                        StorageType type)
       throws IOException {
     checkNNStartup();
+    checkCollation(path);
     namesystem.setQuota(path, namespaceQuota, storagespaceQuota, type);
   }
   
@@ -936,12 +966,14 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void fsync(String src, long fileId, String clientName, long lastBlockLength)
       throws IOException {
     checkNNStartup();
+    checkCollation(src);
     namesystem.fsync(src, fileId, clientName, lastBlockLength);
   }
 
   @Override // ClientProtocol
   public void setTimes(String src, long mtime, long atime) throws IOException {
     checkNNStartup();
+    checkCollation(src);
     namesystem.setTimes(src, mtime, atime);
   }
 
@@ -949,6 +981,8 @@ class NameNodeRpcServer implements NamenodeProtocols {
   public void createSymlink(String target, String link, FsPermission dirPerms,
       boolean createParent) throws IOException {
     checkNNStartup();
+    checkCollation(target);
+    checkCollation(link);
     /* We enforce the MAX_PATH_LENGTH limit even though a symlink target
      * URI may refer to a non-HDFS file system. 
      */
@@ -967,6 +1001,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public String getLinkTarget(String path) throws IOException {
     checkNNStartup();
+    checkCollation(path);
     metrics.incrGetLinkTargetOps();
     HdfsFileStatus stat = null;
     try {
@@ -1637,5 +1672,17 @@ class NameNodeRpcServer implements NamenodeProtocols {
   @VisibleForTesting
   void setFSNamesystem(FSNamesystem fsn){
     namesystem = fsn;
+  }
+
+  // File names are stored in a talbe where name column has
+  // latin1_general_cs collation.
+  // Throw an error to the user if the file name contains unicode
+  public static void checkCollation(String input) throws IOException {
+    for (char c : input.toCharArray()) {
+      if (c > 255) {
+        throw new IOException("File/Dir name \""+input+"\" does not confrom latin1_general_cs " +
+                "collation.");
+      }
+    }
   }
 }
