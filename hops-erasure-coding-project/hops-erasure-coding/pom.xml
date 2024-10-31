@@ -7,13 +7,13 @@
   <parent>
     <groupId>io.hops</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>3.2.0.15-SNAPSHOT</version>
+    <version>3.2.0.16-SNAPSHOT</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
 
   <groupId>io.hops</groupId>
   <artifactId>erasure-coding</artifactId>
-  <version>3.2.0.15-SNAPSHOT</version>
+  <version>3.2.0.16-SNAPSHOT</version>
 
   <dependencies>
     <dependency>
