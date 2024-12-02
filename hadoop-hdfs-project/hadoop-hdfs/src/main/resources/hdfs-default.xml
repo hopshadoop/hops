@@ -2098,7 +2098,7 @@
   </property>
 
   <property>
-    <name>dfs.subtree.clean.failed.ops.locks.delay</name>
+    <name>dfs.subtree.clean.slow.ops.locks.delay.key</name>
     <value>900000</value>
     <description>
     When a NN dies does not complete a subtree operation in
