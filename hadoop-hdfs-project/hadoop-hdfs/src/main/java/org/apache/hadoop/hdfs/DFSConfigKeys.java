@@ -131,7 +131,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_KEY = "dfs.subtree.clean.failed.ops.locks.delay";
   public static final long DFS_SUBTREE_CLEAN_FAILED_OPS_LOCKS_DELAY_DEFAULT = 10*1000*60; //Reclaim locks after 10 mins
 
-  public static final String DFS_SUBTREE_CLEAN_SLOW_OPS_LOCKS_DELAY_KEY = "dfs.subtree.clean.failed.ops.locks.delay";
+  public static final String DFS_SUBTREE_CLEAN_SLOW_OPS_LOCKS_DELAY_KEY = "dfs.subtree.clean.slow.ops.locks.delay.key";
   public static final long DFS_SUBTREE_CLEAN_SLOW_OPS_LOCKS_DELAY_DEFAULT = 15*1000*60; //Reclaim locks after 15 mins
 
   public static final String DFS_SUBTREE_HIERARCHICAL_LOCKING_KEY = "dfs.namenode.subtree.hierarchical.locking";
