@@ -8,12 +8,15 @@ pipeline {
         stage ('build dal') {
             steps {
                 dir("${WORKSPACE}/../hops_testing/dal"){
+                  sshagent(['id_rsa']){
                     sh """
                         pwd
                         git clone git@github.com:hopshadoop/hops-metadata-dal.git
                     """
+                  }
                 }
                 dir("${WORKSPACE}/../hops_testing/dal/hops-metadata-dal"){
+                  sshagent(['id_rsa']){
                     sh """
                         pwd
                         git fetch
@@ -21,18 +24,22 @@ pipeline {
                         git pull
                         mvn clean install deploy -DskipTests
                     """
+                  }
 	            }
             }
         }
         stage('build and deploy dal impl'){
             steps {
                 dir("${WORKSPACE}/../hops_testing/dal"){
+                  sshagent(['id_rsa']){
                     sh """
                         pwd
                         git clone git@github.com:hopshadoop/hops-metadata-dal-impl-ndb.git
                     """
+                  }
                 }
                 dir("${WORKSPACE}/../hops_testing/dal/hops-metadata-dal-impl-ndb"){
+                  sshagent(['id_rsa']){
                     sh """
                         pwd
                         git fetch
@@ -42,6 +49,7 @@ pipeline {
                         export DOCKER_INTERACTIVE_RUN=
                         ./start-build-env.sh mvn clean install deploy assembly:assembly -DskipTests
                     """
+                  }
                     script {
                         RONDB_VERSION = sh (
                                 script: 'mvn -Dmaven.repo.local=${WORKSPACE}/../hops_testing/.m2_${SUFFIX} dependency:tree | grep "com\\.mysql\\.ndb\\:clusterj-rondb" | cut -d":" -f 4 | uniq',
